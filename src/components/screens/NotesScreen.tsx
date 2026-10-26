@@ -244,6 +244,11 @@ export function NotesScreen() {
     new Map(filteredNotes.map((n) => [n.id, n])).values()
   );
 
+  // Active viewing note synced with reactive store
+  const activeViewingNote = viewingNote
+    ? notes.find((n) => n.id === viewingNote.id) || viewingNote
+    : null;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -428,7 +433,7 @@ export function NotesScreen() {
 
       {/* POPUP VIEW MODAL */}
       <NoteDetailModal
-        note={viewingNote}
+        note={activeViewingNote}
         onClose={() => setViewingNote(null)}
         onEdit={(note) => handleOpenEdit(note)}
         onDelete={(id) => handleDeleteNote(id)}
