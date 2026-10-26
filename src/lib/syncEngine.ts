@@ -75,11 +75,17 @@ class SyncEngine {
 
     for (const item of queue) {
       try {
+        let cleanPayload = item.payload;
+        if (item.table === 'ledger_entries' && cleanPayload) {
+          const { is_billed, ...rest } = cleanPayload;
+          cleanPayload = rest;
+        }
+
         if (item.action === 'upsert') {
-          const { error } = await supabase.from(item.table).upsert(item.payload);
+          const { error } = await supabase.from(item.table).upsert(cleanPayload);
           if (error) throw error;
         } else if (item.action === 'delete') {
-          const { error } = await supabase.from(item.table).delete().eq('id', item.payload.id);
+          const { error } = await supabase.from(item.table).delete().eq('id', cleanPayload.id);
           if (error) throw error;
         }
       } catch (err) {
@@ -493,38 +499,41 @@ class SyncEngine {
   // Ledger
   public async pushLedgerEntry(entry: LedgerEntry) {
     useLedgerStore.getState().addEntryOptimistic(entry);
+    const { is_billed, ...cleanEntry } = entry;
     try {
       const { error } = await supabase.from('ledger_entries').upsert({
-        id: entry.id,
-        workspace_id: entry.workspace_id,
-        type: entry.type,
-        amount: entry.amount,
-        category_id: entry.category_id,
-        cash_location_id: entry.cash_location_id,
-        customer_id: entry.customer_id,
-        card_id: entry.card_id,
-        mode: entry.mode,
-        note: entry.note,
-        entry_date: entry.entry_date,
+        id: cleanEntry.id,
+        workspace_id: cleanEntry.workspace_id,
+        type: cleanEntry.type,
+        amount: cleanEntry.amount,
+        category_id: cleanEntry.category_id,
+        cash_location_id: cleanEntry.cash_location_id,
+        customer_id: cleanEntry.customer_id,
+        card_id: cleanEntry.card_id,
+        mode: cleanEntry.mode,
+        note: cleanEntry.note,
+        entry_date: cleanEntry.entry_date,
       });
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
     } catch {
-      this.enqueue('ledger_entries', 'upsert', entry);
+      this.enqueue('ledger_entries', 'upsert', cleanEntry);
     }
   }
 
   public async updateLedgerEntry(id: string, updates: Partial<LedgerEntry>) {
     useLedgerStore.getState().updateEntryOptimistic(id, updates);
+    const { is_billed, ...cleanUpdates } = updates;
+    if (Object.keys(cleanUpdates).length === 0) return;
     try {
       const { error } = await supabase
         .from('ledger_entries')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update({ ...cleanUpdates, updated_at: new Date().toISOString() })
         .eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
     } catch {
-      this.enqueue('ledger_entries', 'upsert', { id, ...updates });
+      this.enqueue('ledger_entries', 'upsert', { id, ...cleanUpdates });
     }
   }
 

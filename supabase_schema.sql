@@ -309,3 +309,7 @@ ALTER TABLE public.ledger_entries REPLICA IDENTITY FULL;
 ALTER TABLE public.notes REPLICA IDENTITY FULL;
 ALTER TABLE public.sheets REPLICA IDENTITY FULL;
 ALTER TABLE public.vault_items REPLICA IDENTITY FULL;
+
+-- Optional columns for Billed & Unbilled system
+ALTER TABLE public.ledger_entries ADD COLUMN IF NOT EXISTS is_billed BOOLEAN DEFAULT NULL;
+ALTER TABLE public.cards ADD COLUMN IF NOT EXISTS due_day INT DEFAULT 5;
