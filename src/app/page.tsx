@@ -97,19 +97,6 @@ export default function HomePage() {
     setCashNote('');
   };
 
-  if (!mounted) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center ${isLight ? 'bg-slate-50 text-slate-800' : 'bg-[#090d16] text-white'}`}>
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-500 to-teal-400 flex items-center justify-center font-extrabold text-sm text-white shadow-lg shadow-indigo-500/30 animate-pulse">
-            RB
-          </div>
-          <span className="text-xs font-semibold text-slate-400">Loading Record Book...</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className={`min-h-screen flex flex-col transition-colors duration-200 relative ${

@@ -16,6 +16,7 @@ import {
   Layers,
   Sparkles,
   ArrowRightLeft,
+  Trash2,
 } from 'lucide-react';
 import { Card, LedgerEntry } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
@@ -29,9 +30,10 @@ interface CardDetailModalProps {
   onClose: () => void;
   onRecordSpend: () => void;
   onPayBill: () => void;
+  onDeleteCard?: (cardId: string) => void;
 }
 
-export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill }: CardDetailModalProps) {
+export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onDeleteCard }: CardDetailModalProps) {
   const { entries: ledger } = useLedgerStore();
   const [filterType, setFilterType] = useState<'all' | 'billed' | 'unbilled' | 'payments'>('all');
 
@@ -98,12 +100,27 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill }: Car
               </span>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {onDeleteCard && (
+              <button
+                onClick={() => {
+                  if (confirm(`Delete card "${card.name}" (${card.bank} •••• ${card.last4})?`)) {
+                    onDeleteCard(card.id);
+                  }
+                }}
+                className="p-1.5 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors"
+                title="Delete this Credit Card"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Reminder Status Banner */}

@@ -23,6 +23,8 @@ import {
   Sparkles,
   RefreshCw,
   ArrowRightLeft,
+  Trash2,
+  Sparkle,
 } from 'lucide-react';
 import { Card, LedgerEntry } from '@/types';
 import { formatPaise, parseToPaise, paiseToRupees } from '@/lib/money';
@@ -39,7 +41,10 @@ import {
 } from '@/lib/cardBilling';
 
 export function CardsScreen() {
-  const { cards } = useCardStore();
+  const rawCards = useCardStore((s) => s.cards);
+  // Strictly deduplicate cards by ID to prevent any double entry
+  const cards = Array.from(new Map(rawCards.map((c) => [c.id, c])).values());
+
   const { entries: ledger } = useLedgerStore();
   const { accounts, updateAccountBalance } = useAccountStore();
   const { activeWorkspaceId, theme, user } = useSessionStore();
@@ -49,7 +54,10 @@ export function CardsScreen() {
   const [activeTab, setActiveTab] = useState<'cards' | 'report'>('cards');
   const [selectedCardForDetail, setSelectedCardForDetail] = useState<Card | null>(null);
 
-  // Billing Report calculation across all cards
+  // Card to delete state
+  const [cardToDelete, setCardToDelete] = useState<Card | null>(null);
+
+  // Billing Report calculation across all deduplicated cards
   const billingReport = calculateAllCardsBillingReport(cards, ledger);
 
   // New Card State
@@ -62,14 +70,14 @@ export function CardsScreen() {
   const [dueDay, setDueDay] = useState('5');
   const [initialBilledRupees, setInitialBilledRupees] = useState('');
 
-  // Spend State
+  // Spend State - Auto Cycle is DEFAULT as requested
   const [showSpendModal, setShowSpendModal] = useState(false);
   const [spendCardId, setSpendCardId] = useState('');
   const [spendAmountRupees, setSpendAmountRupees] = useState('');
   const [spendCategory, setSpendCategory] = useState('Shopping');
   const [spendMerchant, setSpendMerchant] = useState('');
   const [spendDate, setSpendDate] = useState(new Date().toISOString().slice(0, 10));
-  const [spendBillingOption, setSpendBillingOption] = useState<'billed' | 'unbilled' | 'auto'>('billed');
+  const [spendBillingOption, setSpendBillingOption] = useState<'auto' | 'billed' | 'unbilled'>('auto');
 
   // Bill Payment State
   const [showPayBillModal, setShowPayBillModal] = useState(false);
@@ -79,12 +87,33 @@ export function CardsScreen() {
   const [payAccountId, setPayAccountId] = useState('');
   const [payNote, setPayNote] = useState('');
 
-  const cardGradients = [
-    'from-indigo-600 via-purple-600 to-slate-900',
-    'from-amber-600 via-orange-600 to-slate-900',
-    'from-teal-600 via-emerald-600 to-slate-900',
-    'from-rose-600 via-pink-600 to-slate-900',
-    'from-blue-600 via-cyan-600 to-slate-900',
+  // Luxury Card Gradients (High-end metallic obsidian, ruby, sapphire, emerald)
+  const cardThemes = [
+    {
+      bg: 'from-slate-900 via-indigo-950 to-blue-950 border-indigo-500/30 shadow-indigo-950/50',
+      accent: 'text-indigo-400',
+      chip: 'from-amber-200 via-amber-400 to-amber-600',
+    },
+    {
+      bg: 'from-zinc-900 via-purple-950 to-slate-950 border-purple-500/30 shadow-purple-950/50',
+      accent: 'text-purple-400',
+      chip: 'from-amber-200 via-amber-400 to-amber-600',
+    },
+    {
+      bg: 'from-stone-900 via-rose-950 to-red-950 border-rose-500/30 shadow-rose-950/50',
+      accent: 'text-rose-400',
+      chip: 'from-amber-200 via-amber-400 to-amber-600',
+    },
+    {
+      bg: 'from-slate-900 via-emerald-950 to-teal-950 border-emerald-500/30 shadow-emerald-950/50',
+      accent: 'text-emerald-400',
+      chip: 'from-amber-200 via-amber-400 to-amber-600',
+    },
+    {
+      bg: 'from-neutral-900 via-amber-950 to-slate-950 border-amber-500/30 shadow-amber-950/50',
+      accent: 'text-amber-400',
+      chip: 'from-amber-200 via-amber-400 to-amber-600',
+    },
   ];
 
   // Helper when opening Pay Bill modal for a specific card
@@ -185,7 +214,7 @@ export function CardsScreen() {
     setShowSpendModal(false);
     setSpendAmountRupees('');
     setSpendMerchant('');
-    setSpendBillingOption('billed');
+    setSpendBillingOption('auto'); // Reset to Auto Cycle by default
   };
 
   const handlePayBill = (e: React.FormEvent) => {
@@ -196,7 +225,6 @@ export function CardsScreen() {
     const selectedCard = cards.find((c) => c.id === payCardId);
     const summary = selectedCard ? calculateCardBilling(selectedCard, ledger) : null;
 
-    // Check if this payment exceeds billed amount to label note accurately
     let paymentLabel = 'Bill Payment';
     if (summary && paise > summary.billedDue) {
       paymentLabel = summary.billedDue > 0 ? 'Bill & Advance Payment' : 'Card Payment / Advance';
@@ -216,7 +244,6 @@ export function CardsScreen() {
       created_by: user?.id || 'owner',
     };
 
-    // Deduct from paying account if selected
     if (selectedAccount) {
       const newBal = Math.max(0, selectedAccount.balance - paise);
       updateAccountBalance(selectedAccount.id, newBal);
@@ -227,6 +254,15 @@ export function CardsScreen() {
     setShowPayBillModal(false);
     setPayAmountRupees('');
     setPayNote('');
+  };
+
+  const confirmDeleteCard = () => {
+    if (!cardToDelete) return;
+    syncEngine.deleteCard(cardToDelete.id);
+    if (selectedCardForDetail && selectedCardForDetail.id === cardToDelete.id) {
+      setSelectedCardForDetail(null);
+    }
+    setCardToDelete(null);
   };
 
   return (
@@ -253,7 +289,7 @@ export function CardsScreen() {
               <button
                 onClick={() => {
                   setSpendCardId(cards[0].id);
-                  setSpendBillingOption('billed');
+                  setSpendBillingOption('auto'); // Auto by default
                   setShowSpendModal(true);
                 }}
                 className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-rose-500 hover:bg-rose-600 font-bold text-white text-xs shadow-md shadow-rose-500/25 transition-all hover-lift touch-press"
@@ -422,54 +458,62 @@ export function CardsScreen() {
         </span>
       </div>
 
-      {/* TAB 1: Cards Grid View */}
+      {/* TAB 1: LUXURY HIGH-END CREDIT CARDS GRID */}
       {activeTab === 'cards' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {cards.length === 0 ? (
-            <div className="col-span-full text-center py-12 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 p-6 text-xs text-slate-400 space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center mx-auto">
-                <CreditCard className="w-6 h-6" />
+            <div className="col-span-full text-center py-16 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 p-6 text-xs text-slate-400 space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center mx-auto shadow-inner">
+                <CreditCard className="w-7 h-7" />
               </div>
-              <p className="font-semibold text-slate-600 dark:text-slate-300">
+              <p className="font-bold text-sm text-slate-700 dark:text-slate-200">
                 No credit cards added yet.
               </p>
-              <p className="text-[11px]">
+              <p className="text-xs max-w-sm mx-auto text-slate-400">
                 Click &quot;Add Card&quot; to manage billing cycles, statement cutoff dates, and bill payments.
               </p>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/25"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Your First Card</span>
+              </button>
             </div>
           ) : (
             billingReport.cardSummaries.map((summary, idx) => {
               const card = summary.card;
+              const theme = cardThemes[idx % cardThemes.length];
               const formattedDueDate = summary.dueDate.toLocaleDateString('en-IN', {
                 day: 'numeric',
                 month: 'short',
               });
 
               // Status badges & colors
-              let badgeColor = 'bg-slate-500/20 text-slate-300';
+              let badgeColor = 'bg-slate-800/80 text-slate-300 border border-slate-700/50';
               let badgeText = `Bill: ${summary.statementDay}th • Due: ${formattedDueDate}`;
 
               if (summary.status === 'overdue') {
-                badgeColor = 'bg-rose-500 text-white animate-pulse';
-                badgeText = `⚠️ Overdue by ${Math.abs(summary.daysUntilDue)}d (${formattedDueDate})`;
+                badgeColor = 'bg-rose-600 text-white shadow-md shadow-rose-600/50 animate-pulse border border-rose-400/50';
+                badgeText = `⚠️ Overdue ${Math.abs(summary.daysUntilDue)}d (${formattedDueDate})`;
               } else if (summary.status === 'urgent') {
-                badgeColor = 'bg-amber-400 text-slate-900 font-black';
+                badgeColor = 'bg-amber-400 text-slate-900 font-black shadow-md border border-amber-300';
                 badgeText = `🚨 Due in ${summary.daysUntilDue}d (${formattedDueDate})`;
               } else if (summary.status === 'due') {
-                badgeColor = 'bg-rose-500/30 text-rose-200 border border-rose-400/30';
-                badgeText = `📅 Due ${formattedDueDate} (${summary.daysUntilDue}d left)`;
+                badgeColor = 'bg-rose-500/20 text-rose-200 border border-rose-400/30';
+                badgeText = `📅 Due ${formattedDueDate} (${summary.daysUntilDue}d)`;
               } else if (summary.status === 'unbilled_only') {
-                badgeColor = 'bg-purple-500/30 text-purple-200';
+                badgeColor = 'bg-purple-500/25 text-purple-200 border border-purple-400/30';
                 badgeText = `🗓️ Next Bill: ${summary.nextStatementDate.toLocaleDateString('en-IN', {
                   day: 'numeric',
                   month: 'short',
                 })}`;
               } else if (summary.status === 'advance_credit') {
-                badgeColor = 'bg-emerald-500 text-white font-black';
-                badgeText = `🟢 Advance Balance: ${formatPaise(summary.advanceCredit)}`;
+                badgeColor = 'bg-emerald-500 text-white font-black shadow-md';
+                badgeText = `🟢 Advance: ${formatPaise(summary.advanceCredit)}`;
               } else {
-                badgeColor = 'bg-emerald-500/30 text-emerald-200';
-                badgeText = `✅ Bill Cleared`;
+                badgeColor = 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30';
+                badgeText = `✅ Cleared`;
               }
 
               const utilization = Math.min(
@@ -480,30 +524,40 @@ export function CardsScreen() {
               return (
                 <div
                   key={card.id}
-                  className={`rounded-3xl p-5 bg-gradient-to-br ${
-                    cardGradients[idx % cardGradients.length]
-                  } text-white shadow-xl hover-lift space-y-4 relative overflow-hidden transition-all flex flex-col justify-between`}
+                  className={`group rounded-3xl p-6 bg-gradient-to-br ${theme.bg} border text-white shadow-2xl relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl flex flex-col justify-between min-h-[300px]`}
                 >
-                  {/* Card Header */}
-                  <div>
-                    <div className="flex items-center justify-between">
+                  {/* Subtle Top Metallic Reflection Arc */}
+                  <div className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-white/10 via-transparent to-transparent pointer-events-none rounded-t-3xl" />
+
+                  {/* Card Top: Bank Issuer, Name, EMV Chip & NFC Wave */}
+                  <div className="relative z-10">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">
+                        <span className="text-[11px] font-bold tracking-widest uppercase text-white/70 block">
                           {card.bank}
                         </span>
-                        <h3 className="font-black text-base text-white">{card.name}</h3>
+                        <h3 className="font-black text-lg text-white tracking-tight mt-0.5">
+                          {card.name}
+                        </h3>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Wifi className="w-4 h-4 text-white/60 rotate-90" />
-                        <div className="w-9 h-7 rounded-md bg-amber-400/80 border border-amber-300 flex items-center justify-center">
-                          <div className="w-5 h-4 border border-amber-600/40 rounded-xs" />
+
+                      <div className="flex items-center gap-3">
+                        <Wifi className="w-5 h-5 text-white/70 rotate-90" />
+                        {/* Realistic Gold EMV Chip */}
+                        <div
+                          className={`w-10 h-7.5 rounded-lg bg-gradient-to-tr ${theme.chip} border border-amber-200/60 shadow-md relative overflow-hidden flex items-center justify-center`}
+                        >
+                          <div className="w-6 h-4 border border-amber-800/40 rounded-xs flex items-center justify-center">
+                            <div className="w-3 h-2 border border-amber-800/30 rounded-2xs" />
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="font-mono text-xs tracking-widest text-white/90">
-                        •••• •••• •••• {card.last4}
+                    {/* Embossed Card Number & Reminder Badge */}
+                    <div className="flex items-center justify-between mt-4">
+                      <div className="font-mono text-sm tracking-widest font-semibold text-white/90 drop-shadow-sm">
+                        ••••  ••••  ••••  {card.last4}
                       </div>
                       <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${badgeColor}`}>
                         {badgeText}
@@ -511,56 +565,52 @@ export function CardsScreen() {
                     </div>
                   </div>
 
-                  {/* Billed vs Unbilled Dual Metric Display */}
-                  <div className="p-3 rounded-2xl bg-black/25 backdrop-blur-xs border border-white/10 space-y-2">
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      {/* Billed Due */}
-                      <div className="p-2 rounded-xl bg-rose-500/20 border border-rose-500/30">
-                        <span className="text-[10px] text-rose-200 uppercase font-bold block">
-                          🔴 Billed Due
-                        </span>
-                        <span className="font-black text-base text-white tabular-nums">
+                  {/* Middle: Floating Glass Duo Pills (🔴 Billed Due vs 🟣 Unbilled Spends) */}
+                  <div className="relative z-10 my-3 p-3.5 rounded-2xl bg-black/40 backdrop-blur-md border border-white/15 space-y-2.5 shadow-inner">
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {/* Billed Due Pill */}
+                      <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-500/25 to-rose-600/10 border border-rose-500/30">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-rose-300 font-extrabold uppercase tracking-wider block">
+                            🔴 Billed Due
+                          </span>
+                        </div>
+                        <span className="font-black text-base text-white tabular-nums block mt-0.5">
                           {formatPaise(summary.billedDue)}
                         </span>
-                        <span className="text-[9px] text-rose-200/80 block mt-0.5">
-                          {summary.billedDue > 0 ? `Pay by ${formattedDueDate}` : 'No bill due'}
+                        <span className="text-[9px] text-rose-200/80 block font-medium">
+                          {summary.billedDue > 0 ? `Due by ${formattedDueDate}` : 'No bill due'}
                         </span>
                       </div>
 
-                      {/* Unbilled Spends */}
-                      <div className="p-2 rounded-xl bg-purple-500/20 border border-purple-500/30">
-                        <span className="text-[10px] text-purple-200 uppercase font-bold block">
-                          🟣 Unbilled Spends
-                        </span>
-                        <span className="font-black text-base text-white tabular-nums">
+                      {/* Unbilled Spends Pill */}
+                      <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500/25 to-indigo-600/10 border border-purple-500/30">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-purple-300 font-extrabold uppercase tracking-wider block">
+                            🟣 Unbilled
+                          </span>
+                        </div>
+                        <span className="font-black text-base text-white tabular-nums block mt-0.5">
                           {formatPaise(summary.netUnbilled)}
                         </span>
-                        <span className="text-[9px] text-purple-200/80 block mt-0.5">
+                        <span className="text-[9px] text-purple-200/80 block font-medium">
                           Bills next cycle
                         </span>
                       </div>
                     </div>
 
-                    {/* Advance balance note if any */}
-                    {summary.advancePayments > 0 && (
-                      <div className="text-[10px] text-emerald-300 flex items-center justify-between pt-1 border-t border-white/10 font-medium">
-                        <span>Advance Paid: {formatPaise(summary.advancePayments)}</span>
-                        <span>Credit: {formatPaise(summary.advanceCredit)}</span>
-                      </div>
-                    )}
-
-                    {/* Utilization Progress Bar with 30% safety mark */}
-                    <div className="pt-1">
+                    {/* Utilization Progress Bar */}
+                    <div>
                       <div className="flex items-center justify-between text-[10px] text-white/70 font-semibold mb-1">
-                        <span className="truncate mr-2">Limit: {formatPaise(card.credit_limit)}</span>
+                        <span className="truncate">Limit: {formatPaise(card.credit_limit)}</span>
                         <span className="shrink-0 text-right">
                           Avail: <strong className="text-emerald-300">{formatPaise(summary.availableCredit)}</strong> ({utilization}%)
                         </span>
                       </div>
-                      <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-white/15 rounded-full overflow-hidden">
                         <div
                           style={{ width: `${utilization}%` }}
-                          className={`h-full transition-all ${
+                          className={`h-full transition-all duration-500 ${
                             utilization > 50
                               ? 'bg-rose-400'
                               : utilization > 30
@@ -572,15 +622,15 @@ export function CardsScreen() {
                     </div>
                   </div>
 
-                  {/* Card Action Buttons */}
-                  <div className="pt-1 flex items-center gap-2">
+                  {/* Bottom Action Footer with Swipe, Pay, Detail, and Delete Button */}
+                  <div className="relative z-10 pt-1 flex items-center gap-2">
                     <button
                       onClick={() => {
                         setSpendCardId(card.id);
-                        setSpendBillingOption('billed');
+                        setSpendBillingOption('auto'); // Auto by default
                         setShowSpendModal(true);
                       }}
-                      className="flex-1 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs flex items-center justify-center gap-1 transition-all touch-press"
+                      className="flex-1 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs flex items-center justify-center gap-1 transition-all touch-press"
                     >
                       <ArrowUpRight className="w-3.5 h-3.5" />
                       <span>Swipe</span>
@@ -588,7 +638,7 @@ export function CardsScreen() {
 
                     <button
                       onClick={() => openPayModalForCard(card.id)}
-                      className={`flex-1 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all touch-press ${
+                      className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all touch-press ${
                         summary.billedDue > 0
                           ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
                           : summary.netUnbilled > 0
@@ -606,12 +656,25 @@ export function CardsScreen() {
                       </span>
                     </button>
 
+                    {/* View Details Button */}
                     <button
                       onClick={() => setSelectedCardForDetail(card)}
-                      className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all"
+                      className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all touch-press"
                       title="View Statement & History"
                     >
                       <Eye className="w-4 h-4" />
+                    </button>
+
+                    {/* Delete Card Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCardToDelete(card);
+                      }}
+                      className="p-2.5 rounded-xl bg-white/10 hover:bg-rose-600/80 text-white/70 hover:text-white transition-all touch-press"
+                      title="Delete this Credit Card"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -794,17 +857,57 @@ export function CardsScreen() {
         </div>
       )}
 
+      {/* DELETE CARD CONFIRMATION MODAL */}
+      {cardToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl text-center">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                Delete {cardToDelete.name}?
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Are you sure you want to delete this credit card ({cardToDelete.bank} •••• {cardToDelete.last4})? This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setCardToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteCard}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-500/25"
+              >
+                Delete Card
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Card Detail Popup Modal */}
       <CardDetailModal
         card={selectedCardForDetail}
         onClose={() => setSelectedCardForDetail(null)}
         onRecordSpend={() => {
           if (selectedCardForDetail) setSpendCardId(selectedCardForDetail.id);
-          setSpendBillingOption('billed');
+          setSpendBillingOption('auto'); // Auto by default
           setShowSpendModal(true);
         }}
         onPayBill={() => {
           if (selectedCardForDetail) openPayModalForCard(selectedCardForDetail.id);
+        }}
+        onDeleteCard={(cardId) => {
+          syncEngine.deleteCard(cardId);
+          setSelectedCardForDetail(null);
         }}
       />
 
@@ -950,7 +1053,7 @@ export function CardsScreen() {
         </div>
       )}
 
-      {/* Modal: Record Card Spend (Swipe) with Billed vs Unbilled Choice */}
+      {/* Modal: Record Card Spend (Swipe) with Auto Cycle by Default */}
       {showSpendModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -985,7 +1088,7 @@ export function CardsScreen() {
                 </select>
               </div>
 
-              {/* Billing Cycle Classification Choice */}
+              {/* Billing Cycle Classification Choice - AUTO CYCLE IS FIRST & DEFAULT */}
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                   Billing Category
@@ -993,46 +1096,46 @@ export function CardsScreen() {
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => setSpendBillingOption('billed')}
-                    className={`p-2 rounded-xl text-center border text-xs font-bold transition-all ${
-                      spendBillingOption === 'billed'
-                        ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
+                    onClick={() => setSpendBillingOption('auto')}
+                    className={`p-2.5 rounded-xl text-center border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      spendBillingOption === 'auto'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/30 ring-2 ring-blue-500/30'
                         : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300'
                     }`}
                   >
-                    🔴 Billed Due
+                    <span>⚡ Auto Cycle</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSpendBillingOption('billed')}
+                    className={`p-2.5 rounded-xl text-center border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      spendBillingOption === 'billed'
+                        ? 'bg-rose-500 text-white border-rose-500 shadow-md shadow-rose-500/30 ring-2 ring-rose-500/30'
+                        : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    <span>🔴 Billed Due</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setSpendBillingOption('unbilled')}
-                    className={`p-2 rounded-xl text-center border text-xs font-bold transition-all ${
+                    className={`p-2.5 rounded-xl text-center border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                       spendBillingOption === 'unbilled'
-                        ? 'bg-purple-500 text-white border-purple-500 shadow-sm'
+                        ? 'bg-purple-500 text-white border-purple-500 shadow-md shadow-purple-500/30 ring-2 ring-purple-500/30'
                         : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300'
                     }`}
                   >
-                    🟣 Unbilled
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSpendBillingOption('auto')}
-                    className={`p-2 rounded-xl text-center border text-xs font-bold transition-all ${
-                      spendBillingOption === 'auto'
-                        ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
-                        : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    ⚡ Auto Cycle
+                    <span>🟣 Unbilled</span>
                   </button>
                 </div>
                 <span className="text-[10px] text-slate-400 block mt-1">
-                  {spendBillingOption === 'billed'
-                    ? 'Adds directly to current Statement Billed Due (to pay by due date).'
-                    : spendBillingOption === 'unbilled'
-                    ? 'Classified as Unbilled spend (bills in next cycle).'
-                    : 'Auto-determines based on spend date and card statement day.'}
+                  {spendBillingOption === 'auto'
+                    ? 'Default: Auto-determines based on spend date and card statement day.'
+                    : spendBillingOption === 'billed'
+                    ? 'Directly adds to current statement bill (to pay by due date).'
+                    : 'Classified as Unbilled spend (rolls to next cycle).'}
                 </span>
               </div>
 

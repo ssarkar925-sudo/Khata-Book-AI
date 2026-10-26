@@ -23,6 +23,7 @@ const DEFAULT_CARDS: Card[] = [
     last4: '4892',
     credit_limit: 30000000, // ₹3,00,000.00
     statement_day: 15,
+    due_day: 5,
     is_active: true,
     created_at: new Date().toISOString(),
   },
@@ -34,17 +35,34 @@ const DEFAULT_CARDS: Card[] = [
     last4: '1043',
     credit_limit: 15000000, // ₹1,50,000.00
     statement_day: 20,
+    due_day: 10,
     is_active: true,
     created_at: new Date().toISOString(),
   },
 ];
+
+// Helper to deduplicate cards array by ID
+function dedupeCards(cards: Card[]): Card[] {
+  const map = new Map<string, Card>();
+  for (const c of cards) {
+    if (c && c.id) {
+      map.set(c.id, c);
+    }
+  }
+  return Array.from(map.values());
+}
 
 export const useCardStore = create<CardState>((set) => ({
   cards: (() => {
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem(STORAGE_KEY_CARDS);
-        if (stored) return JSON.parse(stored);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return dedupeCards(parsed);
+          }
+        }
       } catch {}
     }
     return DEFAULT_CARDS;
@@ -52,15 +70,20 @@ export const useCardStore = create<CardState>((set) => ({
   isLoading: false,
 
   setCards: (cards) => {
+    const deduped = dedupeCards(cards);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_CARDS, JSON.stringify(cards));
+      localStorage.setItem(STORAGE_KEY_CARDS, JSON.stringify(deduped));
     }
-    set({ cards });
+    set({ cards: deduped });
   },
 
   addCardOptimistic: (card) =>
     set((state) => {
-      const updated = [...state.cards, card];
+      // Check if card with this id already exists to prevent duplicate entry
+      if (state.cards.some((c) => c.id === card.id)) {
+        return state;
+      }
+      const updated = dedupeCards([...state.cards, card]);
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY_CARDS, JSON.stringify(updated));
       }

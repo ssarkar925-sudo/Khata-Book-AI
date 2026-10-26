@@ -647,6 +647,17 @@ class SyncEngine {
     }
   }
 
+  public async deleteCard(cardId: string) {
+    useCardStore.getState().deleteCardOptimistic(cardId);
+    try {
+      const { error } = await supabase.from('cards').delete().eq('id', cardId);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+    } catch {
+      this.enqueue('cards', 'delete', { id: cardId });
+    }
+  }
+
   // Notes
   public async pushNote(note: NoteItem) {
     useNoteStore.getState().addNoteOptimistic(note);
