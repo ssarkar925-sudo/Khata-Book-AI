@@ -41,7 +41,7 @@ const DEFAULT_ENTRIES: LedgerEntry[] = [
     workspace_id: '00000000-0000-0000-0000-000000000010',
     type: 'card_spend',
     amount: 345000, // ₹3,450.00
-    card_id: 'default-card-1',
+    card_id: '00000000-0000-0000-0000-000000000101',
     mode: 'card',
     note: 'Team Dinner at Mainland China',
     entry_date: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(),
@@ -49,12 +49,18 @@ const DEFAULT_ENTRIES: LedgerEntry[] = [
   },
 ];
 
-// Helper to deduplicate ledger entries by ID
+// Helper to deduplicate ledger entries by ID and migrate legacy card IDs
 function dedupeEntries(entries: LedgerEntry[]): LedgerEntry[] {
   const map = new Map<string, LedgerEntry>();
   for (const e of entries) {
     if (e && e.id) {
-      map.set(e.id, e);
+      const normalizedCardId =
+        e.card_id === 'default-card-1'
+          ? '00000000-0000-0000-0000-000000000101'
+          : e.card_id === 'default-card-2'
+          ? '00000000-0000-0000-0000-000000000102'
+          : e.card_id;
+      map.set(e.id, { ...e, card_id: normalizedCardId });
     }
   }
   return Array.from(map.values());

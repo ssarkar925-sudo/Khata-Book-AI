@@ -16,7 +16,7 @@ const STORAGE_KEY_CARDS = 'rb_cards';
 
 const DEFAULT_CARDS: Card[] = [
   {
-    id: 'default-card-1',
+    id: '00000000-0000-0000-0000-000000000101',
     workspace_id: '00000000-0000-0000-0000-000000000010',
     name: 'HDFC Regalia Gold',
     bank: 'HDFC Bank',
@@ -28,7 +28,7 @@ const DEFAULT_CARDS: Card[] = [
     created_at: new Date().toISOString(),
   },
   {
-    id: 'default-card-2',
+    id: '00000000-0000-0000-0000-000000000102',
     workspace_id: '00000000-0000-0000-0000-000000000010',
     name: 'SBI Cashback Card',
     bank: 'State Bank of India',
@@ -41,12 +41,18 @@ const DEFAULT_CARDS: Card[] = [
   },
 ];
 
-// Helper to deduplicate cards array by ID
+// Helper to deduplicate cards array by ID and normalize legacy IDs to UUIDs
 function dedupeCards(cards: Card[]): Card[] {
   const map = new Map<string, Card>();
   for (const c of cards) {
     if (c && c.id) {
-      map.set(c.id, c);
+      const normalizedId =
+        c.id === 'default-card-1'
+          ? '00000000-0000-0000-0000-000000000101'
+          : c.id === 'default-card-2'
+          ? '00000000-0000-0000-0000-000000000102'
+          : c.id;
+      map.set(normalizedId, { ...c, id: normalizedId });
     }
   }
   return Array.from(map.values());
