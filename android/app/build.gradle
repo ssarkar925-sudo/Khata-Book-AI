@@ -4,7 +4,7 @@ android {
     namespace "com.khatabook.ai"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.khatabook.ai"
+        applicationId "com.recordbook.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
