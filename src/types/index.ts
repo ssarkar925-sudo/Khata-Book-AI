@@ -31,6 +31,19 @@ export interface CashLocation {
   deleted_at?: string | null;
 }
 
+export interface CashCount {
+  id: string;
+  workspace_id: string;
+  location_id: string;
+  denominations: Record<string, number>;
+  loose_amount: number; // in paise
+  total_counted: number; // in paise
+  expected_amount: number; // in paise
+  difference: number; // in paise
+  counted_at: string;
+  notes?: string | null;
+}
+
 export interface Customer {
   id: string;
   workspace_id: string;

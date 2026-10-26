@@ -17,6 +17,7 @@ import {
   Smartphone,
   Coins,
   ShieldAlert,
+  Calculator,
 } from 'lucide-react';
 import { CashLocation, AccountType } from '@/types';
 import { formatPaise, parseToPaise, paiseToRupees } from '@/lib/money';
@@ -24,6 +25,7 @@ import { useSessionStore } from '@/stores/useSessionStore';
 import { useAccountStore, BankAccountItem } from '@/stores/useAccountStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { AccountDetailModal } from '@/components/modals/AccountDetailModal';
+import { CashDenominationModal } from '@/components/modals/CashDenominationModal';
 
 const BANK_OPTIONS = [
   'State Bank of India',
@@ -97,6 +99,8 @@ export function CashScreen() {
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showDenominationModal, setShowDenominationModal] = useState(false);
+  const [denominationTargetAccount, setDenominationTargetAccount] = useState<CashLocation | null>(null);
   const [selectedAccForDetail, setSelectedAccForDetail] = useState<CashLocation | null>(null);
   const [accountToEdit, setAccountToEdit] = useState<BankAccountItem | null>(null);
   const [accountToDelete, setAccountToDelete] = useState<BankAccountItem | null>(null);
@@ -309,6 +313,19 @@ export function CashScreen() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Note Counting / Cash Denomination Calculator Button */}
+          <button
+            onClick={() => {
+              const defaultDrawer = accounts.find((a) => a.account_type === 'cash_counter') || accounts[0];
+              setDenominationTargetAccount(defaultDrawer || null);
+              setShowDenominationModal(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border border-amber-500/30 bg-amber-50 dark:bg-amber-950/30 font-bold text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all hover-lift touch-press"
+          >
+            <Calculator className="w-4 h-4 text-amber-500" />
+            <span>Count Cash (Till/Notes)</span>
+          </button>
+
           <button
             onClick={() => {
               setFromAccId(accounts[0]?.id || '');
@@ -450,6 +467,20 @@ export function CashScreen() {
                     </span>
                   )}
 
+                  {/* Count Physical Cash / Notes Button for Cash Counter accounts */}
+                  {(acc.account_type === 'cash_counter' || acc.name.toLowerCase().includes('cash')) && (
+                    <button
+                      onClick={() => {
+                        setDenominationTargetAccount(acc);
+                        setShowDenominationModal(true);
+                      }}
+                      title="Count Physical Notes & Coins (Denomination Counter)"
+                      className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+                    >
+                      <Calculator className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
                   {/* Edit Button */}
                   <button
                     onClick={() => handleOpenEdit(acc)}
@@ -511,6 +542,20 @@ export function CashScreen() {
         }}
         onEdit={(acc) => handleOpenEdit(acc as BankAccountItem)}
         onDelete={(id) => handleDeleteAccount(id)}
+        onCountCash={(acc) => {
+          setDenominationTargetAccount(acc);
+          setShowDenominationModal(true);
+        }}
+      />
+
+      {/* MODAL: Physical Cash Denomination Counter */}
+      <CashDenominationModal
+        isOpen={showDenominationModal}
+        targetAccount={denominationTargetAccount}
+        onClose={() => {
+          setShowDenominationModal(false);
+          setDenominationTargetAccount(null);
+        }}
       />
 
       {/* MODAL: Add Account */}

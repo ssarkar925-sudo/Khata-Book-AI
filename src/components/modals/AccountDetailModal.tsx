@@ -15,6 +15,7 @@ import {
   Wallet,
   Receipt,
   FileText,
+  Calculator,
 } from 'lucide-react';
 import { CashLocation, LedgerEntry } from '@/types';
 import { formatPaise, paiseToRupees } from '@/lib/money';
@@ -27,6 +28,7 @@ interface AccountDetailModalProps {
   onTransfer: () => void;
   onEdit?: (account: CashLocation) => void;
   onDelete?: (id: string) => void;
+  onCountCash?: (account: CashLocation) => void;
 }
 
 export function AccountDetailModal({
@@ -35,6 +37,7 @@ export function AccountDetailModal({
   onTransfer,
   onEdit,
   onDelete,
+  onCountCash,
 }: AccountDetailModalProps) {
   const { entries: ledger } = useLedgerStore();
   const [filterType, setFilterType] = useState<'all' | 'in' | 'out'>('all');
@@ -361,6 +364,19 @@ export function AccountDetailModal({
 
         {/* Footer Actions */}
         <div className="pt-3 border-t border-slate-100 dark:border-white/5 flex gap-2 shrink-0">
+          {onCountCash && (account.account_type === 'cash_counter' || account.name.toLowerCase().includes('cash')) && (
+            <button
+              onClick={() => {
+                onClose();
+                onCountCash(account);
+              }}
+              className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/25 transition-all hover-lift touch-press"
+            >
+              <Calculator className="w-4 h-4" />
+              <span>Count Notes & Coins</span>
+            </button>
+          )}
+
           <button
             onClick={() => {
               onClose();
