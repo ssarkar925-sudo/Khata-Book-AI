@@ -13,6 +13,7 @@ import {
 import { CashLocation } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
 import { useSessionStore } from '@/stores/useSessionStore';
+import { AccountDetailModal } from '@/components/modals/AccountDetailModal';
 
 export function CashScreen() {
   const { activeWorkspaceId, theme } = useSessionStore();
@@ -50,6 +51,7 @@ export function CashScreen() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [selectedAccForDetail, setSelectedAccForDetail] = useState<CashLocation | null>(null);
   const [newAccName, setNewAccName] = useState('');
   const [newAccBalanceRupees, setNewAccBalanceRupees] = useState('');
 
@@ -156,7 +158,8 @@ export function CashScreen() {
         {accounts.map((acc) => (
           <div
             key={acc.id}
-            className={`rounded-3xl border p-5 transition-all hover-lift bg-gradient-to-br ${acc.gradient} ${
+            onClick={() => setSelectedAccForDetail(acc)}
+            className={`cursor-pointer rounded-3xl border p-5 transition-all hover-lift bg-gradient-to-br ${acc.gradient} ${
               isLight
                 ? 'bg-white border-slate-200 shadow-sm hover:border-slate-300'
                 : 'bg-slate-900/80 border-white/10 hover:border-white/20'
@@ -247,6 +250,16 @@ export function CashScreen() {
           </div>
         </div>
       )}
+
+      {/* Modal: Account Detail Popup */}
+      <AccountDetailModal
+        account={selectedAccForDetail}
+        onClose={() => setSelectedAccForDetail(null)}
+        onTransfer={() => {
+          if (selectedAccForDetail) setFromAccId(selectedAccForDetail.id);
+          setShowTransferModal(true);
+        }}
+      />
 
       {/* Modal: Transfer Money */}
       {showTransferModal && (

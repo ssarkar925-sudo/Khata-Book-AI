@@ -6,6 +6,7 @@ import {
   Wallet,
   Users,
   CreditCard,
+  Table,
   StickyNote,
   Lock,
   FileSpreadsheet,
@@ -63,6 +64,14 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       color: 'from-purple-500 to-pink-600',
       activeText: 'text-purple-600 dark:text-purple-300',
       iconBg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+    },
+    {
+      id: 'sheets' as TabType,
+      label: 'Sheets & Registers',
+      icon: Table,
+      color: 'from-blue-600 to-cyan-600',
+      activeText: 'text-blue-600 dark:text-blue-300',
+      iconBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
     },
     {
       id: 'notes' as TabType,

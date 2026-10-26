@@ -18,6 +18,7 @@ import { CardsScreen } from '@/components/screens/CardsScreen';
 import { NotesScreen } from '@/components/screens/NotesScreen';
 import { VaultScreen } from '@/components/screens/VaultScreen';
 import { ReportsScreen } from '@/components/screens/ReportsScreen';
+import { SheetsScreen } from '@/components/screens/SheetsScreen';
 import { parseToPaise } from '@/lib/money';
 import { X } from 'lucide-react';
 
@@ -157,6 +158,7 @@ export default function HomePage() {
           {activeTab === 'cash' && <CashScreen />}
           {activeTab === 'dues' && <DuesScreen />}
           {activeTab === 'cards' && <CardsScreen />}
+          {activeTab === 'sheets' && <SheetsScreen />}
           {activeTab === 'notes' && <NotesScreen />}
           {activeTab === 'vault' && <VaultScreen />}
           {activeTab === 'reports' && <ReportsScreen />}
@@ -190,24 +192,33 @@ export default function HomePage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => {
+                  setActiveTab('sheets');
+                  setIsMobileMoreOpen(false);
+                }}
+                className="p-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-center font-bold text-xs text-slate-800 dark:text-slate-200"
+              >
+                📊 Sheets
+              </button>
               <button
                 onClick={() => {
                   setActiveTab('vault');
                   setIsMobileMoreOpen(false);
                 }}
-                className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 bg-zinc-50/50 dark:bg-zinc-800/40 text-left font-medium text-xs text-zinc-900 dark:text-zinc-100 transition-colors"
+                className="p-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-center font-bold text-xs text-slate-800 dark:text-slate-200"
               >
-                🔐 Encrypted Vault
+                🔐 Vault
               </button>
               <button
                 onClick={() => {
                   setActiveTab('reports');
                   setIsMobileMoreOpen(false);
                 }}
-                className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 bg-zinc-50/50 dark:bg-zinc-800/40 text-left font-medium text-xs text-zinc-900 dark:text-zinc-100 transition-colors"
+                className="p-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-center font-bold text-xs text-slate-800 dark:text-slate-200"
               >
-                📊 Reports & Export
+                📈 Reports
               </button>
             </div>
           </div>

@@ -15,12 +15,14 @@ import { Customer, PeopleDue } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
 import { useCustomerStore } from '@/stores/useCustomerStore';
 import { useSessionStore } from '@/stores/useSessionStore';
+import { ContactDetailModal } from '@/components/modals/ContactDetailModal';
 
 export function DuesScreen() {
   const { customers, dues, addCustomerOptimistic, addDueOptimistic, updateDueStatusOptimistic } = useCustomerStore();
   const { activeWorkspaceId, theme } = useSessionStore();
   const isLight = theme === 'light';
 
+  const [selectedCustForDetail, setSelectedCustForDetail] = useState<Customer | null>(null);
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [showAddDueModal, setShowAddDueModal] = useState(false);
 
@@ -206,14 +208,18 @@ export function DuesScreen() {
 
               return (
                 <div key={due.id} className="py-3.5 flex items-center justify-between gap-3 text-xs hover:bg-slate-50/50 dark:hover:bg-white/5 px-2 rounded-2xl transition-colors">
-                  <div className="flex items-center gap-3">
+                  <div
+                    onClick={() => cust && setSelectedCustForDetail(cust)}
+                    className="flex items-center gap-3 cursor-pointer group"
+                    title="Click to view full contact statement"
+                  >
                     <div
-                      className={`w-10 h-10 rounded-2xl bg-gradient-to-tr ${getAvatarGradient(cust?.name || 'Customer')} flex items-center justify-center text-white font-extrabold text-sm shadow-md shrink-0`}
+                      className={`w-10 h-10 rounded-2xl bg-gradient-to-tr ${getAvatarGradient(cust?.name || 'Customer')} flex items-center justify-center text-white font-extrabold text-sm shadow-md shrink-0 group-hover:scale-105 transition-transform`}
                     >
                       {nameInitial}
                     </div>
                     <div>
-                      <div className="font-bold text-slate-900 dark:text-white text-sm">
+                      <div className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
                         {cust?.name || 'Contact'}
                       </div>
                       <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
@@ -423,6 +429,15 @@ export function DuesScreen() {
           </div>
         </div>
       )}
+      {/* Modal: Contact Detail Statement Popup */}
+      <ContactDetailModal
+        customer={selectedCustForDetail}
+        onClose={() => setSelectedCustForDetail(null)}
+        onRecordDue={() => {
+          if (selectedCustForDetail) setSelectedCustId(selectedCustForDetail.id);
+          setShowAddDueModal(true);
+        }}
+      />
     </div>
   );
 }

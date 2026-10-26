@@ -7,23 +7,46 @@ import {
   Calendar,
   X,
   Wifi,
+  ArrowUpRight,
+  CheckCircle2,
+  TrendingDown,
+  ShoppingBag,
 } from 'lucide-react';
-import { Card } from '@/types';
+import { Card, LedgerEntry } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
 import { useCardStore } from '@/stores/useCardStore';
+import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useSessionStore } from '@/stores/useSessionStore';
+import { CardDetailModal } from '@/components/modals/CardDetailModal';
 
 export function CardsScreen() {
   const { cards, addCardOptimistic } = useCardStore();
-  const { activeWorkspaceId, theme } = useSessionStore();
+  const { entries: ledger, addEntryOptimistic } = useLedgerStore();
+  const { activeWorkspaceId, theme, user } = useSessionStore();
   const isLight = theme === 'light';
 
+  const [selectedCardForDetail, setSelectedCardForDetail] = useState<Card | null>(null);
+
+  // New Card State
   const [showAddModal, setShowAddModal] = useState(false);
   const [cardName, setCardName] = useState('');
   const [cardBank, setCardBank] = useState('');
   const [last4, setLast4] = useState('');
   const [limitRupees, setLimitRupees] = useState('');
   const [statementDay, setStatementDay] = useState('15');
+
+  // Spend State
+  const [showSpendModal, setShowSpendModal] = useState(false);
+  const [spendCardId, setSpendCardId] = useState('');
+  const [spendAmountRupees, setSpendAmountRupees] = useState('');
+  const [spendCategory, setSpendCategory] = useState('Shopping');
+  const [spendMerchant, setSpendMerchant] = useState('');
+
+  // Bill Payment State
+  const [showPayBillModal, setShowPayBillModal] = useState(false);
+  const [payCardId, setPayCardId] = useState('');
+  const [payAmountRupees, setPayAmountRupees] = useState('');
+  const [payNote, setPayNote] = useState('');
 
   const cardGradients = [
     'from-indigo-600 via-purple-600 to-slate-900',
@@ -56,6 +79,54 @@ export function CardsScreen() {
     setLimitRupees('');
   };
 
+  const handleRecordSpend = (e: React.FormEvent) => {
+    e.preventDefault();
+    const paise = parseToPaise(spendAmountRupees);
+    if (paise <= 0 || !spendCardId) return;
+
+    const selectedCard = cards.find((c) => c.id === spendCardId);
+    const entry: LedgerEntry = {
+      id: crypto.randomUUID(),
+      workspace_id: activeWorkspaceId,
+      type: 'card_spend',
+      amount: paise,
+      card_id: spendCardId,
+      mode: 'card',
+      note: `${spendCategory} - ${spendMerchant.trim() || selectedCard?.name || 'Card Swipe'}`,
+      entry_date: new Date().toISOString(),
+      created_by: user?.id || 'owner',
+    };
+
+    addEntryOptimistic(entry);
+    setShowSpendModal(false);
+    setSpendAmountRupees('');
+    setSpendMerchant('');
+  };
+
+  const handlePayBill = (e: React.FormEvent) => {
+    e.preventDefault();
+    const paise = parseToPaise(payAmountRupees);
+    if (paise <= 0 || !payCardId) return;
+
+    const selectedCard = cards.find((c) => c.id === payCardId);
+    const entry: LedgerEntry = {
+      id: crypto.randomUUID(),
+      workspace_id: activeWorkspaceId,
+      type: 'bill_payment',
+      amount: paise,
+      card_id: payCardId,
+      mode: 'bank',
+      note: `Bill Payment - ${selectedCard?.name || 'Card'} (${payNote || 'Full / Part'})`,
+      entry_date: new Date().toISOString(),
+      created_by: user?.id || 'owner',
+    };
+
+    addEntryOptimistic(entry);
+    setShowPayBillModal(false);
+    setPayAmountRupees('');
+    setPayNote('');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -68,17 +139,45 @@ export function CardsScreen() {
             <span>Credit Cards & Billing</span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Track credit limits, billing statement cycles, and available headroom.
+            Track credit limits, card swipe spends, statement cycles, and bill payments.
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 font-bold text-white text-xs shadow-lg shadow-purple-500/25 transition-all hover-lift touch-press"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Credit Card</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {cards.length > 0 && (
+            <>
+              <button
+                onClick={() => {
+                  setSpendCardId(cards[0].id);
+                  setShowSpendModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-rose-500 hover:bg-rose-600 font-bold text-white text-xs shadow-md shadow-rose-500/25 transition-all hover-lift touch-press"
+              >
+                <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+                <span>Swipe (Spend)</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setPayCardId(cards[0].id);
+                  setShowPayBillModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 font-bold text-white text-xs shadow-md shadow-emerald-500/25 transition-all hover-lift touch-press"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Pay Bill</span>
+              </button>
+            </>
+          )}
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 font-bold text-white text-xs shadow-lg shadow-purple-500/25 transition-all hover-lift touch-press"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Card</span>
+          </button>
+        </div>
       </div>
 
       {/* Cards List */}
@@ -92,50 +191,79 @@ export function CardsScreen() {
             <p className="text-[11px]">Click &quot;Add Credit Card&quot; to monitor your billing cycles and spending limits.</p>
           </div>
         ) : (
-          cards.map((card, idx) => (
-            <div
-              key={card.id}
-              className={`rounded-3xl p-6 bg-gradient-to-br ${
-                cardGradients[idx % cardGradients.length]
-              } text-white shadow-xl hover-lift space-y-5 relative overflow-hidden`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">
-                    {card.bank}
-                  </span>
-                  <h3 className="font-black text-base text-white">{card.name}</h3>
+          cards.map((card, idx) => {
+            const cardSpends = ledger.filter((e) => e.card_id === card.id && e.type === 'card_spend');
+            const cardPayments = ledger.filter((e) => e.card_id === card.id && e.type === 'bill_payment');
+            const totalSpent = cardSpends.reduce((s, e) => s + Number(e.amount), 0);
+            const totalPaid = cardPayments.reduce((s, e) => s + Number(e.amount), 0);
+            const outstanding = Math.max(0, totalSpent - totalPaid);
+            const available = Math.max(0, card.credit_limit - outstanding);
+
+            return (
+              <div
+                key={card.id}
+                onClick={() => setSelectedCardForDetail(card)}
+                className={`cursor-pointer rounded-3xl p-6 bg-gradient-to-br ${
+                  cardGradients[idx % cardGradients.length]
+                } text-white shadow-xl hover-lift space-y-5 relative overflow-hidden transition-all`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">
+                      {card.bank}
+                    </span>
+                    <h3 className="font-black text-base text-white">{card.name}</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Wifi className="w-4 h-4 text-white/60 rotate-90" />
+                    <div className="w-9 h-7 rounded-md bg-amber-400/80 border border-amber-300 flex items-center justify-center">
+                      <div className="w-5 h-4 border border-amber-600/40 rounded-xs" />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Wifi className="w-4 h-4 text-white/60 rotate-90" />
-                  <div className="w-9 h-7 rounded-md bg-amber-400/80 border border-amber-300 flex items-center justify-center">
-                    <div className="w-5 h-4 border border-amber-600/40 rounded-xs" />
+
+                <div className="flex items-center justify-between">
+                  <div className="font-mono text-sm tracking-widest text-white/90">
+                    •••• •••• •••• {card.last4}
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/20">
+                    Tap for details &gt;
+                  </span>
+                </div>
+
+                <div className="pt-3 border-t border-white/15 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-[10px] text-white/70 uppercase tracking-wider block font-semibold">Available Limit</span>
+                    <span className="font-black text-sm text-emerald-300 tabular-nums">
+                      {formatPaise(available)}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-white/70 uppercase tracking-wider block font-semibold">Current Due</span>
+                    <span className="font-black text-sm text-rose-300 tabular-nums">
+                      {formatPaise(outstanding)}
+                    </span>
                   </div>
                 </div>
               </div>
-
-              <div className="font-mono text-sm tracking-widest text-white/90 pt-1">
-                •••• •••• •••• {card.last4}
-              </div>
-
-              <div className="pt-3 border-t border-white/15 flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-[10px] text-white/70 uppercase tracking-wider block font-semibold">Credit Limit</span>
-                  <span className="font-black text-sm text-white tabular-nums">
-                    {formatPaise(card.credit_limit)}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-white/70 uppercase tracking-wider block font-semibold">Cutoff Cycle</span>
-                  <span className="font-bold text-xs text-white">
-                    {card.statement_day}th of month
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
+
+      {/* Card Detail Popup Modal */}
+      <CardDetailModal
+        card={selectedCardForDetail}
+        onClose={() => setSelectedCardForDetail(null)}
+        onRecordSpend={() => {
+          if (selectedCardForDetail) setSpendCardId(selectedCardForDetail.id);
+          setShowSpendModal(true);
+        }}
+        onPayBill={() => {
+          if (selectedCardForDetail) setPayCardId(selectedCardForDetail.id);
+          setShowPayBillModal(true);
+        }}
+      />
 
       {/* Modal: Add Card */}
       {showAddModal && (
@@ -154,7 +282,7 @@ export function CardsScreen() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. HDFC Millennia, SBI Cashback"
+                  placeholder="e.g. HDFC Millennia, SBI SimplyClick"
                   value={cardName}
                   onChange={(e) => setCardName(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -223,6 +351,165 @@ export function CardsScreen() {
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 text-white font-bold text-xs shadow-md shadow-purple-500/25"
                 >
                   Save Card
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Record Card Spend */}
+      {showSpendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Record Card Spend (Swipe)</h3>
+              <button onClick={() => setShowSpendModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRecordSpend} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Select Card</label>
+                <select
+                  value={spendCardId}
+                  onChange={(e) => setSpendCardId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                >
+                  {cards.map((c) => (
+                    <option key={c.id} value={c.id} className="dark:bg-slate-900">
+                      {c.name} (•••• {c.last4})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Amount (₹)</label>
+                <input
+                  type="number"
+                  required
+                  autoFocus
+                  placeholder="0.00"
+                  value={spendAmountRupees}
+                  onChange={(e) => setSpendAmountRupees(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Spend Category</label>
+                <select
+                  value={spendCategory}
+                  onChange={(e) => setSpendCategory(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                >
+                  <option value="Shopping">🛍️ Shopping & Retail</option>
+                  <option value="Dining">🍽️ Food & Dining</option>
+                  <option value="Groceries">🛒 Groceries & Supermarket</option>
+                  <option value="Fuel">⛽ Fuel & Travel</option>
+                  <option value="Utilities">💡 Utilities & Bills</option>
+                  <option value="Electronics">💻 Electronics & Gadgets</option>
+                  <option value="Other">📦 Other Expenses</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Merchant / Store Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Amazon, Zomato, Reliance Smart"
+                  value={spendMerchant}
+                  onChange={(e) => setSpendMerchant(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSpendModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 text-white font-bold text-xs shadow-md shadow-rose-500/25"
+                >
+                  Save Spend
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Pay Card Bill */}
+      {showPayBillModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Pay Credit Card Bill</h3>
+              <button onClick={() => setShowPayBillModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handlePayBill} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Card to Pay</label>
+                <select
+                  value={payCardId}
+                  onChange={(e) => setPayCardId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                >
+                  {cards.map((c) => (
+                    <option key={c.id} value={c.id} className="dark:bg-slate-900">
+                      {c.name} (•••• {c.last4})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Payment Amount (₹)</label>
+                <input
+                  type="number"
+                  required
+                  autoFocus
+                  placeholder="0.00"
+                  value={payAmountRupees}
+                  onChange={(e) => setPayAmountRupees(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Remarks / Note</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Minimum due paid, Full settlement via Netbanking"
+                  value={payNote}
+                  onChange={(e) => setPayNote(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPayBillModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-500/25"
+                >
+                  Record Bill Payment
                 </button>
               </div>
             </form>

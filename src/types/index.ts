@@ -132,5 +132,32 @@ export interface VaultItem {
   updated_at?: string;
 }
 
+export type SheetColumnType = 'text' | 'number' | 'date' | 'amount' | 'status' | 'phone';
+
+export interface SheetColumn {
+  id: string;
+  name: string;
+  type: SheetColumnType;
+}
+
+export interface SheetRow {
+  id: string;
+  data: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RecordSheet {
+  id: string;
+  workspace_id: string;
+  title: string;
+  category?: string;
+  color?: string;
+  columns: SheetColumn[];
+  rows: SheetRow[];
+  created_at?: string;
+  updated_at?: string;
+}
+
 export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error';
-export type TabType = 'dashboard' | 'cash' | 'dues' | 'cards' | 'notes' | 'vault' | 'reports';
+export type TabType = 'dashboard' | 'cash' | 'dues' | 'cards' | 'sheets' | 'notes' | 'vault' | 'reports';

@@ -12,6 +12,8 @@ import {
   X,
   KeyRound,
   ShieldCheck,
+  RotateCcw,
+  ShieldAlert,
 } from 'lucide-react';
 import { VaultItem } from '@/types';
 import { useVaultStore } from '@/stores/useVaultStore';
@@ -19,27 +21,115 @@ import { useSessionStore } from '@/stores/useSessionStore';
 import { encryptData, decryptData } from '@/lib/crypto';
 
 export function VaultScreen() {
-  const { vaultItems, masterPassword, isUnlocked, setMasterPassword, addVaultItemOptimistic, deleteVaultItemOptimistic, lockVault } = useVaultStore();
+  const {
+    vaultItems,
+    masterPassword,
+    isUnlocked,
+    hasConfiguredPassword,
+    setupMasterPassword,
+    verifyAndUnlock,
+    changeMasterPassword,
+    resetVault,
+    addVaultItemOptimistic,
+    deleteVaultItemOptimistic,
+    lockVault,
+  } = useVaultStore();
+
   const { activeWorkspaceId, theme } = useSessionStore();
   const isLight = theme === 'light';
 
+  // Unlock / Setup PIN Inputs
   const [enteredPin, setEnteredPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [authError, setAuthError] = useState('');
+
+  // Change PIN Modal
+  const [showChangePinModal, setShowChangePinModal] = useState(false);
+  const [currentPinInput, setCurrentPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [confirmNewPinInput, setConfirmNewPinInput] = useState('');
+  const [changePinError, setChangePinError] = useState('');
+  const [changePinSuccess, setChangePinSuccess] = useState('');
+
+  // Reset Vault Modal
+  const [showResetModal, setShowResetModal] = useState(false);
+
+  // Add Item State
   const [showAddModal, setShowAddModal] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, string>>({});
-
-  // Add Item State
   const [itemTitle, setItemTitle] = useState('');
   const [itemType, setItemType] = useState<'password' | 'pin' | 'id_card' | 'secure_note'>('password');
   const [username, setUsername] = useState('');
   const [secretValue, setSecretValue] = useState('');
   const [itemNotes, setItemNotes] = useState('');
 
+  const handleInitialSetup = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    if (!enteredPin.trim() || enteredPin.length < 4) {
+      setAuthError('PIN / Password must be at least 4 characters long.');
+      return;
+    }
+    if (enteredPin !== confirmPin) {
+      setAuthError('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setupMasterPassword(enteredPin.trim());
+    setEnteredPin('');
+    setConfirmPin('');
+  };
+
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError('');
     if (!enteredPin.trim()) return;
-    setMasterPassword(enteredPin.trim());
+
+    const ok = verifyAndUnlock(enteredPin.trim());
+    if (!ok) {
+      setAuthError('Incorrect Master Password / PIN. Please try again.');
+    } else {
+      setEnteredPin('');
+    }
+  };
+
+  const handleChangePin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setChangePinError('');
+    setChangePinSuccess('');
+
+    if (newPinInput !== confirmNewPinInput) {
+      setChangePinError('New PINs do not match.');
+      return;
+    }
+    if (newPinInput.length < 4) {
+      setChangePinError('New PIN must be at least 4 characters.');
+      return;
+    }
+
+    const ok = changeMasterPassword(currentPinInput, newPinInput);
+    if (!ok) {
+      setChangePinError('Current Master PIN is incorrect.');
+    } else {
+      setChangePinSuccess('Master PIN updated successfully!');
+      setTimeout(() => {
+        setShowChangePinModal(false);
+        setCurrentPinInput('');
+        setNewPinInput('');
+        setConfirmNewPinInput('');
+        setChangePinSuccess('');
+      }, 1000);
+    }
+  };
+
+  const handleConfirmReset = () => {
+    resetVault();
+    setShowResetModal(false);
     setEnteredPin('');
+    setConfirmPin('');
+    setAuthError('');
+    alert('Vault has been reset. You can now configure a fresh Master PIN.');
   };
 
   const handleCreateItem = async (e: React.FormEvent) => {
@@ -137,6 +227,14 @@ export function VaultScreen() {
         {isUnlocked && (
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowChangePinModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-2xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 transition-all touch-press"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Change PIN</span>
+            </button>
+
+            <button
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 font-bold text-white text-xs shadow-lg shadow-violet-500/25 transition-all hover-lift touch-press"
             >
@@ -146,17 +244,17 @@ export function VaultScreen() {
 
             <button
               onClick={lockVault}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-all touch-press"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 transition-all touch-press"
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>Lock Vault</span>
+              <span>Lock</span>
             </button>
           </div>
         )}
       </div>
 
       {!isUnlocked ? (
-        /* Locked State */
+        /* Locked / Setup State */
         <div
           className={`max-w-md mx-auto rounded-3xl border p-8 text-center space-y-5 shadow-2xl ${
             isLight ? 'bg-white border-slate-200' : 'bg-slate-900/90 border-white/10'
@@ -165,30 +263,81 @@ export function VaultScreen() {
           <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-violet-500/30">
             <KeyRound className="w-7 h-7" />
           </div>
+
           <div>
-            <h3 className="font-black text-lg text-slate-900 dark:text-white">Vault is Locked</h3>
+            <h3 className="font-black text-lg text-slate-900 dark:text-white">
+              {hasConfiguredPassword ? 'Unlock Secure Vault' : 'Set Up Master PIN / Password'}
+            </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 max-w-xs mx-auto">
-              Enter your Master PIN or Password to decrypt your stored secrets and passwords.
+              {hasConfiguredPassword
+                ? 'Enter your Master PIN or Password to decrypt your stored passwords.'
+                : 'Create a Master PIN (4+ digits) to protect all your sensitive banking and personal IDs.'}
             </p>
           </div>
 
-          <form onSubmit={handleUnlock} className="space-y-3.5">
-            <input
-              type="password"
-              required
-              autoFocus
-              placeholder="Enter Master Password / PIN"
-              value={enteredPin}
-              onChange={(e) => setEnteredPin(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-center font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-            />
-            <button
-              type="submit"
-              className="w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold text-xs shadow-lg shadow-violet-500/30 transition-all hover-lift touch-press"
-            >
-              Unlock Vault
-            </button>
-          </form>
+          {authError && (
+            <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+              {authError}
+            </div>
+          )}
+
+          {!hasConfiguredPassword ? (
+            /* First Time Setup Form */
+            <form onSubmit={handleInitialSetup} className="space-y-3.5">
+              <input
+                type="password"
+                required
+                autoFocus
+                placeholder="Choose a Master PIN (e.g. 1234)"
+                value={enteredPin}
+                onChange={(e) => setEnteredPin(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-center font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+              <input
+                type="password"
+                required
+                placeholder="Confirm Master PIN"
+                value={confirmPin}
+                onChange={(e) => setConfirmPin(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-center font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+              <button
+                type="submit"
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold text-xs shadow-lg shadow-violet-500/30 transition-all hover-lift touch-press"
+              >
+                Set Master PIN & Open Vault
+              </button>
+            </form>
+          ) : (
+            /* Unlock Form */
+            <form onSubmit={handleUnlock} className="space-y-3.5">
+              <input
+                type="password"
+                required
+                autoFocus
+                placeholder="Enter Master Password / PIN"
+                value={enteredPin}
+                onChange={(e) => setEnteredPin(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-center font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+              <button
+                type="submit"
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold text-xs shadow-lg shadow-violet-500/30 transition-all hover-lift touch-press"
+              >
+                Unlock Vault
+              </button>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(true)}
+                  className="text-xs text-slate-400 hover:text-rose-500 underline font-medium"
+                >
+                  Forgot PIN? Reset Vault Password
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       ) : (
         /* Unlocked Vault Grid */
@@ -263,6 +412,121 @@ export function VaultScreen() {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* Modal: Change Master PIN */}
+      {showChangePinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Change Master PIN / Password</h3>
+              <button onClick={() => setShowChangePinModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {changePinError && (
+              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+                {changePinError}
+              </div>
+            )}
+
+            {changePinSuccess && (
+              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
+                {changePinSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleChangePin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Current Master PIN</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter current PIN"
+                  value={currentPinInput}
+                  onChange={(e) => setCurrentPinInput(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">New Master PIN</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter new PIN"
+                  value={newPinInput}
+                  onChange={(e) => setNewPinInput(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Confirm New Master PIN</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Re-type new PIN"
+                  value={confirmNewPinInput}
+                  onChange={(e) => setConfirmNewPinInput(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-mono"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowChangePinModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold text-xs shadow-md shadow-violet-500/25"
+                >
+                  Update PIN
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Reset Vault (Safety Alert) */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="font-black text-lg text-slate-900 dark:text-white">Reset Vault Password?</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Because AES-256 is zero-knowledge encrypted, resetting your master password will erase currently encrypted passwords that cannot be decrypted without the old PIN.
+              </p>
+            </div>
+
+            <div className="pt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReset}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-500/25"
+              >
+                Yes, Reset Vault
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

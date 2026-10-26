@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Wallet,
   CreditCard,
@@ -17,7 +17,8 @@ import { useCustomerStore } from '@/stores/useCustomerStore';
 import { useCardStore } from '@/stores/useCardStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { formatPaise } from '@/lib/money';
-import { TabType } from '@/types';
+import { TabType, LedgerEntry } from '@/types';
+import { TransactionDetailModal } from '@/components/modals/TransactionDetailModal';
 
 interface DashboardProps {
   onNavigateTab: (tab: TabType) => void;
@@ -37,6 +38,8 @@ export function DashboardScreen({
   const { cards } = useCardStore();
   const { theme } = useSessionStore();
   const isLight = theme === 'light';
+
+  const [selectedEntryForDetail, setSelectedEntryForDetail] = useState<LedgerEntry | null>(null);
 
   // Live financial metrics
   const totalReceivables = dues
@@ -318,7 +321,11 @@ export function DashboardScreen({
             {ledger.slice(0, 8).map((entry) => {
               const isInflow = entry.type === 'cash_in';
               return (
-                <div key={entry.id} className="py-3 flex items-center justify-between text-xs hover:bg-slate-50/50 dark:hover:bg-white/5 px-2 rounded-xl transition-colors">
+                <div
+                  key={entry.id}
+                  onClick={() => setSelectedEntryForDetail(entry)}
+                  className="py-3 flex items-center justify-between text-xs hover:bg-slate-50/50 dark:hover:bg-white/5 px-2 rounded-xl transition-colors cursor-pointer"
+                >
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-xs shrink-0 shadow-xs ${
@@ -361,6 +368,12 @@ export function DashboardScreen({
           </div>
         )}
       </div>
+
+      {/* Transaction Detail Popup Modal */}
+      <TransactionDetailModal
+        entry={selectedEntryForDetail}
+        onClose={() => setSelectedEntryForDetail(null)}
+      />
     </div>
   );
 }
