@@ -30,7 +30,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const activeCardsCount = cards.filter((c) => c.is_active).length;
 
   const navItems = [
-    { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'dashboard' as TabType, label: 'Overview', icon: LayoutDashboard },
     { id: 'cash' as TabType, label: 'Bank & Accounts', icon: Wallet },
     { id: 'dues' as TabType, label: 'Dues & Udhar', icon: Users, badge: pendingDuesCount || undefined },
     { id: 'cards' as TabType, label: 'Credit Cards', icon: CreditCard, badge: activeCardsCount || undefined },
@@ -41,14 +41,14 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   return (
     <aside
-      className={`hidden md:flex flex-col w-64 border-r p-4 space-y-1.5 select-none transition-all ${
+      className={`hidden md:flex flex-col w-56 border-r p-3 space-y-1 select-none transition-colors ${
         isLight
-          ? 'bg-white/70 border-slate-200/90 text-slate-800 backdrop-blur-xl'
-          : 'bg-slate-950/70 border-white/10 text-white backdrop-blur-xl'
+          ? 'bg-zinc-50/50 border-zinc-200 text-zinc-800'
+          : 'bg-[#09090b] border-zinc-800/80 text-zinc-200'
       }`}
     >
-      <div className="text-[11px] font-bold tracking-wider uppercase text-slate-400 px-3 py-2">
-        Financial Modules
+      <div className="text-[10px] font-semibold tracking-wider uppercase text-zinc-400 dark:text-zinc-500 px-2.5 py-1.5">
+        Modules
       </div>
       {navItems.map((item) => {
         const Icon = item.icon;
@@ -57,36 +57,22 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 touch-press ${
+            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md font-medium text-xs transition-colors ${
               isActive
-                ? isLight
-                  ? 'bg-emerald-500/15 text-emerald-800 font-bold border border-emerald-300 shadow-xs'
-                  : 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-300 font-bold border border-emerald-500/30 shadow-md shadow-emerald-950/40'
-                : isLight
-                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                ? 'bg-zinc-200/70 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100/80 dark:hover:bg-zinc-850'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <Icon
-                className={`w-4 h-4 ${
-                  isActive
-                    ? 'text-emerald-500'
-                    : isLight
-                    ? 'text-slate-500'
-                    : 'text-slate-400'
-                }`}
-              />
+            <div className="flex items-center gap-2.5">
+              <Icon className="w-3.5 h-3.5 opacity-70" />
               <span>{item.label}</span>
             </div>
             {item.badge !== undefined && (
               <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
                   isActive
-                    ? 'bg-emerald-500 text-white'
-                    : isLight
-                    ? 'bg-slate-200 text-slate-700'
-                    : 'bg-white/10 text-slate-300'
+                    ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                    : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                 }`}
               >
                 {item.badge}

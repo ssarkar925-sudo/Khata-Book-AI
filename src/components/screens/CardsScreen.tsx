@@ -5,9 +5,7 @@ import {
   CreditCard,
   Plus,
   Calendar,
-  AlertCircle,
   X,
-  TrendingDown,
 } from 'lucide-react';
 import { Card } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
@@ -50,65 +48,70 @@ export function CardsScreen() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-indigo-500" />
-            <span>Credit Cards & Billing</span>
+          <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-zinc-500" />
+            <span>Credit Cards</span>
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Track credit limits, billing statement cut dates, and monthly swipe dues.
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Monitor credit card limits and statement cutoff cycles.
           </p>
         </div>
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 font-semibold text-white text-xs shadow-md shadow-indigo-500/20 transition-all touch-press"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white font-medium text-xs transition-colors"
         >
-          <Plus className="w-4 h-4" />
-          <span>Add Credit Card</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>Add Card</span>
         </button>
       </div>
 
       {/* Cards List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {cards.length === 0 ? (
-          <div className="col-span-full text-center py-12 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 p-6 text-xs text-slate-400">
-            No credit cards added yet. Click <span className="font-bold text-indigo-500">+ Add Credit Card</span> above to track your limits and billing cycles.
+          <div className="col-span-full text-center py-12 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 p-6 text-xs text-zinc-400 space-y-1">
+            <p>No credit cards configured.</p>
+            <p className="text-[11px] text-zinc-500">Click &quot;Add Card&quot; to manage your billing and limits.</p>
           </div>
         ) : (
           cards.map((card) => (
             <div
               key={card.id}
-              className="rounded-3xl p-6 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-500/20 shadow-xl space-y-4 hover-lift"
+              className={`rounded-xl border p-4 space-y-3 transition-colors ${
+                isLight ? 'bg-white border-zinc-200' : 'bg-[#121215] border-zinc-800/80'
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">
                     {card.bank}
                   </span>
-                  <h3 className="font-bold text-base text-white">{card.name}</h3>
+                  <h3 className="font-medium text-sm text-zinc-900 dark:text-zinc-100">{card.name}</h3>
                 </div>
-                <div className="p-2 rounded-xl bg-white/10">
-                  <CreditCard className="w-5 h-5 text-indigo-400" />
-                </div>
+                <CreditCard className="w-4 h-4 text-zinc-400" />
               </div>
 
-              <div className="flex items-center justify-between font-mono text-xs text-slate-300">
-                <span>•••• •••• •••• {card.last4}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10">
-                  Bill Day: {card.statement_day}th
-                </span>
+              <div className="font-mono text-xs text-zinc-400">
+                •••• •••• •••• {card.last4}
               </div>
 
-              <div className="pt-3 border-t border-white/10 flex items-center justify-between">
+              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-xs">
                 <div>
-                  <span className="text-[10px] text-slate-400 block">Total Limit</span>
-                  <span className="text-sm font-bold tabular-nums">{formatPaise(card.credit_limit)}</span>
+                  <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Credit Limit</span>
+                  <span className="font-mono font-medium text-zinc-900 dark:text-zinc-100 tabular-nums">
+                    {formatPaise(card.credit_limit)}
+                  </span>
                 </div>
-                <span className="text-xs text-emerald-400 font-bold">Active</span>
+                <div className="text-right">
+                  <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Cutoff Day</span>
+                  <span className="font-mono font-medium text-zinc-900 dark:text-zinc-100">
+                    {card.statement_day}th / month
+                  </span>
+                </div>
               </div>
             </div>
           ))
@@ -117,86 +120,92 @@ export function CardsScreen() {
 
       {/* Modal: Add Card */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">Add Credit Card</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-3">
+              <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">New Credit Card</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddCard} className="space-y-4">
+            <form onSubmit={handleAddCard} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Card Name</label>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Card Name / Nickname</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. HDFC Millennia, ICICI Amazon Pay"
+                  placeholder="e.g. HDFC Regalia, SBI SimplyClick"
                   value={cardName}
                   onChange={(e) => setCardName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Bank Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. HDFC, SBI"
-                    value={cardBank}
-                    onChange={(e) => setCardBank(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Last 4 Digits</label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={4}
-                    placeholder="e.g. 4082"
-                    value={last4}
-                    onChange={(e) => setLast4(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white"
-                  />
-                </div>
+              <div>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Bank Issuer</label>
+                <input
+                  type="text"
+                  placeholder="e.g. HDFC Bank, ICICI"
+                  value={cardBank}
+                  onChange={(e) => setCardBank(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Total Limit (₹)</label>
+                  <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Last 4 Digits</label>
                   <input
-                    type="number"
-                    placeholder="e.g. 150000"
-                    value={limitRupees}
-                    onChange={(e) => setLimitRupees(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white"
+                    type="text"
+                    maxLength={4}
+                    required
+                    placeholder="1234"
+                    value={last4}
+                    onChange={(e) => setLast4(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Statement Day</label>
+                  <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Bill Date (Day)</label>
                   <input
                     type="number"
                     min={1}
                     max={31}
                     value={statementDay}
                     onChange={(e) => setStatementDay(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
                   />
                 </div>
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
-              >
-                Add Card
-              </button>
+              <div>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Total Limit (₹)</label>
+                <input
+                  type="number"
+                  placeholder="e.g. 150000"
+                  value={limitRupees}
+                  onChange={(e) => setLimitRupees(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-xs font-medium transition-colors"
+                >
+                  Save Card
+                </button>
+              </div>
             </form>
           </div>
         </div>

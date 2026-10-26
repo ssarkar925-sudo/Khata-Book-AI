@@ -27,7 +27,7 @@ export function MobileNav({ activeTab, setActiveTab, onOpenMore }: MobileNavProp
   const pendingDuesCount = dues.filter((d) => d.status === 'pending').length;
 
   const items: { id: TabType; label: string; icon: React.ElementType; badge?: number }[] = [
-    { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
     { id: 'cash', label: 'Accounts', icon: Wallet },
     { id: 'dues', label: 'Dues', icon: Users, badge: pendingDuesCount || undefined },
     { id: 'cards', label: 'Cards', icon: CreditCard },
@@ -36,10 +36,10 @@ export function MobileNav({ activeTab, setActiveTab, onOpenMore }: MobileNavProp
 
   return (
     <nav
-      className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 mobile-dock transition-all ${
+      className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 transition-colors border-t ${
         isLight
-          ? 'bg-white/90 border-slate-200/90 text-slate-700 shadow-[0_-8px_25px_rgba(0,0,0,0.06)]'
-          : 'bg-slate-950/90 border-white/10 text-slate-300 shadow-[0_-8px_30px_rgba(0,0,0,0.45)]'
+          ? 'bg-white/95 border-zinc-200 text-zinc-600 shadow-sm'
+          : 'bg-[#0c0d0e]/95 border-zinc-800/80 text-zinc-400 shadow-sm'
       }`}
       style={{
         paddingBottom: 'max(0.45rem, env(safe-area-inset-bottom, 0px))',
@@ -54,29 +54,25 @@ export function MobileNav({ activeTab, setActiveTab, onOpenMore }: MobileNavProp
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center py-1 rounded-2xl transition-all touch-press ${
+              className={`flex flex-col items-center justify-center py-1 transition-colors ${
                 isActive
-                  ? 'text-emerald-600 dark:text-emerald-400 font-bold'
-                  : isLight
-                  ? 'text-slate-500 hover:text-slate-800'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'text-zinc-900 dark:text-zinc-100 font-semibold'
+                  : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
               }`}
             >
               <div
-                className={`relative flex items-center justify-center w-11 h-7 rounded-full transition-all duration-200 ${
-                  isActive
-                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 scale-105 shadow-xs shadow-emerald-500/20'
-                    : 'bg-transparent'
+                className={`relative flex items-center justify-center w-10 h-7 rounded-md transition-colors ${
+                  isActive ? 'bg-zinc-100 dark:bg-zinc-800' : 'bg-transparent'
                 }`}
               >
-                <Icon className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform ${isActive ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                <Icon className="w-4 h-4" />
                 {item.badge && item.badge > 0 ? (
-                  <span className="absolute -top-1 -right-1 px-1 min-w-[15px] h-[15px] rounded-full text-[9px] bg-rose-500 text-white flex items-center justify-center font-bold shadow-sm ring-1 ring-white dark:ring-slate-900">
+                  <span className="absolute -top-0.5 -right-0.5 px-1 min-w-[13px] h-[13px] rounded-full text-[8.5px] bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 flex items-center justify-center font-mono font-bold">
                     {item.badge > 99 ? '99+' : item.badge}
                   </span>
                 ) : null}
               </div>
-              <span className={`text-[9.5px] mt-0.5 tracking-tight truncate max-w-full px-0.5 ${isActive ? 'font-bold' : 'font-medium'}`}>
+              <span className="text-[9px] mt-0.5 tracking-tight truncate max-w-full px-0.5">
                 {item.label}
               </span>
             </button>
@@ -86,24 +82,22 @@ export function MobileNav({ activeTab, setActiveTab, onOpenMore }: MobileNavProp
         {/* More Tab */}
         <button
           onClick={onOpenMore}
-          className={`flex flex-col items-center justify-center py-1 rounded-2xl transition-all touch-press ${
+          className={`flex flex-col items-center justify-center py-1 transition-colors ${
             activeTab === 'vault' || activeTab === 'reports'
-              ? 'text-emerald-600 dark:text-emerald-400 font-bold'
-              : isLight
-              ? 'text-slate-500 hover:text-slate-800'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'text-zinc-900 dark:text-zinc-100 font-semibold'
+              : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
           }`}
         >
           <div
-            className={`flex items-center justify-center w-11 h-7 rounded-full transition-all duration-200 ${
+            className={`flex items-center justify-center w-10 h-7 rounded-md transition-colors ${
               activeTab === 'vault' || activeTab === 'reports'
-                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 scale-105 shadow-xs shadow-emerald-500/20'
+                ? 'bg-zinc-100 dark:bg-zinc-800'
                 : 'bg-transparent'
             }`}
           >
-            <MoreHorizontal className="w-4 h-4 sm:w-5 sm:h-5" />
+            <MoreHorizontal className="w-4 h-4" />
           </div>
-          <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">More</span>
+          <span className="text-[9px] mt-0.5 tracking-tight font-medium">More</span>
         </button>
       </div>
     </nav>

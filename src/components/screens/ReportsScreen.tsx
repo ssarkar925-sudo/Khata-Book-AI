@@ -13,9 +13,9 @@ import { paiseToRupees } from '@/lib/money';
 
 export function ReportsScreen() {
   const { entries: ledger } = useLedgerStore();
-  const { customers, dues } = useCustomerStore();
+  const { customers } = useCustomerStore();
   const { cards } = useCardStore();
-  const { theme, workspaces, activeWorkspaceId } = useSessionStore();
+  const { workspaces, activeWorkspaceId, theme } = useSessionStore();
   const isLight = theme === 'light';
 
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -42,48 +42,56 @@ export function ReportsScreen() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
-            <span>Financial Statements & Tax Export</span>
+          <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <FileSpreadsheet className="w-4 h-4 text-zinc-500" />
+            <span>Reports & Tax Export</span>
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Download your transaction journals and debtor summaries ready for your CA or tax accountant.
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Export structured financial statements ready for audit, CA, or tax filing.
           </p>
         </div>
 
         <button
           onClick={handleExportCSV}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all touch-press"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white font-medium text-xs transition-colors"
         >
-          <Download className="w-4 h-4" />
-          <span>Export Full Ledger CSV</span>
+          <Download className="w-3.5 h-3.5" />
+          <span>Export CSV Statement</span>
         </button>
       </div>
 
       <div
-        className={`rounded-3xl border p-6 space-y-4 ${
-          isLight ? 'bg-white border-slate-200/90 shadow-xs' : 'bg-slate-900/80 border-white/10'
+        className={`rounded-xl border p-5 space-y-4 ${
+          isLight ? 'bg-white border-zinc-200' : 'bg-[#121215] border-zinc-800/80'
         }`}
       >
-        <h3 className="font-bold text-sm text-slate-900 dark:text-white">Summary for Accountant</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-            <span className="text-slate-400 block mb-1">Total Logged Transactions</span>
-            <span className="font-black text-lg text-slate-900 dark:text-white">{ledger.length}</span>
+        <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 uppercase tracking-wider font-mono">
+          Financial Journal Summary
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="p-3.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/40">
+            <span className="text-[11px] text-zinc-400 font-mono block mb-1">Total Journal Entries</span>
+            <span className="font-semibold text-base font-mono text-zinc-900 dark:text-zinc-100 tabular-nums">
+              {ledger.length}
+            </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-            <span className="text-slate-400 block mb-1">Active Customers / Parties</span>
-            <span className="font-black text-lg text-slate-900 dark:text-white">{customers.length}</span>
+          <div className="p-3.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/40">
+            <span className="text-[11px] text-zinc-400 font-mono block mb-1">Parties & Contacts</span>
+            <span className="font-semibold text-base font-mono text-zinc-900 dark:text-zinc-100 tabular-nums">
+              {customers.length}
+            </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-            <span className="text-slate-400 block mb-1">Credit Cards Tracked</span>
-            <span className="font-black text-lg text-slate-900 dark:text-white">{cards.length}</span>
+          <div className="p-3.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/40">
+            <span className="text-[11px] text-zinc-400 font-mono block mb-1">Tracked Credit Cards</span>
+            <span className="font-semibold text-base font-mono text-zinc-900 dark:text-zinc-100 tabular-nums">
+              {cards.length}
+            </span>
           </div>
         </div>
       </div>

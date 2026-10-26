@@ -6,9 +6,8 @@ import {
   RefreshCw,
   Sun,
   Moon,
-  Building,
-  CheckCircle2,
-  Plus,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 import { useSessionStore } from '@/stores/useSessionStore';
 
@@ -26,46 +25,48 @@ export function Navbar({ onOpenAskAI, onRefresh }: NavbarProps) {
 
   return (
     <header
-      className={`sticky top-0 z-40 w-full border-b transition-all px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between ${
+      className={`sticky top-0 z-40 w-full border-b transition-colors px-4 sm:px-6 py-2.5 flex items-center justify-between ${
         isLight
-          ? 'bg-white/85 border-slate-200/90 backdrop-blur-xl shadow-xs text-slate-800'
-          : 'bg-slate-950/85 border-white/10 backdrop-blur-xl text-white shadow-lg shadow-black/20'
+          ? 'bg-white/95 border-zinc-200 backdrop-blur-md text-zinc-900'
+          : 'bg-[#0c0d0e]/95 border-zinc-800/80 backdrop-blur-md text-zinc-100'
       }`}
     >
-      {/* Brand & Workspace Switcher */}
-      <div className="flex items-center gap-2.5">
-        <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-amber-500 via-emerald-500 to-teal-400 flex items-center justify-center font-extrabold text-sm text-white shadow-md shadow-emerald-500/25 shrink-0">
-          RB
-        </div>
-        <div className="hidden sm:block">
-          <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 dark:from-emerald-400 dark:via-teal-300 dark:to-cyan-400 bg-clip-text text-transparent">
+      {/* Brand & Workspace */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 flex items-center justify-center font-mono font-bold text-xs tracking-wider shrink-0 shadow-2xs">
+            RB
+          </div>
+          <span className="font-semibold text-sm tracking-tight text-zinc-900 dark:text-zinc-100">
             Record Book
           </span>
         </div>
 
-        {/* Workspace Dropdown */}
+        <span className="text-zinc-300 dark:text-zinc-700 font-light select-none">/</span>
+
+        {/* Minimalist Workspace Dropdown */}
         <div className="relative">
           <button
             onClick={() => setShowWsMenu(!showWsMenu)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs sm:text-sm font-semibold transition-all touch-press ${
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
               isLight
-                ? 'bg-slate-100/90 hover:bg-slate-200/90 border-slate-200 text-slate-800 shadow-xs'
-                : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200 shadow-xs'
+                ? 'hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900'
+                : 'hover:bg-zinc-800/60 text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            <Building className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <span className="max-w-[120px] sm:max-w-[180px] truncate">
+            <span className="max-w-[130px] sm:max-w-[180px] truncate">
               {activeWs?.name || 'Primary Record Book'}
             </span>
+            <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
           </button>
 
           {showWsMenu && (
             <div
-              className={`absolute left-0 mt-2 w-60 rounded-2xl border shadow-2xl p-2 z-50 ${
-                isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-white/10 text-white'
+              className={`absolute left-0 mt-1.5 w-56 rounded-lg border shadow-lg p-1 z-50 ${
+                isLight ? 'bg-white border-zinc-200 text-zinc-800' : 'bg-[#141517] border-zinc-800 text-zinc-200'
               }`}
             >
-              <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <div className="px-2.5 py-1 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                 Workspaces
               </div>
               {workspaces.map((ws) => (
@@ -75,16 +76,14 @@ export function Navbar({ onOpenAskAI, onRefresh }: NavbarProps) {
                     setActiveWorkspaceId(ws.id);
                     setShowWsMenu(false);
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-all ${
+                  className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs flex items-center justify-between transition-colors ${
                     ws.id === activeWorkspaceId
-                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 font-semibold'
-                      : isLight
-                      ? 'text-slate-700 hover:bg-slate-100'
-                      : 'text-slate-300 hover:bg-white/5'
+                      ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium'
+                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400'
                   }`}
                 >
                   <span className="truncate">{ws.name}</span>
-                  {ws.id === activeWorkspaceId && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+                  {ws.id === activeWorkspaceId && <Check className="w-3.5 h-3.5 shrink-0 opacity-80" />}
                 </button>
               ))}
             </div>
@@ -94,49 +93,48 @@ export function Navbar({ onOpenAskAI, onRefresh }: NavbarProps) {
 
       {/* Right Controls: Ask AI, Sync Badge, Theme */}
       <div className="flex items-center gap-2">
-        {/* ASK AI BUTTON (Prominent, High-Value) */}
+        {/* ASK AI Linear-Style Command Button */}
         <button
           onClick={onOpenAskAI}
           title="Open Ask AI Accountant"
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all touch-press"
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium transition-all ${
+            isLight
+              ? 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200 text-zinc-800'
+              : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-200'
+          }`}
         >
-          <Sparkles className="w-3.5 h-3.5" />
+          <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
           <span>Ask AI</span>
+          <kbd className="hidden sm:inline-block ml-1 px-1 py-0.2 rounded border text-[10px] font-mono border-zinc-300 dark:border-zinc-700 text-zinc-400">
+            ⌘K
+          </kbd>
         </button>
 
         {/* Sync Status Badge */}
         <button
           onClick={onRefresh}
-          title={`Sync status: ${syncStatus}. Tap to refresh.`}
-          className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold border transition-all touch-press ${
-            syncStatus === 'synced'
-              ? isLight
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700'
-                : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-              : 'bg-amber-500/15 border-amber-500/30 text-amber-500'
+          title={`Status: ${syncStatus}. Click to refresh.`}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs border transition-colors ${
+            isLight
+              ? 'border-zinc-200 hover:bg-zinc-100 text-zinc-500'
+              : 'border-zinc-800 hover:bg-zinc-850 text-zinc-400'
           }`}
         >
-          <span className="relative flex h-2 w-2">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-              syncStatus === 'synced' ? 'bg-emerald-400' : 'bg-amber-400'
-            }`} />
-            <span className={`relative inline-flex rounded-full h-2 w-2 ${
-              syncStatus === 'synced' ? 'bg-emerald-500' : 'bg-amber-500'
-            }`} />
-          </span>
-          <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+          <RefreshCw className="w-3 h-3 hover:rotate-180 transition-transform duration-300" />
         </button>
 
         {/* Theme Toggle */}
         <button
           onClick={() => setTheme(isLight ? 'dark' : 'light')}
-          className={`p-2 rounded-xl border transition-all touch-press ${
+          className={`p-1.5 rounded-md border transition-colors ${
             isLight
-              ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-              : 'bg-white/5 hover:bg-white/10 border-white/10 text-amber-400'
+              ? 'bg-transparent hover:bg-zinc-100 border-zinc-200 text-zinc-600'
+              : 'bg-transparent hover:bg-zinc-800 border-zinc-800 text-zinc-300'
           }`}
+          title="Toggle Theme"
         >
-          {isLight ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+          {isLight ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
         </button>
       </div>
     </header>

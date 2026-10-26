@@ -3,8 +3,6 @@
 import React, { useState } from 'react';
 import {
   Lock,
-  Unlock,
-  KeyRound,
   Plus,
   Copy,
   Check,
@@ -12,7 +10,7 @@ import {
   EyeOff,
   Trash2,
   X,
-  ShieldCheck,
+  KeyRound,
 } from 'lucide-react';
 import { VaultItem } from '@/types';
 import { useVaultStore } from '@/stores/useVaultStore';
@@ -70,7 +68,7 @@ export function VaultScreen() {
       setUsername('');
       setSecretValue('');
       setItemNotes('');
-    } catch (err) {
+    } catch {
       alert('Failed to encrypt secret. Please try again.');
     }
   };
@@ -107,16 +105,16 @@ export function VaultScreen() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <Lock className="w-5 h-5 text-purple-500" />
-            <span>Zero-Knowledge Encrypted Vault</span>
+          <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <Lock className="w-4 h-4 text-zinc-500" />
+            <span>Encrypted Vault (AES-256)</span>
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Store banking passwords, PINs, and personal IDs (Aadhaar, PAN) encrypted with AES-256.
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Client-side encrypted storage for banking passwords and confidential PINs.
           </p>
         </div>
 
@@ -124,50 +122,52 @@ export function VaultScreen() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 font-semibold text-white text-xs shadow-md shadow-purple-500/20 transition-all touch-press"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white font-medium text-xs transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>Add Password / ID</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Secret</span>
             </button>
 
             <button
               onClick={lockVault}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-all touch-press"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-colors"
             >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Lock Vault</span>
+              <Lock className="w-3 h-3" />
+              <span>Lock</span>
             </button>
           </div>
         )}
       </div>
 
       {!isUnlocked ? (
-        /* Locked Screen */
+        /* Locked State */
         <div
-          className={`max-w-md mx-auto rounded-3xl border p-8 text-center space-y-4 shadow-xl ${
-            isLight ? 'bg-white border-slate-200/90 shadow-xs' : 'bg-slate-900/80 border-white/10'
+          className={`max-w-sm mx-auto rounded-xl border p-6 text-center space-y-4 ${
+            isLight ? 'bg-white border-zinc-200 shadow-2xs' : 'bg-[#121215] border-zinc-800/80 shadow-2xs'
           }`}
         >
-          <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center mx-auto shadow-inner">
-            <KeyRound className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto text-zinc-500">
+            <KeyRound className="w-5 h-5" />
           </div>
-          <h3 className="font-bold text-lg text-slate-900 dark:text-white">Vault is Locked</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Enter your Master PIN/Password to decrypt your stored passwords and personal records.
-          </p>
+          <div>
+            <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">Vault is Locked</h3>
+            <p className="text-xs text-zinc-400 mt-1">
+              Enter your Master PIN or Password to decrypt your stored secrets.
+            </p>
+          </div>
 
           <form onSubmit={handleUnlock} className="space-y-3">
             <input
               type="password"
               required
-              placeholder="Enter Master Password / PIN"
+              placeholder="Master PIN / Password"
               value={enteredPin}
               onChange={(e) => setEnteredPin(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-center font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-900 dark:text-white"
+              className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-center font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
             />
             <button
               type="submit"
-              className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-500/20 transition-all touch-press"
+              className="w-full py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-xs font-medium transition-colors"
             >
               Unlock Vault
             </button>
@@ -175,73 +175,70 @@ export function VaultScreen() {
         </div>
       ) : (
         /* Unlocked Vault Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {vaultItems.length === 0 ? (
-            <div className="col-span-full text-center py-12 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 p-6 text-xs text-slate-400">
-              Vault is empty. Click <span className="font-bold text-purple-500">+ Add Password / ID</span> above to store your bank passwords, portal logins, and personal IDs safely.
+            <div className="col-span-full text-center py-12 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 p-6 text-xs text-zinc-400 space-y-1">
+              <p>Vault is empty.</p>
+              <p className="text-[11px] text-zinc-500">Click &quot;Add Secret&quot; above to store secure passwords or IDs.</p>
             </div>
           ) : (
             vaultItems.map((item) => (
               <div
                 key={item.id}
-                className={`rounded-3xl border p-5 space-y-3 transition-all hover-lift ${
-                  isLight ? 'bg-white border-slate-200/90 shadow-xs' : 'bg-slate-900/80 border-white/10'
+                className={`rounded-xl border p-4 space-y-3 transition-colors ${
+                  isLight ? 'bg-white border-zinc-200 hover:border-zinc-400' : 'bg-[#121215] border-zinc-800/80 hover:border-zinc-600'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                    <span className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
                       {item.item_type}
                     </span>
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-white">{item.title}</h3>
+                    <h3 className="font-medium text-xs text-zinc-900 dark:text-zinc-100">{item.title}</h3>
                   </div>
 
                   <button
                     onClick={() => deleteVaultItemOptimistic(item.id)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-rose-500 transition-colors"
+                    className="p-1 rounded text-zinc-400 hover:text-rose-500 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
                 {item.username && (
-                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                    <span className="opacity-75">ID/User: </span>
-                    <span className="font-mono text-slate-800 dark:text-slate-200">{item.username}</span>
+                  <div className="text-xs text-zinc-500">
+                    <span className="text-zinc-400">User: </span>
+                    <span className="font-mono text-zinc-800 dark:text-zinc-200">{item.username}</span>
                   </div>
                 )}
 
                 {/* Secret Value View & Copy */}
-                <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-between text-xs font-mono">
-                  <span className="truncate pr-2">
+                <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs font-mono">
+                  <span className="truncate pr-2 text-zinc-800 dark:text-zinc-200">
                     {visiblePasswords[item.id] ? visiblePasswords[item.id] : '••••••••••••'}
                   </span>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => revealPassword(item)}
-                      className="p-1 text-slate-400 hover:text-slate-600"
+                      className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500"
+                      title={visiblePasswords[item.id] ? 'Hide' : 'Reveal'}
                     >
                       {visiblePasswords[item.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
+
                     <button
-                      onClick={() => {
-                        const val = visiblePasswords[item.id] || item.decrypted_password || '';
-                        if (val) copyToClipboard(val, item.id);
-                      }}
-                      className="p-1 text-slate-400 hover:text-slate-600"
+                      onClick={() => copyToClipboard(item.decrypted_password || visiblePasswords[item.id] || '', item.id)}
+                      className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500"
+                      title="Copy"
                     >
-                      {copiedId === item.id ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-500" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
+                      {copiedId === item.id ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>
 
                 {item.notes && (
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">{item.notes}</p>
+                  <p className="text-[11px] text-zinc-400">{item.notes}</p>
                 )}
               </div>
             ))
@@ -249,73 +246,82 @@ export function VaultScreen() {
         </div>
       )}
 
-      {/* Modal: Add Vault Item */}
+      {/* Modal: Add Item */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">Add Encrypted Item</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-3">
+              <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">Add Secret to Vault</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateItem} className="space-y-4">
+            <form onSubmit={handleCreateItem} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Title</label>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Title</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. HDFC NetBanking, PAN & Aadhaar"
+                  placeholder="e.g. SBI Netbanking, PAN Card"
                   value={itemTitle}
                   onChange={(e) => setItemTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Item Type</label>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Type</label>
                 <select
                   value={itemType}
                   onChange={(e) => setItemType(e.target.value as any)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
                 >
-                  <option value="password">Password / Portal Login</option>
-                  <option value="pin">Bank ATM PIN</option>
-                  <option value="id_card">Personal ID / PAN / Aadhaar</option>
-                  <option value="secure_note">Secret Note</option>
+                  <option value="password">Password</option>
+                  <option value="pin">PIN Code</option>
+                  <option value="id_card">Personal ID / Aadhaar / PAN</option>
+                  <option value="secure_note">Secure Note</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Username / ID (Optional)</label>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Username / ID (Optional)</label>
                 <input
                   type="text"
-                  placeholder="e.g. user_admin"
+                  placeholder="e.g. user@example.com"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Secret / Password / Number</label>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Secret / Password Value</label>
                 <input
                   type="password"
                   required
-                  placeholder="Enter secret to encrypt"
+                  placeholder="Secret content to encrypt"
                   value={secretValue}
                   onChange={(e) => setSecretValue(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs font-mono text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
                 />
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs"
-              >
-                Encrypt & Save in Vault
-              </button>
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-xs font-medium transition-colors"
+                >
+                  Encrypt & Save
+                </button>
+              </div>
             </form>
           </div>
         </div>

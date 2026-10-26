@@ -117,12 +117,12 @@ export default function HomePage() {
 
   if (!mounted) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${isLight ? 'bg-slate-50 text-slate-800' : 'bg-slate-950 text-white'}`}>
-        <div className="flex flex-col items-center gap-2 animate-pulse">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-500 flex items-center justify-center font-bold text-white text-base shadow-lg shadow-emerald-500/20">
+      <div className={`min-h-screen flex items-center justify-center ${isLight ? 'bg-zinc-50 text-zinc-900' : 'bg-zinc-950 text-zinc-100'}`}>
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center font-bold text-xs text-white dark:text-zinc-900 tracking-wider">
             RB
           </div>
-          <span className="text-xs font-semibold text-slate-400">Loading Record Book...</span>
+          <span className="text-xs text-zinc-400 font-mono">loading...</span>
         </div>
       </div>
     );
@@ -130,8 +130,8 @@ export default function HomePage() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col transition-colors duration-250 relative ${
-        isLight ? 'bg-slate-50 fintech-mesh-light text-slate-900' : 'bg-slate-950 fintech-mesh-dark text-slate-100'
+      className={`min-h-screen flex flex-col transition-colors duration-150 relative ${
+        isLight ? 'bg-[#fafafa] text-zinc-900' : 'bg-[#09090b] text-zinc-100'
       }`}
     >
       <Navbar
@@ -175,28 +175,28 @@ export default function HomePage() {
       {/* Mobile More Sheet */}
       {isMobileMoreOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end bg-black/75 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-xs lg:hidden"
           onClick={() => setIsMobileMoreOpen(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full rounded-t-3xl border-t border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-5 space-y-4"
+            className="w-full rounded-t-2xl border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 space-y-4 shadow-xl"
           >
-            <div className="w-12 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto" />
+            <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto" />
             <div className="flex justify-between items-center">
-              <span className="text-sm font-bold text-slate-900 dark:text-white">More Modules</span>
-              <button onClick={() => setIsMobileMoreOpen(false)} className="text-slate-400">
-                <X className="w-5 h-5" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">More Tools</span>
+              <button onClick={() => setIsMobileMoreOpen(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <button
                 onClick={() => {
                   setActiveTab('vault');
                   setIsMobileMoreOpen(false);
                 }}
-                className="p-4 rounded-2xl border border-slate-200 dark:border-white/10 text-left font-bold text-xs"
+                className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 bg-zinc-50/50 dark:bg-zinc-800/40 text-left font-medium text-xs text-zinc-900 dark:text-zinc-100 transition-colors"
               >
                 🔐 Encrypted Vault
               </button>
@@ -205,72 +205,70 @@ export default function HomePage() {
                   setActiveTab('reports');
                   setIsMobileMoreOpen(false);
                 }}
-                className="p-4 rounded-2xl border border-slate-200 dark:border-white/10 text-left font-bold text-xs"
+                className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 bg-zinc-50/50 dark:bg-zinc-800/40 text-left font-medium text-xs text-zinc-900 dark:text-zinc-100 transition-colors"
               >
                 📊 Reports & Export
               </button>
             </div>
-
-            <button
-              onClick={() => {
-                supabase.auth.signOut();
-                setUser(null);
-                setIsMobileMoreOpen(false);
-              }}
-              className="w-full py-2.5 rounded-xl bg-rose-500/10 text-rose-500 font-bold text-xs"
-            >
-              Log Out
-            </button>
           </div>
         </div>
       )}
 
       {/* Quick Cash In / Out Modal */}
       {showCashModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                {showCashModal === 'in' ? 'Record Cash In (+)' : 'Record Cash Out (-)'}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-3">
+              <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+                {showCashModal === 'in' ? 'Record Inflow (+)' : 'Record Outflow (-)'}
               </h3>
-              <button onClick={() => setShowCashModal(null)} className="text-slate-400">
-                <X className="w-5 h-5" />
+              <button onClick={() => setShowCashModal(null)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleRecordQuickCash} className="space-y-4">
+            <form onSubmit={handleRecordQuickCash} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Amount (₹)</label>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Amount (₹)</label>
                 <input
                   type="number"
                   required
                   autoFocus
-                  placeholder="e.g. 500"
+                  placeholder="0.00"
                   value={cashAmountRupees}
                   onChange={(e) => setCashAmountRupees(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-mono text-base font-bold"
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-zinc-900 dark:text-zinc-100 font-mono text-lg font-semibold focus:outline-none focus:border-zinc-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Note / Reason</label>
+                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Note</label>
                 <input
                   type="text"
-                  placeholder="e.g. Customer payment, Tea expense"
+                  placeholder="Description..."
                   value={cashNote}
                   onChange={(e) => setCashNote(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
                 />
               </div>
 
-              <button
-                type="submit"
-                className={`w-full py-2.5 rounded-xl font-bold text-xs text-white ${
-                  showCashModal === 'in' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
-                }`}
-              >
-                {showCashModal === 'in' ? 'Save Cash In' : 'Save Cash Out'}
-              </button>
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCashModal(null)}
+                  className="flex-1 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`flex-1 py-2 rounded-lg font-medium text-xs text-white transition-opacity ${
+                    showCashModal === 'in' ? 'bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white' : 'bg-rose-600 hover:bg-rose-700'
+                  }`}
+                >
+                  Confirm
+                </button>
+              </div>
             </form>
           </div>
         </div>

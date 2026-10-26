@@ -27,7 +27,7 @@ export function AskAIModal({ isOpen, onClose }: AskAIModalProps) {
   const [messages, setMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string; action?: any }>>([
     {
       sender: 'ai',
-      text: 'Hello! I am **Ask AI**, your personal financial accountant. Ask me about your monthly spending, who owes you money, upcoming card bills, or total balances.',
+      text: 'Hello. I am **Ask AI**, your automated financial assistant. You can ask me about monthly spending, debtor dues, upcoming credit card cutoffs, or net liquid balances.',
     },
   ]);
   const [isThinking, setIsThinking] = useState(false);
@@ -64,7 +64,7 @@ export function AskAIModal({ isOpen, onClose }: AskAIModalProps) {
         },
       ]);
       setIsThinking(false);
-    }, 250);
+    }, 200);
   };
 
   const quickQuestions = [
@@ -75,58 +75,52 @@ export function AskAIModal({ isOpen, onClose }: AskAIModalProps) {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl flex flex-col h-[600px] max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs">
+      <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col h-[580px] max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50/80 dark:bg-slate-950/50">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/25">
-              <Sparkles className="w-4 h-4" />
+        <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 flex items-center justify-center font-mono text-xs">
+              <Sparkles className="w-3.5 h-3.5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-                <span>Ask AI</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold">
-                  Accountant
-                </span>
+              <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                <span>Ask AI Assistant</span>
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Instant financial intelligence on your Record Book
-              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+            className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Chat Stream */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.map((msg, idx) => (
             <div
               key={idx}
               className={`flex items-start gap-2.5 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.sender === 'ai' && (
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                  <Bot className="w-4 h-4" />
+                <div className="w-6 h-6 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-500 flex items-center justify-center shrink-0 mt-0.5">
+                  <Bot className="w-3.5 h-3.5" />
                 </div>
               )}
 
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-3 text-xs leading-relaxed ${
+                className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
                   msg.sender === 'user'
-                    ? 'bg-emerald-600 text-white font-medium rounded-tr-xs'
-                    : 'bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-200 rounded-tl-xs whitespace-pre-wrap'
+                    ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium'
+                    : 'bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap'
                 }`}
               >
                 {msg.text}
 
                 {msg.action && msg.action.type === 'whatsapp' && (
-                  <div className="mt-2.5 pt-2 border-t border-slate-200 dark:border-white/10">
+                  <div className="mt-2.5 pt-2 border-t border-zinc-200 dark:border-zinc-750">
                     <a
                       href={`https://wa.me/91${msg.action.payload.phone}?text=Hello%20${encodeURIComponent(
                         msg.action.payload.name
@@ -135,9 +129,9 @@ export function AskAIModal({ isOpen, onClose }: AskAIModalProps) {
                       ).toFixed(2)}.`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[11px] transition-colors"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium text-[11px] transition-colors"
                     >
-                      <MessageSquare className="w-3.5 h-3.5" />
+                      <MessageSquare className="w-3 h-3" />
                       <span>{msg.action.label}</span>
                     </a>
                   </div>
@@ -147,32 +141,27 @@ export function AskAIModal({ isOpen, onClose }: AskAIModalProps) {
           ))}
 
           {isThinking && (
-            <div className="flex items-center gap-2 text-xs text-slate-400 pl-9 animate-pulse">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Analyzing your records...</span>
+            <div className="flex items-center gap-2 text-xs text-zinc-400 pl-8 font-mono animate-pulse">
+              <span>computing financial data...</span>
             </div>
           )}
         </div>
 
-        {/* Quick Suggestion Chips */}
-        <div className="px-4 py-2 border-t border-slate-200 dark:border-white/10 flex items-center gap-2 overflow-x-auto scrollbar-none bg-slate-50/50 dark:bg-slate-950/20">
-          {quickQuestions.map((chip, idx) => {
-            const Icon = chip.icon;
-            return (
-              <button
-                key={idx}
-                onClick={() => handleSend(chip.query)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:border-emerald-500/50 hover:text-emerald-600 dark:hover:text-emerald-400 whitespace-nowrap transition-all touch-press"
-              >
-                <Icon className="w-3 h-3 text-emerald-500" />
-                <span>{chip.label}</span>
-              </button>
-            );
-          })}
+        {/* Quick Suggestions Chips */}
+        <div className="px-4 py-2 border-t border-zinc-100 dark:border-zinc-850 overflow-x-auto flex gap-1.5">
+          {quickQuestions.map((q, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleSend(q.query)}
+              className="shrink-0 text-[11px] px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors"
+            >
+              {q.label}
+            </button>
+          ))}
         </div>
 
         {/* Input Bar */}
-        <div className="p-3 border-t border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900">
+        <div className="p-3 border-t border-zinc-200 dark:border-zinc-800">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -182,17 +171,18 @@ export function AskAIModal({ isOpen, onClose }: AskAIModalProps) {
           >
             <input
               type="text"
+              autoFocus
+              placeholder="Ask anything about your finances..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask anything (e.g. who owes me money?)..."
-              className="flex-1 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-slate-900 dark:text-white placeholder:text-slate-400"
+              className="flex-1 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
             />
             <button
               type="submit"
               disabled={!query.trim()}
-              className="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white transition-all shadow-md shadow-emerald-500/20"
+              className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white disabled:opacity-40 transition-colors"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-3.5 h-3.5" />
             </button>
           </form>
         </div>
