@@ -129,8 +129,16 @@ class SyncEngine {
           if (error) throw error;
         }
       } catch (err: any) {
-        if (err?.code === 'PGRST204' || err?.code === '42703') {
-          console.warn(`[SyncEngine] Purged obsolete schema error for ${item.table}`);
+        const errCode = String(err?.code || '');
+        // Purge invalid schema columns or impossible constraint violations (e.g. non-existent test user foreign keys)
+        if (
+          errCode === 'PGRST204' ||
+          errCode === '42703' ||
+          errCode === '23502' ||
+          errCode === '23503' ||
+          errCode === '22P02'
+        ) {
+          console.warn(`[SyncEngine] Purged invalid/obsolete database entry for ${item.table}:`, err?.message || errCode);
           continue;
         }
         console.warn(`[SyncEngine] Failed to flush item for table ${item.table}:`, err);
