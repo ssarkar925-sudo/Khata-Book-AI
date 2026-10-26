@@ -6,7 +6,9 @@ import {
   Plus,
   ArrowRightLeft,
   Building,
+  ArrowRight,
   X,
+  CreditCard,
 } from 'lucide-react';
 import { CashLocation } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
@@ -16,13 +18,15 @@ export function CashScreen() {
   const { activeWorkspaceId, theme } = useSessionStore();
   const isLight = theme === 'light';
 
-  const [accounts, setAccounts] = useState<CashLocation[]>([
+  const [accounts, setAccounts] = useState<Array<CashLocation & { gradient?: string; iconColor?: string }>>([
     {
       id: 'default-cash',
       workspace_id: activeWorkspaceId,
       name: 'Physical Cash Drawer',
       balance: 1500000,
       is_default: true,
+      gradient: 'from-amber-500/20 via-orange-500/10 to-transparent',
+      iconColor: 'bg-amber-500 text-white',
     },
     {
       id: 'default-sbi',
@@ -30,6 +34,8 @@ export function CashScreen() {
       name: 'SBI Savings Account',
       balance: 4500000,
       is_default: false,
+      gradient: 'from-blue-600/20 via-cyan-500/10 to-transparent',
+      iconColor: 'bg-blue-600 text-white',
     },
     {
       id: 'default-hdfc',
@@ -37,6 +43,8 @@ export function CashScreen() {
       name: 'HDFC Business Current',
       balance: 8200000,
       is_default: false,
+      gradient: 'from-indigo-600/20 via-purple-500/10 to-transparent',
+      iconColor: 'bg-indigo-600 text-white',
     },
   ]);
 
@@ -56,12 +64,14 @@ export function CashScreen() {
     e.preventDefault();
     if (!newAccName.trim()) return;
     const balancePaise = parseToPaise(newAccBalanceRupees);
-    const newAcc: CashLocation = {
+    const newAcc = {
       id: crypto.randomUUID(),
       workspace_id: activeWorkspaceId,
       name: newAccName.trim(),
       balance: balancePaise,
       is_default: false,
+      gradient: 'from-teal-500/20 via-emerald-500/10 to-transparent',
+      iconColor: 'bg-teal-600 text-white',
     };
     setAccounts((prev) => [...prev, newAcc]);
     setShowAddModal(false);
@@ -87,16 +97,18 @@ export function CashScreen() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
-          <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-            <Wallet className="w-4 h-4 text-zinc-500" />
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-md shadow-emerald-500/25">
+              <Wallet className="w-5 h-5" />
+            </div>
             <span>Bank & Cash Accounts</span>
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            Manage your multiple bank accounts and cash balances.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Track your multiple bank accounts, cash in hand, and internal funds movement.
           </p>
         </div>
 
@@ -107,64 +119,75 @@ export function CashScreen() {
               setToAccId(accounts[1]?.id || '');
               setShowTransferModal(true);
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 font-medium text-xs text-zinc-700 dark:text-zinc-300 transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/30 font-bold text-xs text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all hover-lift touch-press"
           >
-            <ArrowRightLeft className="w-3.5 h-3.5 opacity-70" />
-            <span>Transfer</span>
+            <ArrowRightLeft className="w-4 h-4 text-indigo-500" />
+            <span>Transfer Funds</span>
           </button>
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white font-medium text-xs transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-white text-xs shadow-lg shadow-emerald-500/25 transition-all hover-lift touch-press"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Account</span>
+            <Plus className="w-4 h-4" />
+            <span>Add Bank / Cash</span>
           </button>
         </div>
       </div>
 
-      {/* Summary Banner */}
+      {/* Hero Summary Card */}
       <div
-        className={`rounded-xl border p-4 sm:p-5 transition-colors ${
-          isLight ? 'bg-white border-zinc-200' : 'bg-[#121215] border-zinc-800/80'
-        }`}
+        className="rounded-3xl p-6 sm:p-7 bg-gradient-to-br from-emerald-900 via-teal-900 to-slate-900 text-white border border-emerald-500/25 shadow-xl relative overflow-hidden"
       >
-        <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+        <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-teal-400/10 blur-2xl pointer-events-none" />
+        <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
           Total Liquid Balance
         </span>
-        <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 mt-0.5 tabular-nums font-mono">
+        <div className="text-3xl sm:text-4xl font-black tracking-tight text-white mt-1 tabular-nums">
           {formatPaise(totalBalance)}
         </div>
-        <span className="text-xs text-zinc-400 mt-1 inline-block">
-          Across {accounts.length} accounts
-        </span>
+        <p className="text-xs text-slate-300 mt-2 font-medium">
+          Accumulated across {accounts.length} active bank and physical cash counters
+        </p>
       </div>
 
-      {/* Accounts List */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {/* Accounts Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {accounts.map((acc) => (
           <div
             key={acc.id}
-            className={`rounded-xl border p-4 transition-colors ${
+            className={`rounded-3xl border p-5 transition-all hover-lift bg-gradient-to-br ${acc.gradient} ${
               isLight
-                ? 'bg-white border-zinc-200 hover:border-zinc-400'
-                : 'bg-[#121215] border-zinc-800/80 hover:border-zinc-600'
+                ? 'bg-white border-slate-200 shadow-sm hover:border-slate-300'
+                : 'bg-slate-900/80 border-white/10 hover:border-white/20'
             }`}
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Building className="w-4 h-4 text-zinc-400" />
-                <span className="font-medium text-xs text-zinc-900 dark:text-zinc-100">{acc.name}</span>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-xs shadow-md ${acc.iconColor}`}>
+                  <Building className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
+                    {acc.name}
+                  </h3>
+                  <span className="text-[10px] text-slate-400">Personal Account</span>
+                </div>
               </div>
               {acc.is_default && (
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
                   Primary
                 </span>
               )}
             </div>
 
-            <div className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 tabular-nums font-mono">
+            <div className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">
               {formatPaise(acc.balance)}
+            </div>
+
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-200/60 dark:border-white/10 text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-medium">Active & verified</span>
+              <span className="text-indigo-600 dark:text-indigo-400 font-bold">100% liquid</span>
             </div>
           </div>
         ))}
@@ -172,36 +195,36 @@ export function CashScreen() {
 
       {/* Modal: Add Account */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-3">
-              <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">Add Account</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
-                <X className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Add Bank Account or Counter</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddAccount} className="space-y-3.5">
+            <form onSubmit={handleAddAccount} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Account Name</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Account Name</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. SBI Savings, Cash Counter"
+                  placeholder="e.g. SBI Savings, Paytm Wallet, Shop Cash"
                   value={newAccName}
                   onChange={(e) => setNewAccName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Initial Balance (₹)</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Starting Balance (₹)</label>
                 <input
                   type="number"
                   placeholder="0.00"
                   value={newAccBalanceRupees}
                   onChange={(e) => setNewAccBalanceRupees(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
@@ -209,15 +232,15 @@ export function CashScreen() {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-colors"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-xs font-medium transition-colors"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-500/25"
                 >
-                  Save
+                  Save Account
                 </button>
               </div>
             </form>
@@ -227,25 +250,25 @@ export function CashScreen() {
 
       {/* Modal: Transfer Money */}
       {showTransferModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-3">
-              <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">Transfer Funds</h3>
-              <button onClick={() => setShowTransferModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
-                <X className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Internal Funds Transfer</h3>
+              <button onClick={() => setShowTransferModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleTransfer} className="space-y-3.5">
+            <form onSubmit={handleTransfer} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">From Account</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Transfer From</label>
                 <select
                   value={fromAccId}
                   onChange={(e) => setFromAccId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
                 >
                   {accounts.map((a) => (
-                    <option key={a.id} value={a.id} className="dark:bg-zinc-900">
+                    <option key={a.id} value={a.id} className="dark:bg-slate-900">
                       {a.name} ({formatPaise(a.balance)})
                     </option>
                   ))}
@@ -253,14 +276,14 @@ export function CashScreen() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">To Account</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Transfer To</label>
                 <select
                   value={toAccId}
                   onChange={(e) => setToAccId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
                 >
                   {accounts.map((a) => (
-                    <option key={a.id} value={a.id} className="dark:bg-zinc-900">
+                    <option key={a.id} value={a.id} className="dark:bg-slate-900">
                       {a.name} ({formatPaise(a.balance)})
                     </option>
                   ))}
@@ -268,14 +291,14 @@ export function CashScreen() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Transfer Amount (₹)</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Amount to Transfer (₹)</label>
                 <input
                   type="number"
                   required
                   placeholder="0.00"
                   value={transferAmountRupees}
                   onChange={(e) => setTransferAmountRupees(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold"
                 />
               </div>
 
@@ -283,15 +306,15 @@ export function CashScreen() {
                 <button
                   type="button"
                   onClick={() => setShowTransferModal(false)}
-                  className="flex-1 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-colors"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-xs font-medium transition-colors"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 text-white font-bold text-xs shadow-md shadow-indigo-500/25"
                 >
-                  Transfer
+                  Confirm Transfer
                 </button>
               </div>
             </form>

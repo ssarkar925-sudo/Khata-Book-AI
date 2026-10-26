@@ -5,8 +5,11 @@ import {
   Users,
   Plus,
   MessageSquare,
-  Check,
+  CheckCircle2,
+  TrendingUp,
+  TrendingDown,
   X,
+  Phone,
 } from 'lucide-react';
 import { Customer, PeopleDue } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
@@ -72,27 +75,50 @@ export function DuesScreen() {
   };
 
   const pendingDues = dues.filter((d) => d.status === 'pending');
+  const totalReceivables = pendingDues
+    .filter((d) => d.direction === 'you_will_get')
+    .reduce((s, d) => s + Number(d.amount), 0);
+  const totalPayables = pendingDues
+    .filter((d) => d.direction === 'you_will_give')
+    .reduce((s, d) => s + Number(d.amount), 0);
+
+  // Color generator for customer initials avatar
+  const getAvatarGradient = (name: string) => {
+    const gradients = [
+      'from-blue-500 to-indigo-600',
+      'from-teal-400 to-emerald-600',
+      'from-purple-500 to-pink-500',
+      'from-amber-400 to-orange-500',
+      'from-rose-500 to-red-600',
+      'from-cyan-400 to-blue-500',
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return gradients[Math.abs(hash) % gradients.length];
+  };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
-          <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-            <Users className="w-4 h-4 text-zinc-500" />
-            <span>Dues & Credit Ledger</span>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25">
+              <Users className="w-5 h-5" />
+            </div>
+            <span>Dues & Udhar Book</span>
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            Track receivables (You Will Get) and payables (You Will Give).
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Track receivables (You Will Get), payables (You Will Give), and dispatch one-tap WhatsApp reminders.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowAddCustomerModal(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 font-medium text-xs text-zinc-700 dark:text-zinc-300 transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 font-bold text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-white/10 transition-all hover-lift touch-press"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             <span>Add Contact</span>
           </button>
 
@@ -101,52 +127,97 @@ export function DuesScreen() {
               if (customers.length > 0) setSelectedCustId(customers[0].id);
               setShowAddDueModal(true);
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white font-medium text-xs transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 font-bold text-white text-xs shadow-lg shadow-cyan-500/25 transition-all hover-lift touch-press"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Record Due</span>
+            <Plus className="w-4 h-4" />
+            <span>Record Due (Udhar)</span>
           </button>
+        </div>
+      </div>
+
+      {/* Dual Summary Banners (Receivables vs Payables) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Receivables Banner */}
+        <div className="rounded-3xl p-6 bg-gradient-to-br from-emerald-950 via-slate-900 to-teal-950 text-white border border-emerald-500/25 shadow-xl relative overflow-hidden">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+              Total You Will Get
+            </span>
+            <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300">
+              <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+            </div>
+          </div>
+          <div className="text-3xl font-black text-emerald-400 tabular-nums">
+            +{formatPaise(totalReceivables)}
+          </div>
+          <span className="text-xs text-slate-300 mt-1 inline-block">
+            Expected from credit customers
+          </span>
+        </div>
+
+        {/* Payables Banner */}
+        <div className="rounded-3xl p-6 bg-gradient-to-br from-rose-950 via-slate-900 to-red-950 text-white border border-rose-500/25 shadow-xl relative overflow-hidden">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-300">
+              Total You Will Give
+            </span>
+            <div className="p-2 rounded-xl bg-rose-500/20 text-rose-300">
+              <TrendingDown className="w-4 h-4 stroke-[2.5]" />
+            </div>
+          </div>
+          <div className="text-3xl font-black text-rose-400 tabular-nums">
+            -{formatPaise(totalPayables)}
+          </div>
+          <span className="text-xs text-slate-300 mt-1 inline-block">
+            Pending payments to suppliers & vendors
+          </span>
         </div>
       </div>
 
       {/* Dues List */}
       <div
-        className={`rounded-xl border p-4 sm:p-5 transition-colors ${
-          isLight ? 'bg-white border-zinc-200' : 'bg-[#121215] border-zinc-800/80'
+        className={`rounded-3xl border p-5 sm:p-6 transition-all ${
+          isLight ? 'bg-white border-slate-200/90 shadow-sm' : 'bg-slate-900/80 border-white/10 shadow-lg'
         }`}
       >
-        <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-zinc-100 dark:border-zinc-800/60">
-          <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 uppercase tracking-wider font-mono">
-            Pending Dues ({pendingDues.length})
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-white/5">
+          <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+            Active Due Records ({pendingDues.length})
           </h3>
-          <span className="text-xs text-zinc-400 font-mono">{customers.length} contacts</span>
+          <span className="text-xs font-bold text-slate-400">
+            {customers.length} total contacts
+          </span>
         </div>
 
         {pendingDues.length === 0 ? (
-          <div className="text-center py-10 text-xs text-zinc-400 space-y-1">
-            <p>No pending dues recorded.</p>
-            <p className="text-[11px] text-zinc-500">All customer and supplier dues are currently settled.</p>
+          <div className="text-center py-10 text-xs text-slate-400 space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center mx-auto text-slate-400">
+              <Users className="w-6 h-6 opacity-60" />
+            </div>
+            <p className="font-semibold text-slate-600 dark:text-slate-300">No pending dues recorded.</p>
+            <p className="text-[11px] text-slate-400">All customer and supplier accounts are fully settled.</p>
           </div>
         ) : (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+          <div className="divide-y divide-slate-100 dark:divide-white/5">
             {pendingDues.map((due) => {
               const cust = customers.find((c) => c.id === due.customer_id);
               const isGet = due.direction === 'you_will_get';
+              const nameInitial = (cust?.name || 'C').charAt(0).toUpperCase();
 
               return (
-                <div key={due.id} className="py-3 flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        isGet ? 'bg-emerald-500' : 'bg-rose-500'
-                      }`}
-                    />
+                <div key={due.id} className="py-3.5 flex items-center justify-between gap-3 text-xs hover:bg-slate-50/50 dark:hover:bg-white/5 px-2 rounded-2xl transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-2xl bg-gradient-to-tr ${getAvatarGradient(cust?.name || 'Customer')} flex items-center justify-center text-white font-extrabold text-sm shadow-md shrink-0`}
+                    >
+                      {nameInitial}
+                    </div>
                     <div>
-                      <div className="font-medium text-zinc-900 dark:text-zinc-100">
+                      <div className="font-bold text-slate-900 dark:text-white text-sm">
                         {cust?.name || 'Contact'}
                       </div>
-                      <div className="text-[11px] text-zinc-400 font-mono flex items-center gap-2 mt-0.5">
-                        {cust?.phone && <span>{cust.phone}</span>}
+                      <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                        {cust?.phone && <span className="font-semibold text-slate-500">📞 {cust.phone}</span>}
                         {due.notes && <span>• {due.notes}</span>}
                       </div>
                     </div>
@@ -155,41 +226,42 @@ export function DuesScreen() {
                   <div className="flex items-center gap-3">
                     <div className="text-right">
                       <div
-                        className={`font-mono font-medium tabular-nums ${
+                        className={`font-black text-sm tabular-nums ${
                           isGet ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                         }`}
                       >
                         {isGet ? '+' : '-'}{formatPaise(due.amount)}
                       </div>
-                      <span className="text-[10px] text-zinc-400">
-                        {isGet ? 'Receivable' : 'Payable'}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        isGet ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                      }`}>
+                        {isGet ? 'You Will Get' : 'You Will Give'}
                       </span>
                     </div>
 
                     {/* WhatsApp Reminder Button */}
                     {cust?.phone && isGet && (
                       <a
-                        href={`https://wa.me/91${cust.phone}?text=Hello%20${encodeURIComponent(
+                        href={`https://wa.me/91${cust.phone}?text=Dear%20${encodeURIComponent(
                           cust.name
-                        )},%20this%20is%20a%20reminder%20regarding%20pending%20balance%20of%20Rs.%20${(
+                        )},%20this%20is%20a%20gentle%20reminder%20regarding%20pending%20balance%20of%20Rs.%20${(
                           due.amount / 100
-                        ).toFixed(2)}.`}
+                        ).toFixed(2)}.%20Thank%20you!`}
                         target="_blank"
                         rel="noopener noreferrer"
                         title="Send WhatsApp Reminder"
-                        className="p-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition-colors"
+                        className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white shadow-md shadow-emerald-500/25 transition-all hover-lift touch-press"
                       >
-                        <MessageSquare className="w-3.5 h-3.5" />
+                        <MessageSquare className="w-4 h-4" />
                       </a>
                     )}
 
                     {/* Settle Button */}
                     <button
                       onClick={() => updateDueStatusOptimistic(due.id, 'settled')}
-                      className="px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-xs transition-colors flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-600 dark:hover:text-emerald-400 font-bold text-xs text-slate-700 dark:text-slate-200 transition-colors"
                     >
-                      <Check className="w-3 h-3" />
-                      <span>Settle</span>
+                      Settle
                     </button>
                   </div>
                 </div>
@@ -199,38 +271,38 @@ export function DuesScreen() {
         )}
       </div>
 
-      {/* Modal: Add Customer */}
+      {/* Modal: New Contact */}
       {showAddCustomerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-3">
-              <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">New Contact</h3>
-              <button onClick={() => setShowAddCustomerModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
-                <X className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Add Contact / Customer</h3>
+              <button onClick={() => setShowAddCustomerModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateCustomer} className="space-y-3.5">
+            <form onSubmit={handleCreateCustomer} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Full Name</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Full Name</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Ramesh Kumar"
                   value={custName}
                   onChange={(e) => setCustName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Phone Number</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Mobile / WhatsApp Number</label>
                 <input
                   type="tel"
                   placeholder="e.g. 9876543210"
                   value={custPhone}
                   onChange={(e) => setCustPhone(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 />
               </div>
 
@@ -238,15 +310,15 @@ export function DuesScreen() {
                 <button
                   type="button"
                   onClick={() => setShowAddCustomerModal(false)}
-                  className="flex-1 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-colors"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-xs font-medium transition-colors"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-xs shadow-md shadow-cyan-500/25"
                 >
-                  Save
+                  Save Contact
                 </button>
               </div>
             </form>
@@ -256,25 +328,25 @@ export function DuesScreen() {
 
       {/* Modal: Record Due */}
       {showAddDueModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-3">
-              <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">Record Due</h3>
-              <button onClick={() => setShowAddDueModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
-                <X className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Record Due (Udhar Entry)</h3>
+              <button onClick={() => setShowAddDueModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateDue} className="space-y-3.5">
+            <form onSubmit={handleCreateDue} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Contact</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Select Contact</label>
                 <select
                   value={selectedCustId}
                   onChange={(e) => setSelectedCustId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
                 >
                   {customers.map((c) => (
-                    <option key={c.id} value={c.id} className="dark:bg-zinc-900">
+                    <option key={c.id} value={c.id} className="dark:bg-slate-900">
                       {c.name} {c.phone ? `(${c.phone})` : ''}
                     </option>
                   ))}
@@ -282,15 +354,15 @@ export function DuesScreen() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Direction</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Direction</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setDueDirection('you_will_get')}
-                    className={`py-2 rounded-lg border text-xs font-medium transition-colors ${
+                    className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
                       dueDirection === 'you_will_get'
-                        ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
-                        : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400'
+                        ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/25 ring-2 ring-emerald-400'
+                        : 'border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300'
                     }`}
                   >
                     You Will Get (+)
@@ -298,10 +370,10 @@ export function DuesScreen() {
                   <button
                     type="button"
                     onClick={() => setDueDirection('you_will_give')}
-                    className={`py-2 rounded-lg border text-xs font-medium transition-colors ${
+                    className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
                       dueDirection === 'you_will_give'
-                        ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
-                        : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400'
+                        ? 'bg-rose-500 text-white shadow-md shadow-rose-500/25 ring-2 ring-rose-400'
+                        : 'border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300'
                     }`}
                   >
                     You Will Give (-)
@@ -310,25 +382,25 @@ export function DuesScreen() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Amount (₹)</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Amount (₹)</label>
                 <input
                   type="number"
                   required
                   placeholder="0.00"
                   value={dueAmountRupees}
                   onChange={(e) => setDueAmountRupees(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">Note (Optional)</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Note (Optional)</label>
                 <input
                   type="text"
-                  placeholder="e.g. Rice bags, loan repayment"
+                  placeholder="e.g. 5 bags of cement, shop grocery"
                   value={dueNotes}
                   onChange={(e) => setDueNotes(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
                 />
               </div>
 
@@ -336,15 +408,15 @@ export function DuesScreen() {
                 <button
                   type="button"
                   onClick={() => setShowAddDueModal(false)}
-                  className="flex-1 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-colors"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-xs font-medium transition-colors"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-xs shadow-md shadow-cyan-500/25"
                 >
-                  Confirm
+                  Confirm Entry
                 </button>
               </div>
             </form>

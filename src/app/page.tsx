@@ -117,12 +117,12 @@ export default function HomePage() {
 
   if (!mounted) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${isLight ? 'bg-zinc-50 text-zinc-900' : 'bg-zinc-950 text-zinc-100'}`}>
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center font-bold text-xs text-white dark:text-zinc-900 tracking-wider">
+      <div className={`min-h-screen flex items-center justify-center ${isLight ? 'bg-slate-50 text-slate-800' : 'bg-[#090d16] text-white'}`}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-500 to-teal-400 flex items-center justify-center font-extrabold text-sm text-white shadow-lg shadow-indigo-500/30 animate-pulse">
             RB
           </div>
-          <span className="text-xs text-zinc-400 font-mono">loading...</span>
+          <span className="text-xs font-semibold text-slate-400">Loading Record Book...</span>
         </div>
       </div>
     );
@@ -130,8 +130,8 @@ export default function HomePage() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col transition-colors duration-150 relative ${
-        isLight ? 'bg-[#fafafa] text-zinc-900' : 'bg-[#09090b] text-zinc-100'
+      className={`min-h-screen flex flex-col transition-colors duration-200 relative ${
+        isLight ? 'bg-slate-50 modern-mesh-light text-slate-900' : 'bg-[#090d16] modern-mesh-dark text-slate-100'
       }`}
     >
       <Navbar

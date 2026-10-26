@@ -26,20 +26,58 @@ export function MobileNav({ activeTab, setActiveTab, onOpenMore }: MobileNavProp
 
   const pendingDuesCount = dues.filter((d) => d.status === 'pending').length;
 
-  const items: { id: TabType; label: string; icon: React.ElementType; badge?: number }[] = [
-    { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
-    { id: 'cash', label: 'Accounts', icon: Wallet },
-    { id: 'dues', label: 'Dues', icon: Users, badge: pendingDuesCount || undefined },
-    { id: 'cards', label: 'Cards', icon: CreditCard },
-    { id: 'notes', label: 'Notes', icon: StickyNote },
+  const items: {
+    id: TabType;
+    label: string;
+    icon: React.ElementType;
+    badge?: number;
+    color: string;
+    activeText: string;
+  }[] = [
+    {
+      id: 'dashboard',
+      label: 'Home',
+      icon: LayoutDashboard,
+      color: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400',
+      activeText: 'text-indigo-600 dark:text-indigo-400',
+    },
+    {
+      id: 'cash',
+      label: 'Banks',
+      icon: Wallet,
+      color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+      activeText: 'text-emerald-600 dark:text-emerald-400',
+    },
+    {
+      id: 'dues',
+      label: 'Dues',
+      icon: Users,
+      badge: pendingDuesCount || undefined,
+      color: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400',
+      activeText: 'text-cyan-600 dark:text-cyan-400',
+    },
+    {
+      id: 'cards',
+      label: 'Cards',
+      icon: CreditCard,
+      color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400',
+      activeText: 'text-purple-600 dark:text-purple-400',
+    },
+    {
+      id: 'notes',
+      label: 'Notes',
+      icon: StickyNote,
+      color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+      activeText: 'text-amber-600 dark:text-amber-400',
+    },
   ];
 
   return (
     <nav
-      className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 transition-colors border-t ${
+      className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 transition-colors border-t glass-panel ${
         isLight
-          ? 'bg-white/95 border-zinc-200 text-zinc-600 shadow-sm'
-          : 'bg-[#0c0d0e]/95 border-zinc-800/80 text-zinc-400 shadow-sm'
+          ? 'bg-white/90 border-slate-200/90 text-slate-600 shadow-[0_-8px_25px_rgba(0,0,0,0.06)]'
+          : 'bg-[#0f172a]/90 border-white/10 text-slate-300 shadow-[0_-8px_30px_rgba(0,0,0,0.5)]'
       }`}
       style={{
         paddingBottom: 'max(0.45rem, env(safe-area-inset-bottom, 0px))',
@@ -54,25 +92,23 @@ export function MobileNav({ activeTab, setActiveTab, onOpenMore }: MobileNavProp
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center py-1 transition-colors ${
-                isActive
-                  ? 'text-zinc-900 dark:text-zinc-100 font-semibold'
-                  : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+              className={`flex flex-col items-center justify-center py-1 transition-all touch-press ${
+                isActive ? item.activeText + ' font-bold' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
               }`}
             >
               <div
-                className={`relative flex items-center justify-center w-10 h-7 rounded-md transition-colors ${
-                  isActive ? 'bg-zinc-100 dark:bg-zinc-800' : 'bg-transparent'
+                className={`relative flex items-center justify-center w-11 h-7 rounded-xl transition-all ${
+                  isActive ? item.color + ' scale-105 shadow-xs' : 'bg-transparent'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className={`w-4 h-4 ${isActive ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
                 {item.badge && item.badge > 0 ? (
-                  <span className="absolute -top-0.5 -right-0.5 px-1 min-w-[13px] h-[13px] rounded-full text-[8.5px] bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 flex items-center justify-center font-mono font-bold">
+                  <span className="absolute -top-1 -right-1 px-1 min-w-[15px] h-[15px] rounded-full text-[9px] bg-rose-500 text-white flex items-center justify-center font-bold ring-2 ring-white dark:ring-slate-900">
                     {item.badge > 99 ? '99+' : item.badge}
                   </span>
                 ) : null}
               </div>
-              <span className="text-[9px] mt-0.5 tracking-tight truncate max-w-full px-0.5">
+              <span className="text-[9.5px] mt-0.5 tracking-tight truncate max-w-full px-0.5">
                 {item.label}
               </span>
             </button>
@@ -82,22 +118,22 @@ export function MobileNav({ activeTab, setActiveTab, onOpenMore }: MobileNavProp
         {/* More Tab */}
         <button
           onClick={onOpenMore}
-          className={`flex flex-col items-center justify-center py-1 transition-colors ${
+          className={`flex flex-col items-center justify-center py-1 transition-all touch-press ${
             activeTab === 'vault' || activeTab === 'reports'
-              ? 'text-zinc-900 dark:text-zinc-100 font-semibold'
-              : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+              ? 'text-violet-600 dark:text-violet-400 font-bold'
+              : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
           }`}
         >
           <div
-            className={`flex items-center justify-center w-10 h-7 rounded-md transition-colors ${
+            className={`flex items-center justify-center w-11 h-7 rounded-xl transition-all ${
               activeTab === 'vault' || activeTab === 'reports'
-                ? 'bg-zinc-100 dark:bg-zinc-800'
+                ? 'bg-violet-500/15 text-violet-600 dark:text-violet-400 scale-105'
                 : 'bg-transparent'
             }`}
           >
             <MoreHorizontal className="w-4 h-4" />
           </div>
-          <span className="text-[9px] mt-0.5 tracking-tight font-medium">More</span>
+          <span className="text-[9.5px] mt-0.5 tracking-tight font-medium">More</span>
         </button>
       </div>
     </nav>

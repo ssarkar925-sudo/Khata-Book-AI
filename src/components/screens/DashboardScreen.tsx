@@ -6,9 +6,11 @@ import {
   CreditCard,
   Users,
   Sparkles,
-  Plus,
-  Minus,
+  ArrowDownLeft,
   ArrowUpRight,
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
 } from 'lucide-react';
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useCustomerStore } from '@/stores/useCustomerStore';
@@ -65,208 +67,290 @@ export function DashboardScreen({
 
   const netPosition = totalCash + totalReceivables - (totalPayables + totalCardDues);
 
+  // Asset distribution calculation for colorful bar
+  const totalAssets = Math.max(1, totalCash + totalReceivables);
+  const cashPct = Math.round((totalCash / totalAssets) * 100);
+  const recPct = Math.round((totalReceivables / totalAssets) * 100);
+
   return (
-    <div className="space-y-5">
-      {/* 1. Linear-Style Net Position Hero */}
+    <div className="space-y-6">
+      {/* 1. MODERN MULTICOLOR HERO CARD */}
       <div
-        className={`border rounded-xl p-5 sm:p-6 transition-colors ${
-          isLight
-            ? 'bg-white border-zinc-200 shadow-2xs'
-            : 'bg-[#121215] border-zinc-800/80 shadow-2xs'
-        }`}
+        className="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 text-white border border-indigo-500/25 shadow-2xl transition-all"
       >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="space-y-1">
+        {/* Ambient Gradient Glow Orbs */}
+        <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -mb-12 -ml-12 w-64 h-64 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
-                Net Position
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Net Position
               </span>
+
               <button
                 onClick={onOpenAskAI}
-                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 font-medium transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 text-white shadow-md shadow-violet-500/25 transition-all hover-lift touch-press"
               >
-                <Sparkles className="w-2.5 h-2.5" />
+                <Sparkles className="w-3 h-3 text-amber-300" />
                 <span>Ask AI</span>
               </button>
             </div>
 
-            <div className="text-3xl sm:text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 tabular-nums font-mono">
+            <div className="text-4xl sm:text-5xl font-black tracking-tight text-white tabular-nums">
               {formatPaise(netPosition)}
             </div>
 
-            <div className="text-[11px] text-zinc-400 font-mono">
-              (Cash + Receivables) − (Payables + Card Dues)
+            {/* Micro Formula Badge Strip */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] font-semibold text-slate-300">
+              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300">
+                Cash: {formatPaise(totalCash)}
+              </span>
+              <span className="text-slate-500">+</span>
+              <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300">
+                Get: {formatPaise(totalReceivables)}
+              </span>
+              <span className="text-slate-500">−</span>
+              <span className="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300">
+                Give: {formatPaise(totalPayables)}
+              </span>
+              <span className="text-slate-500">−</span>
+              <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300">
+                Cards: {formatPaise(totalCardDues)}
+              </span>
             </div>
           </div>
 
-          {/* Quick Action Toolbar */}
-          <div className="flex items-center flex-wrap gap-2">
+          {/* Saturated Action Buttons */}
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2.5">
             <button
               onClick={onQuickCashIn}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-xs font-medium transition-colors shadow-2xs"
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-500/30 transition-all hover-lift touch-press"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Inflow</span>
+              <ArrowDownLeft className="w-4 h-4 stroke-[2.5]" />
+              <span>+ Inflow</span>
             </button>
 
             <button
               onClick={onQuickCashOut}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 text-xs font-medium text-zinc-800 dark:text-zinc-200 transition-colors"
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white font-bold text-xs shadow-lg shadow-rose-500/30 transition-all hover-lift touch-press"
             >
-              <Minus className="w-3.5 h-3.5" />
-              <span>Outflow</span>
+              <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+              <span>− Outflow</span>
             </button>
 
             <button
               onClick={() => onNavigateTab('dues')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 text-xs font-medium text-zinc-800 dark:text-zinc-200 transition-colors"
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/30 transition-all hover-lift touch-press"
             >
-              <Users className="w-3.5 h-3.5 opacity-70" />
-              <span>Record Due</span>
+              <Users className="w-4 h-4 stroke-[2]" />
+              <span>Add Due</span>
+            </button>
+
+            <button
+              onClick={onOpenAskAI}
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-rose-500 to-purple-600 hover:opacity-95 text-white font-bold text-xs shadow-lg shadow-purple-500/30 transition-all hover-lift touch-press"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Ask AI</span>
             </button>
           </div>
         </div>
+
+        {/* Assets Segmented Progress Bar */}
+        <div className="relative mt-6 pt-4 border-t border-white/10">
+          <div className="flex items-center justify-between text-xs text-slate-300 font-semibold mb-2">
+            <span>Liquid Asset Ratio</span>
+            <span className="text-[11px] text-slate-400">Cash ({cashPct}%) • Receivables ({recPct}%)</span>
+          </div>
+          <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden flex">
+            <div
+              style={{ width: `${cashPct}%` }}
+              className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-all duration-500"
+              title={`Cash: ${cashPct}%`}
+            />
+            <div
+              style={{ width: `${recPct}%` }}
+              className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-all duration-500"
+              title={`Receivables: ${recPct}%`}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* 2. Key Metrics Grid (4 Clean Cards) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Cash & Banks */}
+      {/* 2. FOUR VIBRANT MULTICOLOR METRIC CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Emerald Cash & Banks */}
         <div
           onClick={() => onNavigateTab('cash')}
-          className={`cursor-pointer rounded-xl border p-4 transition-colors ${
+          className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
             isLight
-              ? 'bg-white border-zinc-200 hover:border-zinc-400'
-              : 'bg-[#121215] border-zinc-800/80 hover:border-zinc-600'
+              ? 'bg-gradient-to-br from-white via-emerald-50/40 to-white border-emerald-200 shadow-sm hover:border-emerald-400'
+              : 'bg-gradient-to-br from-slate-900 via-emerald-950/20 to-slate-900 border-emerald-500/20 hover:border-emerald-500/40'
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-zinc-500 font-medium">Cash & Banks</span>
-            <Wallet className="w-3.5 h-3.5 text-zinc-400" />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              Cash & Banks
+            </span>
+            <div className="p-2.5 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shadow-xs">
+              <Wallet className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 tabular-nums font-mono">
+          <div className="text-2xl font-black tracking-tight text-slate-900 dark:text-white tabular-nums">
             {formatPaise(totalCash)}
           </div>
-          <span className="text-[10px] text-zinc-400 mt-1 inline-flex items-center gap-0.5">
-            Manage accounts <ArrowUpRight className="w-2.5 h-2.5" />
-          </span>
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-emerald-100 dark:border-emerald-500/15 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+            <span>Manage accounts</span>
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+          </div>
         </div>
 
-        {/* You Will Get (Receivables) */}
+        {/* Card 2: Cyan You Will Get (Receivables) */}
         <div
           onClick={() => onNavigateTab('dues')}
-          className={`cursor-pointer rounded-xl border p-4 transition-colors ${
+          className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
             isLight
-              ? 'bg-white border-zinc-200 hover:border-zinc-400'
-              : 'bg-[#121215] border-zinc-800/80 hover:border-zinc-600'
+              ? 'bg-gradient-to-br from-white via-cyan-50/40 to-white border-cyan-200 shadow-sm hover:border-cyan-400'
+              : 'bg-gradient-to-br from-slate-900 via-cyan-950/20 to-slate-900 border-cyan-500/20 hover:border-cyan-500/40'
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-zinc-500 font-medium">You Will Get</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
-              Receivable
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+              You Will Get
             </span>
+            <div className="p-2.5 rounded-2xl bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 group-hover:scale-110 transition-transform shadow-xs">
+              <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+            </div>
           </div>
-          <div className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 tabular-nums font-mono">
-            {formatPaise(totalReceivables)}
+          <div className="text-2xl font-black tracking-tight text-cyan-600 dark:text-cyan-400 tabular-nums">
+            +{formatPaise(totalReceivables)}
           </div>
-          <span className="text-[10px] text-zinc-400 mt-1 inline-block">
-            From {customers.length} contacts
-          </span>
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-cyan-100 dark:border-cyan-500/15 text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <span>From {customers.length} contacts</span>
+            <span className="font-bold text-cyan-600 dark:text-cyan-400 text-[11px]">Receivable</span>
+          </div>
         </div>
 
-        {/* You Will Give (Payables) */}
+        {/* Card 3: Rose You Will Give (Payables) */}
         <div
           onClick={() => onNavigateTab('dues')}
-          className={`cursor-pointer rounded-xl border p-4 transition-colors ${
+          className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
             isLight
-              ? 'bg-white border-zinc-200 hover:border-zinc-400'
-              : 'bg-[#121215] border-zinc-800/80 hover:border-zinc-600'
+              ? 'bg-gradient-to-br from-white via-rose-50/40 to-white border-rose-200 shadow-sm hover:border-rose-400'
+              : 'bg-gradient-to-br from-slate-900 via-rose-950/20 to-slate-900 border-rose-500/20 hover:border-rose-500/40'
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-zinc-500 font-medium">You Will Give</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium">
-              Payable
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+              You Will Give
             </span>
+            <div className="p-2.5 rounded-2xl bg-rose-500/15 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform shadow-xs">
+              <TrendingDown className="w-4 h-4 stroke-[2.5]" />
+            </div>
           </div>
-          <div className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 tabular-nums font-mono">
-            {formatPaise(totalPayables)}
+          <div className="text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400 tabular-nums">
+            -{formatPaise(totalPayables)}
           </div>
-          <span className="text-[10px] text-zinc-400 mt-1 inline-block">
-            Vendors & suppliers
-          </span>
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-rose-100 dark:border-rose-500/15 text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <span>Vendors & suppliers</span>
+            <span className="font-bold text-rose-600 dark:text-rose-400 text-[11px]">Payable</span>
+          </div>
         </div>
 
-        {/* Credit Card Dues */}
+        {/* Card 4: Purple Credit Card Dues */}
         <div
           onClick={() => onNavigateTab('cards')}
-          className={`cursor-pointer rounded-xl border p-4 transition-colors ${
+          className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
             isLight
-              ? 'bg-white border-zinc-200 hover:border-zinc-400'
-              : 'bg-[#121215] border-zinc-800/80 hover:border-zinc-600'
+              ? 'bg-gradient-to-br from-white via-purple-50/40 to-white border-purple-200 shadow-sm hover:border-purple-400'
+              : 'bg-gradient-to-br from-slate-900 via-purple-950/20 to-slate-900 border-purple-500/20 hover:border-purple-500/40'
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-zinc-500 font-medium">Card Dues</span>
-            <CreditCard className="w-3.5 h-3.5 text-zinc-400" />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+              Card Dues
+            </span>
+            <div className="p-2.5 rounded-2xl bg-purple-500/15 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform shadow-xs">
+              <CreditCard className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 tabular-nums font-mono">
-            {formatPaise(totalCardDues)}
+          <div className="text-2xl font-black tracking-tight text-purple-600 dark:text-purple-400 tabular-nums">
+            -{formatPaise(totalCardDues)}
           </div>
-          <span className="text-[10px] text-zinc-400 mt-1 inline-block">
-            {cards.length} active cards
-          </span>
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-purple-100 dark:border-purple-500/15 text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <span>{cards.length} active cards</span>
+            <span className="font-bold text-purple-600 dark:text-purple-400 text-[11px]">Limits & bills</span>
+          </div>
         </div>
       </div>
 
-      {/* 3. Recent Transactions Feed */}
+      {/* 3. RECENT TRANSACTIONS WITH COLORFUL AVATARS */}
       <div
-        className={`rounded-xl border p-5 transition-colors ${
-          isLight ? 'bg-white border-zinc-200' : 'bg-[#121215] border-zinc-800/80'
+        className={`rounded-3xl border p-5 sm:p-6 transition-all ${
+          isLight ? 'bg-white border-slate-200/90 shadow-sm' : 'bg-slate-900/80 border-white/10 shadow-lg'
         }`}
       >
-        <div className="flex items-center justify-between mb-3.5 pb-2.5 border-b border-zinc-100 dark:border-zinc-800/60">
-          <h3 className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 uppercase tracking-wider font-mono">
-            Recent Ledger Entries
-          </h3>
-          <span className="text-xs text-zinc-400 font-mono">{ledger.length} records</span>
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-white/5">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-tr from-emerald-500 to-indigo-500" />
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Recent Transactions</h3>
+          </div>
+          <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full">
+            {ledger.length} total entries
+          </span>
         </div>
 
         {ledger.length === 0 ? (
-          <div className="text-center py-10 text-xs text-zinc-400 space-y-2">
-            <p>No transactions recorded yet.</p>
-            <p className="text-[11px] text-zinc-500">
-              Use <span className="font-mono text-zinc-700 dark:text-zinc-300">Inflow</span> or <span className="font-mono text-zinc-700 dark:text-zinc-300">Outflow</span> buttons above to make your first record.
+          <div className="text-center py-10 text-xs text-slate-400 space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center mx-auto text-slate-400">
+              <Wallet className="w-6 h-6 opacity-60" />
+            </div>
+            <p className="font-semibold text-slate-600 dark:text-slate-300">No transactions recorded yet.</p>
+            <p className="text-[11px] text-slate-400">
+              Click <span className="font-bold text-emerald-600 dark:text-emerald-400">+ Inflow</span> or <span className="font-bold text-rose-600 dark:text-rose-400">− Outflow</span> above to record your first transaction.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+          <div className="divide-y divide-slate-100 dark:divide-white/5">
             {ledger.slice(0, 8).map((entry) => {
               const isInflow = entry.type === 'cash_in';
               return (
-                <div key={entry.id} className="py-2.5 flex items-center justify-between text-xs">
+                <div key={entry.id} className="py-3 flex items-center justify-between text-xs hover:bg-slate-50/50 dark:hover:bg-white/5 px-2 rounded-xl transition-colors">
                   <div className="flex items-center gap-3">
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        isInflow ? 'bg-emerald-500' : 'bg-zinc-400 dark:bg-zinc-600'
+                    <div
+                      className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-xs shrink-0 shadow-xs ${
+                        isInflow
+                          ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 text-white'
+                          : 'bg-gradient-to-tr from-rose-500 to-red-400 text-white'
                       }`}
-                    />
+                    >
+                      {isInflow ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                    </div>
                     <div>
-                      <div className="font-medium text-zinc-900 dark:text-zinc-100">
+                      <div className="font-bold text-slate-900 dark:text-white text-sm">
                         {entry.note || (isInflow ? 'Cash Received' : 'Cash Paid')}
                       </div>
-                      <div className="text-[10px] text-zinc-400 font-mono">
-                        {new Date(entry.entry_date).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                        })} • {entry.mode.toUpperCase()}
+                      <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                        <span className="font-semibold text-slate-500 dark:text-slate-400">
+                          {new Date(entry.entry_date).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                          })}
+                        </span>
+                        <span>•</span>
+                        <span className="uppercase text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300">
+                          {entry.mode}
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   <div
-                    className={`font-mono font-medium tabular-nums ${
-                      isInflow ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-900 dark:text-zinc-100'
+                    className={`font-black text-sm tabular-nums ${
+                      isInflow ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                     }`}
                   >
                     {isInflow ? '+' : '-'}{formatPaise(entry.amount)}
