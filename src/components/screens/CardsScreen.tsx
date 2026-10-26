@@ -21,6 +21,8 @@ import {
   ChevronRight,
   Info,
   Sparkles,
+  RefreshCw,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { Card, LedgerEntry } from '@/types';
 import { formatPaise, parseToPaise, paiseToRupees } from '@/lib/money';
@@ -37,7 +39,7 @@ import {
 } from '@/lib/cardBilling';
 
 export function CardsScreen() {
-  const { cards, addCardOptimistic } = useCardStore();
+  const { cards } = useCardStore();
   const { entries: ledger } = useLedgerStore();
   const { accounts, updateAccountBalance } = useAccountStore();
   const { activeWorkspaceId, theme, user } = useSessionStore();
@@ -58,6 +60,7 @@ export function CardsScreen() {
   const [limitRupees, setLimitRupees] = useState('');
   const [statementDay, setStatementDay] = useState('15');
   const [dueDay, setDueDay] = useState('5');
+  const [initialBilledRupees, setInitialBilledRupees] = useState('');
 
   // Spend State
   const [showSpendModal, setShowSpendModal] = useState(false);
@@ -65,6 +68,8 @@ export function CardsScreen() {
   const [spendAmountRupees, setSpendAmountRupees] = useState('');
   const [spendCategory, setSpendCategory] = useState('Shopping');
   const [spendMerchant, setSpendMerchant] = useState('');
+  const [spendDate, setSpendDate] = useState(new Date().toISOString().slice(0, 10));
+  const [spendBillingOption, setSpendBillingOption] = useState<'billed' | 'unbilled' | 'auto'>('billed');
 
   // Bill Payment State
   const [showPayBillModal, setShowPayBillModal] = useState(false);
@@ -93,9 +98,9 @@ export function CardsScreen() {
     if (summary.billedDue > 0) {
       setPayOption('billed');
       setPayAmountRupees(paiseToRupees(summary.billedDue).toString());
-    } else if (summary.totalOutstanding > 0) {
+    } else if (summary.netUnbilled > 0) {
       setPayOption('total');
-      setPayAmountRupees(paiseToRupees(summary.totalOutstanding).toString());
+      setPayAmountRupees(paiseToRupees(summary.netUnbilled).toString());
     } else {
       setPayOption('custom');
       setPayAmountRupees('');
@@ -124,6 +129,24 @@ export function CardsScreen() {
     };
 
     syncEngine.pushCard(newCard);
+
+    // If user provided existing statement bill amount, record it as a billed spend
+    if (initialBilledRupees && parseToPaise(initialBilledRupees) > 0) {
+      const billedEntry: LedgerEntry = {
+        id: crypto.randomUUID(),
+        workspace_id: activeWorkspaceId,
+        type: 'card_spend',
+        amount: parseToPaise(initialBilledRupees),
+        card_id: newCard.id,
+        mode: 'card',
+        is_billed: true,
+        note: 'Statement Bill Opening Due',
+        entry_date: new Date().toISOString(),
+        created_by: user?.id || 'owner',
+      };
+      syncEngine.pushLedgerEntry(billedEntry);
+    }
+
     setShowAddModal(false);
     setCardName('');
     setCardBank('');
@@ -131,6 +154,7 @@ export function CardsScreen() {
     setLimitRupees('');
     setStatementDay('15');
     setDueDay('5');
+    setInitialBilledRupees('');
   };
 
   const handleRecordSpend = (e: React.FormEvent) => {
@@ -139,6 +163,11 @@ export function CardsScreen() {
     if (paise <= 0 || !spendCardId) return;
 
     const selectedCard = cards.find((c) => c.id === spendCardId);
+
+    // Determine billing classification
+    const isBilledOverride =
+      spendBillingOption === 'billed' ? true : spendBillingOption === 'unbilled' ? false : undefined;
+
     const entry: LedgerEntry = {
       id: crypto.randomUUID(),
       workspace_id: activeWorkspaceId,
@@ -146,8 +175,9 @@ export function CardsScreen() {
       amount: paise,
       card_id: spendCardId,
       mode: 'card',
+      is_billed: isBilledOverride,
       note: `${spendCategory} - ${spendMerchant.trim() || selectedCard?.name || 'Card Swipe'}`,
-      entry_date: new Date().toISOString(),
+      entry_date: new Date(spendDate + 'T12:00:00Z').toISOString(),
       created_by: user?.id || 'owner',
     };
 
@@ -155,6 +185,7 @@ export function CardsScreen() {
     setShowSpendModal(false);
     setSpendAmountRupees('');
     setSpendMerchant('');
+    setSpendBillingOption('billed');
   };
 
   const handlePayBill = (e: React.FormEvent) => {
@@ -168,7 +199,7 @@ export function CardsScreen() {
     // Check if this payment exceeds billed amount to label note accurately
     let paymentLabel = 'Bill Payment';
     if (summary && paise > summary.billedDue) {
-      paymentLabel = summary.billedDue > 0 ? 'Bill & Advance Payment' : 'Advance Payment';
+      paymentLabel = summary.billedDue > 0 ? 'Bill & Advance Payment' : 'Card Payment / Advance';
     }
 
     const selectedAccount = accounts.find((a) => a.id === payAccountId);
@@ -199,19 +230,21 @@ export function CardsScreen() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-2 sm:pt-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-gradient-to-tr from-purple-500 to-pink-500 text-white shadow-md shadow-purple-500/25">
-              <CreditCard className="w-5 h-5" />
-            </div>
-            <span>Credit Cards & Billed System</span>
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Track Billed Statement dues, unbilled current spends, advance payments & due reminders.
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-purple-500 to-pink-500 text-white shadow-md shadow-purple-500/25 shrink-0">
+            <CreditCard className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
+              Credit Cards & Billed System
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Track Billed Statement dues, unbilled current spends, advance payments & due reminders.
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -220,6 +253,7 @@ export function CardsScreen() {
               <button
                 onClick={() => {
                   setSpendCardId(cards[0].id);
+                  setSpendBillingOption('billed');
                   setShowSpendModal(true);
                 }}
                 className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-rose-500 hover:bg-rose-600 font-bold text-white text-xs shadow-md shadow-rose-500/25 transition-all hover-lift touch-press"
@@ -518,8 +552,8 @@ export function CardsScreen() {
                     {/* Utilization Progress Bar with 30% safety mark */}
                     <div className="pt-1">
                       <div className="flex items-center justify-between text-[10px] text-white/70 font-semibold mb-1">
-                        <span>Limit: {formatPaise(card.credit_limit)}</span>
-                        <span>
+                        <span className="truncate mr-2">Limit: {formatPaise(card.credit_limit)}</span>
+                        <span className="shrink-0 text-right">
                           Avail: <strong className="text-emerald-300">{formatPaise(summary.availableCredit)}</strong> ({utilization}%)
                         </span>
                       </div>
@@ -543,6 +577,7 @@ export function CardsScreen() {
                     <button
                       onClick={() => {
                         setSpendCardId(card.id);
+                        setSpendBillingOption('billed');
                         setShowSpendModal(true);
                       }}
                       className="flex-1 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs flex items-center justify-center gap-1 transition-all touch-press"
@@ -556,11 +591,19 @@ export function CardsScreen() {
                       className={`flex-1 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all touch-press ${
                         summary.billedDue > 0
                           ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
+                          : summary.netUnbilled > 0
+                          ? 'bg-purple-500 hover:bg-purple-600 text-white shadow-md shadow-purple-500/30'
                           : 'bg-white/20 hover:bg-white/30 text-white'
                       }`}
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>{summary.billedDue > 0 ? 'Pay Bill' : 'Advance Pay'}</span>
+                      <span>
+                        {summary.billedDue > 0
+                          ? 'Pay Bill'
+                          : summary.netUnbilled > 0
+                          ? 'Pay Due'
+                          : 'Advance Pay'}
+                      </span>
                     </button>
 
                     <button
@@ -729,7 +772,11 @@ export function CardsScreen() {
                           onClick={() => openPayModalForCard(card.id)}
                           className="px-3 py-1.5 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-bold text-xs shadow-xs transition-all hover-lift"
                         >
-                          {summary.billedDue > 0 ? 'Pay Due' : 'Advance'}
+                          {summary.billedDue > 0
+                            ? 'Pay Due'
+                            : summary.netUnbilled > 0
+                            ? 'Pay'
+                            : 'Advance'}
                         </button>
                       </td>
                     </tr>
@@ -741,7 +788,7 @@ export function CardsScreen() {
 
           <div className="p-4 bg-slate-50 dark:bg-white/5 border-t border-slate-100 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 dark:text-slate-400 gap-2">
             <span>
-              💡 <strong>Systematic Reminder Logic:</strong> Transactions made on or before your statement cutoff are Billed and must be settled by the Due Date. Transactions after the bill date are categorized as Unbilled and bill in the subsequent cycle. Any excess payment automatically applies to unbilled spends or turns into Advance Credit.
+              💡 <strong>Systematic Reminder Logic:</strong> Transactions marked as Billed must be settled by the Due Date. Transactions after the bill date roll into Unbilled. You can also explicitly choose Billed or Unbilled on each swipe.
             </span>
           </div>
         </div>
@@ -753,6 +800,7 @@ export function CardsScreen() {
         onClose={() => setSelectedCardForDetail(null)}
         onRecordSpend={() => {
           if (selectedCardForDetail) setSpendCardId(selectedCardForDetail.id);
+          setSpendBillingOption('billed');
           setShowSpendModal(true);
         }}
         onPayBill={() => {
@@ -763,8 +811,8 @@ export function CardsScreen() {
       {/* Modal: Add Card */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3 shrink-0">
               <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-purple-500" />
                 <span>Add Credit Card</span>
@@ -777,7 +825,7 @@ export function CardsScreen() {
               </button>
             </div>
 
-            <form onSubmit={handleAddCard} className="space-y-4">
+            <form onSubmit={handleAddCard} className="space-y-4 overflow-y-auto pr-1 flex-1">
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Card Name
@@ -785,7 +833,7 @@ export function CardsScreen() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. HDFC Regalia, SBI SimplyClick, ICICI Amazon Pay"
+                  placeholder="e.g. HDFC Regalia, ICICI Coral, SBI SimplyClick"
                   value={cardName}
                   onChange={(e) => setCardName(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -865,7 +913,24 @@ export function CardsScreen() {
                 />
               </div>
 
-              <div className="pt-2 flex gap-2">
+              {/* Optional: Existing Statement Bill to Pay Now */}
+              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-1">
+                <label className="block text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
+                  Current Billed Statement Due (Optional)
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g. 1000 (if a bill has already generated)"
+                  value={initialBilledRupees}
+                  onChange={(e) => setInitialBilledRupees(e.target.value)}
+                  className="w-full px-4 py-2 rounded-xl border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-bold"
+                />
+                <span className="text-[10px] text-slate-400 block">
+                  If your bank has already billed you this month, enter it here so it shows in Billed Due.
+                </span>
+              </div>
+
+              <div className="pt-2 flex gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
@@ -885,11 +950,11 @@ export function CardsScreen() {
         </div>
       )}
 
-      {/* Modal: Record Card Spend (Swipe) */}
+      {/* Modal: Record Card Spend (Swipe) with Billed vs Unbilled Choice */}
       {showSpendModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3 shrink-0">
               <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
                 <ArrowUpRight className="w-5 h-5 text-rose-500" />
                 <span>Record Card Spend (Swipe)</span>
@@ -902,7 +967,7 @@ export function CardsScreen() {
               </button>
             </div>
 
-            <form onSubmit={handleRecordSpend} className="space-y-4">
+            <form onSubmit={handleRecordSpend} className="space-y-4 overflow-y-auto pr-1 flex-1">
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Select Card
@@ -920,20 +985,85 @@ export function CardsScreen() {
                 </select>
               </div>
 
+              {/* Billing Cycle Classification Choice */}
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Amount (₹)
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Billing Category
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  autoFocus
-                  placeholder="0.00"
-                  value={spendAmountRupees}
-                  onChange={(e) => setSpendAmountRupees(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold"
-                />
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSpendBillingOption('billed')}
+                    className={`p-2 rounded-xl text-center border text-xs font-bold transition-all ${
+                      spendBillingOption === 'billed'
+                        ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
+                        : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    🔴 Billed Due
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSpendBillingOption('unbilled')}
+                    className={`p-2 rounded-xl text-center border text-xs font-bold transition-all ${
+                      spendBillingOption === 'unbilled'
+                        ? 'bg-purple-500 text-white border-purple-500 shadow-sm'
+                        : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    🟣 Unbilled
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSpendBillingOption('auto')}
+                    className={`p-2 rounded-xl text-center border text-xs font-bold transition-all ${
+                      spendBillingOption === 'auto'
+                        ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
+                        : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    ⚡ Auto Cycle
+                  </button>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-1">
+                  {spendBillingOption === 'billed'
+                    ? 'Adds directly to current Statement Billed Due (to pay by due date).'
+                    : spendBillingOption === 'unbilled'
+                    ? 'Classified as Unbilled spend (bills in next cycle).'
+                    : 'Auto-determines based on spend date and card statement day.'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Amount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    autoFocus
+                    placeholder="0.00"
+                    value={spendAmountRupees}
+                    onChange={(e) => setSpendAmountRupees(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Spend Date
+                  </label>
+                  <input
+                    type="date"
+                    value={spendDate}
+                    onChange={(e) => setSpendDate(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                  />
+                </div>
               </div>
 
               <div>
@@ -968,7 +1098,7 @@ export function CardsScreen() {
                 />
               </div>
 
-              <div className="pt-2 flex gap-2">
+              <div className="pt-2 flex gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowSpendModal(false)}
@@ -988,11 +1118,11 @@ export function CardsScreen() {
         </div>
       )}
 
-      {/* Modal: Pay Card Bill with Billed vs Total vs Advance Choice */}
+      {/* Modal: Pay Card Bill */}
       {showPayBillModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3 shrink-0">
               <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                 <span>Pay Credit Card Bill</span>
@@ -1005,7 +1135,7 @@ export function CardsScreen() {
               </button>
             </div>
 
-            <form onSubmit={handlePayBill} className="space-y-4">
+            <form onSubmit={handlePayBill} className="space-y-4 overflow-y-auto pr-1 flex-1">
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Card to Pay
@@ -1021,9 +1151,12 @@ export function CardsScreen() {
                       if (sum.billedDue > 0) {
                         setPayOption('billed');
                         setPayAmountRupees(paiseToRupees(sum.billedDue).toString());
-                      } else {
+                      } else if (sum.netUnbilled > 0) {
                         setPayOption('total');
-                        setPayAmountRupees(paiseToRupees(sum.totalOutstanding).toString());
+                        setPayAmountRupees(paiseToRupees(sum.netUnbilled).toString());
+                      } else {
+                        setPayOption('custom');
+                        setPayAmountRupees('');
                       }
                     }
                   }}
@@ -1063,7 +1196,7 @@ export function CardsScreen() {
                       </span>
                     </div>
 
-                    {/* Quick 3-Way Payment Selection Options */}
+                    {/* Quick Payment Selection Options */}
                     <div className="pt-2 grid grid-cols-3 gap-2">
                       <button
                         type="button"
@@ -1087,7 +1220,13 @@ export function CardsScreen() {
                         type="button"
                         onClick={() => {
                           setPayOption('total');
-                          setPayAmountRupees(paiseToRupees(summary.totalOutstanding).toString());
+                          setPayAmountRupees(
+                            paiseToRupees(
+                              summary.billedDue > 0
+                                ? summary.totalOutstanding
+                                : summary.netUnbilled
+                            ).toString()
+                          );
                         }}
                         className={`p-2 rounded-xl text-left border transition-all ${
                           payOption === 'total'
@@ -1095,9 +1234,15 @@ export function CardsScreen() {
                             : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300'
                         }`}
                       >
-                        <span className="text-[9px] uppercase font-bold block">2. Total Owed</span>
+                        <span className="text-[9px] uppercase font-bold block">
+                          {summary.billedDue > 0 ? '2. Total Owed' : '2. Unbilled'}
+                        </span>
                         <span className="font-black text-xs tabular-nums block mt-0.5">
-                          {formatPaise(summary.totalOutstanding)}
+                          {formatPaise(
+                            summary.billedDue > 0
+                              ? summary.totalOutstanding
+                              : summary.netUnbilled
+                          )}
                         </span>
                       </button>
 
@@ -1112,7 +1257,7 @@ export function CardsScreen() {
                             : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300'
                         }`}
                       >
-                        <span className="text-[9px] uppercase font-bold block">3. Advance / Custom</span>
+                        <span className="text-[9px] uppercase font-bold block">3. Advance</span>
                         <span className="font-bold text-[11px] block mt-0.5">Custom</span>
                       </button>
                     </div>
@@ -1161,14 +1306,14 @@ export function CardsScreen() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Full settlement via Netbanking / UPI"
+                  placeholder="e.g. Statement settled via Netbanking / UPI"
                   value={payNote}
                   onChange={(e) => setPayNote(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
                 />
               </div>
 
-              <div className="pt-2 flex gap-2">
+              <div className="pt-2 flex gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowPayBillModal(false)}

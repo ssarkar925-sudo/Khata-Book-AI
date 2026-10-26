@@ -514,6 +514,20 @@ class SyncEngine {
     }
   }
 
+  public async updateLedgerEntry(id: string, updates: Partial<LedgerEntry>) {
+    useLedgerStore.getState().updateEntryOptimistic(id, updates);
+    try {
+      const { error } = await supabase
+        .from('ledger_entries')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+    } catch {
+      this.enqueue('ledger_entries', 'upsert', { id, ...updates });
+    }
+  }
+
   public async deleteLedgerEntry(id: string) {
     useLedgerStore.getState().removeEntryOptimistic(id);
     try {

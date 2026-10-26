@@ -15,12 +15,14 @@ import {
   AlertTriangle,
   Layers,
   Sparkles,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { Card, LedgerEntry } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { calculateCardBilling } from '@/lib/cardBilling';
+import { syncEngine } from '@/lib/syncEngine';
 
 interface CardDetailModalProps {
   card: Card | null;
@@ -42,10 +44,6 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill }: Car
     month: 'short',
     year: 'numeric',
   });
-  const formattedLastStatement = summary.lastStatementDate.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-  });
   const formattedNextStatement = summary.nextStatementDate.toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
@@ -65,7 +63,11 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill }: Car
 
   for (const entry of allCardEntries) {
     const isPayment = entry.type === 'bill_payment';
-    const isBilled = !isPayment && new Date(entry.entry_date) <= summary.lastStatementDate;
+    const isBilled =
+      !isPayment &&
+      (entry.is_billed !== undefined
+        ? entry.is_billed
+        : new Date(entry.entry_date) <= summary.lastStatementDate);
 
     if (filterType === 'all') {
       displayTransactions.push({ entry, isBilled, isPayment });
@@ -227,7 +229,11 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill }: Car
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>
-              {summary.billedDue > 0 ? `Pay Bill (${formatPaise(summary.billedDue)})` : 'Advance Payment'}
+              {summary.billedDue > 0
+                ? `Pay Bill (${formatPaise(summary.billedDue)})`
+                : summary.netUnbilled > 0
+                ? `Pay Unbilled (${formatPaise(summary.netUnbilled)})`
+                : 'Advance Payment'}
             </span>
           </button>
         </div>
@@ -279,7 +285,7 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill }: Car
           </button>
         </div>
 
-        {/* Spends History on this Card */}
+        {/* Spends History on this Card with 1-tap Move to Billed / Move to Unbilled */}
         <div className="flex-1 overflow-y-auto space-y-2 pr-1">
           {displayTransactions.length === 0 ? (
             <div className="text-center py-10 text-xs text-slate-400">
@@ -289,12 +295,12 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill }: Car
             <div className="divide-y divide-slate-100 dark:divide-white/5">
               {displayTransactions.map(({ entry, isBilled, isPayment }) => {
                 return (
-                  <div key={entry.id} className="py-2.5 flex items-center justify-between text-xs">
-                    <div>
-                      <div className="font-bold text-slate-800 dark:text-slate-200">
+                  <div key={entry.id} className="py-2.5 flex items-center justify-between text-xs gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-slate-800 dark:text-slate-200 truncate">
                         {entry.note || (isPayment ? 'Bill Payment' : 'Card Swipe')}
                       </div>
-                      <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                      <div className="text-[10px] text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
                         <span>{new Date(entry.entry_date).toLocaleDateString()}</span>
                         <span>•</span>
                         {isPayment ? (
@@ -313,16 +319,34 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill }: Car
                       </div>
                     </div>
 
-                    <div
-                      className={`font-black text-sm tabular-nums ${
-                        isPayment
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : isBilled
-                          ? 'text-rose-600 dark:text-rose-400'
-                          : 'text-purple-600 dark:text-purple-400'
-                      }`}
-                    >
-                      {isPayment ? '-' : '+'}{formatPaise(entry.amount)}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!isPayment && (
+                        <button
+                          onClick={() => {
+                            syncEngine.updateLedgerEntry(entry.id, { is_billed: !isBilled });
+                          }}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                            isBilled
+                              ? 'border-purple-300 dark:border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10'
+                              : 'border-rose-300 dark:border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10'
+                          }`}
+                          title={isBilled ? 'Move this spend to Unbilled' : 'Move this spend to Current Billed Due'}
+                        >
+                          {isBilled ? 'Move to Unbilled' : 'Move to Billed'}
+                        </button>
+                      )}
+
+                      <div
+                        className={`font-black text-sm tabular-nums text-right ${
+                          isPayment
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : isBilled
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-purple-600 dark:text-purple-400'
+                        }`}
+                      >
+                        {isPayment ? '-' : '+'}{formatPaise(entry.amount)}
+                      </div>
                     </div>
                   </div>
                 );

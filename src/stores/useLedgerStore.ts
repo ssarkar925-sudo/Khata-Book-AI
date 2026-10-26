@@ -7,6 +7,7 @@ interface LedgerState {
 
   setEntries: (entries: LedgerEntry[]) => void;
   addEntryOptimistic: (entry: LedgerEntry) => void;
+  updateEntryOptimistic: (id: string, updates: Partial<LedgerEntry>) => void;
   removeEntryOptimistic: (id: string) => void;
   setIsLoading: (loading: boolean) => void;
   clearLedger: () => void;
@@ -70,6 +71,15 @@ export const useLedgerStore = create<LedgerState>((set) => ({
   addEntryOptimistic: (entry) =>
     set((state) => {
       const updated = [entry, ...state.entries];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      }
+      return { entries: updated };
+    }),
+
+  updateEntryOptimistic: (id, updates) =>
+    set((state) => {
+      const updated = state.entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       }

@@ -89,6 +89,7 @@ export interface LedgerEntry {
   mode: PaymentMode;
   note?: string | null;
   entry_date: string;
+  is_billed?: boolean;
   idempotency_key?: string | null;
   created_by?: string;
   created_at?: string;

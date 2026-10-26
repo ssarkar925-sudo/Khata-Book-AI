@@ -96,16 +96,24 @@ export function calculateCardBilling(
   const cardSpends = ledger.filter((e) => e.card_id === card.id && e.type === 'card_spend');
   const cardPayments = ledger.filter((e) => e.card_id === card.id && e.type === 'bill_payment');
 
-  // Separate Spends into Billed and Unbilled based on lastStatementDate
+  // Separate Spends into Billed and Unbilled based on explicit override or lastStatementDate cutoff
   const billedSpendsList: LedgerEntry[] = [];
   const unbilledSpendsList: LedgerEntry[] = [];
 
   for (const spend of cardSpends) {
-    const spendDate = new Date(spend.entry_date);
-    if (spendDate <= lastStatementDate) {
-      billedSpendsList.push(spend);
+    if (spend.is_billed !== undefined) {
+      if (spend.is_billed) {
+        billedSpendsList.push(spend);
+      } else {
+        unbilledSpendsList.push(spend);
+      }
     } else {
-      unbilledSpendsList.push(spend);
+      const spendDate = new Date(spend.entry_date);
+      if (spendDate <= lastStatementDate) {
+        billedSpendsList.push(spend);
+      } else {
+        unbilledSpendsList.push(spend);
+      }
     }
   }
 
