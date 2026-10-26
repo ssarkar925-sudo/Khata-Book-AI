@@ -58,6 +58,7 @@ export interface Card {
   last4: string;
   credit_limit: number; // in paise
   statement_day: number;
+  due_day?: number;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
