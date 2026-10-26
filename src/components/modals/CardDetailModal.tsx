@@ -17,6 +17,9 @@ import {
   Sparkles,
   ArrowRightLeft,
   Trash2,
+  Edit3,
+  Share2,
+  Check,
 } from 'lucide-react';
 import { Card, LedgerEntry } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
@@ -30,12 +33,14 @@ interface CardDetailModalProps {
   onClose: () => void;
   onRecordSpend: () => void;
   onPayBill: () => void;
+  onEditCard?: (card: Card) => void;
   onDeleteCard?: (cardId: string) => void;
 }
 
-export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onDeleteCard }: CardDetailModalProps) {
+export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEditCard, onDeleteCard }: CardDetailModalProps) {
   const { entries: ledger } = useLedgerStore();
   const [filterType, setFilterType] = useState<'all' | 'billed' | 'unbilled' | 'payments'>('all');
+  const [copiedReminder, setCopiedReminder] = useState(false);
 
   if (!card) return null;
 
@@ -82,6 +87,17 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onDel
     }
   }
 
+  const handleShareReminder = () => {
+    const text = `💳 *Credit Card Bill Reminder*\n*Card:* ${card.name} (${card.bank} •••• ${card.last4})\n*🔴 Billed Due:* ${formatPaise(summary.billedDue)}\n*⏰ Due Date:* ${formattedDueDate} (${summary.reminderMessage})\n*🟣 Unbilled Spends:* ${formatPaise(summary.netUnbilled)}\n*🟢 Available Limit:* ${formatPaise(summary.availableCredit)} / ${formatPaise(card.credit_limit)}\n\n_Tracked in Record Book_`;
+    if (navigator.share) {
+      navigator.share({ title: `${card.name} Payment Reminder`, text }).catch(() => {});
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
+    setCopiedReminder(true);
+    setTimeout(() => setCopiedReminder(false), 2000);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
       <div className="w-full max-w-xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
@@ -101,6 +117,29 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onDel
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            {/* Share WhatsApp Reminder Button */}
+            <button
+              onClick={handleShareReminder}
+              className="p-2 rounded-xl hover:bg-emerald-500/10 text-slate-400 hover:text-emerald-500 transition-colors"
+              title="Share Bill Reminder via WhatsApp / Web Share"
+            >
+              {copiedReminder ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}
+            </button>
+
+            {/* Edit Card Button */}
+            {onEditCard && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onEditCard(card);
+                }}
+                className="p-2 rounded-xl hover:bg-amber-500/10 text-slate-400 hover:text-amber-500 transition-colors"
+                title="Edit Card Details (Limit, Dates)"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+            )}
+
             {onDeleteCard && (
               <button
                 onClick={() => {
@@ -108,7 +147,7 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onDel
                     onDeleteCard(card.id);
                   }
                 }}
-                className="p-1.5 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors"
+                className="p-2 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors"
                 title="Delete this Credit Card"
               >
                 <Trash2 className="w-4 h-4" />
@@ -116,7 +155,7 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onDel
             )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400"
+              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400"
             >
               <X className="w-5 h-5" />
             </button>

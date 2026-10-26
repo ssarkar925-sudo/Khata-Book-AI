@@ -13,6 +13,9 @@ import {
   Copy,
   Check,
   Tag,
+  Share2,
+  Plus,
+  Files,
 } from 'lucide-react';
 import { NoteItem } from '@/types';
 import { syncEngine } from '@/lib/syncEngine';
@@ -22,6 +25,7 @@ interface NoteDetailModalProps {
   onClose: () => void;
   onEdit: (note: NoteItem) => void;
   onDelete: (noteId: string) => void;
+  onDuplicate?: (note: NoteItem) => void;
 }
 
 export function NoteDetailModal({
@@ -29,9 +33,11 @@ export function NoteDetailModal({
   onClose,
   onEdit,
   onDelete,
+  onDuplicate,
 }: NoteDetailModalProps) {
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [newQuickTask, setNewQuickTask] = useState('');
 
   if (!note) return null;
 
@@ -85,12 +91,50 @@ export function NoteDetailModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleShareWhatsApp = () => {
+    let text = `📝 *${note.title || 'Untitled Note'}*\n\n`;
+    if (note.body) text += `${note.body}\n\n`;
+    if (note.checklist_items && note.checklist_items.length > 0) {
+      text += `*Checklist Tasks:*\n`;
+      note.checklist_items.forEach((item) => {
+        text += `${item.is_done ? '✅' : '⬜'} ${item.text}\n`;
+      });
+      text += '\n';
+    }
+    text += `_Saved in Record Book_`;
+    if (navigator.share) {
+      navigator.share({ title: note.title || 'Note', text }).catch(() => {});
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
+  };
+
   const toggleChecklistItem = (itemId: string) => {
     const updated = (note.checklist_items || []).map((item) =>
       item.id === itemId ? { ...item, is_done: !item.is_done } : item
     );
     syncEngine.updateNote(note.id, { checklist_items: updated });
   };
+
+  const handleAddQuickTask = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newQuickTask.trim()) return;
+    const newTask = {
+      id: crypto.randomUUID(),
+      text: newQuickTask.trim(),
+      is_done: false,
+    };
+    const updated = [...(note.checklist_items || []), newTask];
+    syncEngine.updateNote(note.id, { checklist_items: updated });
+    setNewQuickTask('');
+  };
+
+  const checklistTotal = note.checklist_items ? note.checklist_items.length : 0;
+  const checklistCompleted = note.checklist_items
+    ? note.checklist_items.filter((i) => i.is_done).length
+    : 0;
+  const progressPct =
+    checklistTotal > 0 ? Math.round((checklistCompleted / checklistTotal) * 100) : 0;
 
   const formattedDate = note.created_at
     ? new Date(note.created_at).toLocaleString('en-IN', {
@@ -128,6 +172,15 @@ export function NoteDetailModal({
           </div>
 
           <div className="flex items-center gap-1.5">
+            {/* Share WhatsApp Button */}
+            <button
+              onClick={handleShareWhatsApp}
+              title="Share Note via WhatsApp"
+              className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 transition-colors"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+
             {/* Copy Button */}
             <button
               onClick={handleCopyNote}
@@ -189,13 +242,34 @@ export function NoteDetailModal({
             </div>
           )}
 
-          {/* Checklist Items */}
-          {note.checklist_items && note.checklist_items.length > 0 && (
-            <div className="space-y-2 pt-3 border-t border-black/5 dark:border-white/10">
+          {/* Checklist Items & Live Task Quick-Add */}
+          <div className="space-y-3 pt-3 border-t border-black/5 dark:border-white/10">
+            <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider opacity-60 block">
                 Tasks & Checklist
               </span>
-              <div className="space-y-2">
+              {checklistTotal > 0 && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10 opacity-75">
+                  {checklistCompleted} / {checklistTotal} done ({progressPct}%)
+                </span>
+              )}
+            </div>
+
+            {/* Checklist Progress Bar */}
+            {checklistTotal > 0 && (
+              <div className="h-1.5 w-full bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+                <div
+                  style={{ width: `${progressPct}%` }}
+                  className={`h-full transition-all duration-300 ${
+                    progressPct === 100 ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}
+                />
+              </div>
+            )}
+
+            {/* Existing Checklist Items */}
+            {note.checklist_items && note.checklist_items.length > 0 && (
+              <div className="space-y-1.5">
                 {note.checklist_items.map((item) => (
                   <div
                     key={item.id}
@@ -221,8 +295,26 @@ export function NoteDetailModal({
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Inline Quick-Add Task */}
+            <form onSubmit={handleAddQuickTask} className="flex gap-2 pt-1">
+              <input
+                type="text"
+                placeholder="+ Add task..."
+                value={newQuickTask}
+                onChange={(e) => setNewQuickTask(e.target.value)}
+                className="flex-1 px-3.5 py-1.5 rounded-xl border border-black/10 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-800 dark:text-slate-100 placeholder:opacity-50 focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+              />
+              <button
+                type="submit"
+                disabled={!newQuickTask.trim()}
+                className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-bold text-xs shadow-xs"
+              >
+                Add
+              </button>
+            </form>
+          </div>
 
           {/* Tags */}
           {note.tags && note.tags.length > 0 && (
@@ -274,6 +366,20 @@ export function NoteDetailModal({
               </button>
 
               <div className="flex items-center gap-2">
+                {onDuplicate && (
+                  <button
+                    onClick={() => {
+                      onDuplicate(note);
+                      onClose();
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                    title="Duplicate this Note as a new copy"
+                  >
+                    <Files className="w-4 h-4" />
+                    <span>Copy</span>
+                  </button>
+                )}
+
                 <button
                   onClick={onClose}
                   className="px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"

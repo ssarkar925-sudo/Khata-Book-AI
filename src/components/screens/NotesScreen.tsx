@@ -15,6 +15,9 @@ import {
   Check,
   AlertTriangle,
   Search,
+  Share2,
+  Files,
+  ListChecks,
 } from 'lucide-react';
 import { NoteItem } from '@/types';
 import { useNoteStore } from '@/stores/useNoteStore';
@@ -29,6 +32,8 @@ export function NotesScreen() {
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
+  // Category / Tag / Color filter: 'all' | 'pinned' | 'checklist' | color id
+  const [noteFilter, setNoteFilter] = useState<string>('all');
 
   // Popup Viewing Modal
   const [viewingNote, setViewingNote] = useState<NoteItem | null>(null);
@@ -220,9 +225,53 @@ export function NotesScreen() {
     }
   };
 
-  // Filter notes by search query and sort pinned notes first
+  // Duplicate note handler
+  const handleDuplicateNote = (note: NoteItem) => {
+    const duplicatedNote: NoteItem = {
+      id: crypto.randomUUID(),
+      workspace_id: activeWorkspaceId,
+      title: note.title ? `${note.title} (Copy)` : 'Untitled Note (Copy)',
+      body: note.body,
+      color: note.color,
+      tags: note.tags ? [...note.tags] : [],
+      is_pinned: false,
+      checklist_items: (note.checklist_items || []).map((item) => ({
+        id: crypto.randomUUID(),
+        text: item.text,
+        is_done: false, // reset tasks for fresh list
+      })),
+      created_at: new Date().toISOString(),
+    };
+    syncEngine.pushNote(duplicatedNote);
+  };
+
+  // 1-Tap WhatsApp Share note handler
+  const handleShareWhatsAppNote = (e: React.MouseEvent, note: NoteItem) => {
+    e.stopPropagation();
+    let message = `📝 *${note.title || 'Untitled Note'}*\n`;
+    if (note.body) {
+      message += `\n${note.body}\n`;
+    }
+    if (note.checklist_items && note.checklist_items.length > 0) {
+      message += `\n*Tasks & Checklist:*\n`;
+      note.checklist_items.forEach((item) => {
+        message += `${item.is_done ? '✅' : '⬜'} ${item.text}\n`;
+      });
+    }
+    message += `\n_Shared from Record Book_`;
+    const encoded = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encoded}`, '_blank');
+  };
+
+  // Filter notes by category filter & search query, then sort pinned first
   const filteredNotes = notes
     .filter((n) => {
+      // Category / quick filter
+      if (noteFilter === 'pinned' && !n.is_pinned) return false;
+      if (noteFilter === 'checklist' && (!n.checklist_items || n.checklist_items.length === 0)) return false;
+      if (['amber', 'teal', 'indigo', 'rose', 'purple'].includes(noteFilter) && n.color !== noteFilter) return false;
+
+      // Search query
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       const matchTitle = (n.title || '').toLowerCase().includes(q);
@@ -294,6 +343,67 @@ export function NotesScreen() {
         </div>
       </div>
 
+      {/* Filter Tabs & Color Palette */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 pb-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+          <button
+            onClick={() => setNoteFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              noteFilter === 'all'
+                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+            }`}
+          >
+            All ({notes.length})
+          </button>
+          <button
+            onClick={() => setNoteFilter('pinned')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              noteFilter === 'pinned'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+            }`}
+          >
+            <Pin className="w-3 h-3 fill-current" />
+            <span>Pinned ({notes.filter((n) => n.is_pinned).length})</span>
+          </button>
+          <button
+            onClick={() => setNoteFilter('checklist')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              noteFilter === 'checklist'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+            }`}
+          >
+            <ListChecks className="w-3 h-3" />
+            <span>Checklists ({notes.filter((n) => n.checklist_items && n.checklist_items.length > 0).length})</span>
+          </button>
+        </div>
+
+        {/* Color Palette Filters */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Colors:</span>
+          {colorOptions.map((c) => {
+            const isSelected = noteFilter === c.id;
+            const count = notes.filter((n) => n.color === c.id).length;
+            return (
+              <button
+                key={c.id}
+                onClick={() => setNoteFilter(isSelected ? 'all' : c.id)}
+                title={`Filter ${c.name} notes (${count})`}
+                className={`w-5 h-5 rounded-full ${c.dot} transition-transform flex items-center justify-center ${
+                  isSelected
+                    ? 'scale-125 ring-2 ring-slate-900 dark:ring-white ring-offset-1 dark:ring-offset-slate-950'
+                    : 'opacity-60 hover:opacity-100'
+                }`}
+              >
+                {isSelected && <span className="w-1.5 h-1.5 bg-white rounded-full shadow-xs" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Notes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {dedupedFilteredNotes.length === 0 ? (
@@ -329,11 +439,32 @@ export function NotesScreen() {
                       {note.title || <span className="italic opacity-60">Untitled Note</span>}
                     </h3>
 
-                    {/* Actions: Pin, Edit, Delete */}
+                    {/* Actions: WhatsApp Share, Duplicate, Pin, Edit, Delete */}
                     <div
                       className="flex items-center gap-1 shrink-0"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      {/* 1-Tap WhatsApp Share */}
+                      <button
+                        onClick={(e) => handleShareWhatsAppNote(e, note)}
+                        title="Share via WhatsApp"
+                        className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-emerald-600 transition-colors"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Duplicate Note */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDuplicateNote(note);
+                        }}
+                        title="Duplicate Note (Clone)"
+                        className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 transition-colors"
+                      >
+                        <Files className="w-3.5 h-3.5" />
+                      </button>
+
                       {/* Pin Button */}
                       <button
                         onClick={() =>
@@ -376,35 +507,55 @@ export function NotesScreen() {
                     </p>
                   )}
 
-                  {/* Checklist Preview */}
+                  {/* Checklist Preview & Mini Progress Bar */}
                   {note.checklist_items && note.checklist_items.length > 0 && (
-                    <div className="space-y-1.5 pt-3 border-t border-black/5 dark:border-white/10 mt-3">
-                      {note.checklist_items.slice(0, 3).map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={(e) => toggleChecklistItem(e, note.id, item.id)}
-                          className="flex items-center gap-2 text-xs cursor-pointer select-none"
-                        >
-                          {item.is_done ? (
-                            <CheckSquare className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                          ) : (
-                            <Square className="w-3.5 h-3.5 opacity-50 shrink-0" />
-                          )}
-                          <span
-                            className={`truncate ${
-                              item.is_done ? 'line-through opacity-50' : 'font-medium'
-                            }`}
-                          >
-                            {item.text}
+                    <div className="space-y-2 pt-3 border-t border-black/5 dark:border-white/10 mt-3">
+                      {/* Mini Progress Bar */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[10px] font-semibold opacity-70">
+                          <span>Task Progress</span>
+                          <span>
+                            {completedCount}/{checklistCount} ({checklistCount > 0 ? Math.round((completedCount / checklistCount) * 100) : 0}%)
                           </span>
                         </div>
-                      ))}
+                        <div className="h-1.5 w-full bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${checklistCount > 0 ? (completedCount / checklistCount) * 100 : 0}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
 
-                      {note.checklist_items.length > 3 && (
-                        <span className="text-[10px] opacity-60 font-semibold block pt-0.5">
-                          +{note.checklist_items.length - 3} more items...
-                        </span>
-                      )}
+                      <div className="space-y-1.5 pt-1">
+                        {note.checklist_items.slice(0, 3).map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={(e) => toggleChecklistItem(e, note.id, item.id)}
+                            className="flex items-center gap-2 text-xs cursor-pointer select-none"
+                          >
+                            {item.is_done ? (
+                              <CheckSquare className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            ) : (
+                              <Square className="w-3.5 h-3.5 opacity-50 shrink-0" />
+                            )}
+                            <span
+                              className={`truncate ${
+                                item.is_done ? 'line-through opacity-50' : 'font-medium'
+                              }`}
+                            >
+                              {item.text}
+                            </span>
+                          </div>
+                        ))}
+
+                        {note.checklist_items.length > 3 && (
+                          <span className="text-[10px] opacity-60 font-semibold block pt-0.5">
+                            +{note.checklist_items.length - 3} more items...
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -437,6 +588,7 @@ export function NotesScreen() {
         onClose={() => setViewingNote(null)}
         onEdit={(note) => handleOpenEdit(note)}
         onDelete={(id) => handleDeleteNote(id)}
+        onDuplicate={(note) => handleDuplicateNote(note)}
       />
 
       {/* DELETE CONFIRMATION MODAL */}

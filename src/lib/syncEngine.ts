@@ -696,6 +696,20 @@ class SyncEngine {
     }
   }
 
+  public async updateCard(cardId: string, updates: Partial<Card>) {
+    useCardStore.getState().updateCardOptimistic(cardId, updates);
+    try {
+      const { error } = await supabase
+        .from('cards')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', cardId);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+    } catch {
+      this.enqueue('cards', 'upsert', { id: cardId, ...updates });
+    }
+  }
+
   public async deleteCard(cardId: string) {
     useCardStore.getState().deleteCardOptimistic(cardId);
     try {

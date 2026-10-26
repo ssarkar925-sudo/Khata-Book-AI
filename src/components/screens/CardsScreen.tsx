@@ -25,6 +25,9 @@ import {
   ArrowRightLeft,
   Trash2,
   Sparkle,
+  Edit3,
+  Share2,
+  Check,
 } from 'lucide-react';
 import { Card, LedgerEntry } from '@/types';
 import { formatPaise, parseToPaise, paiseToRupees } from '@/lib/money';
@@ -56,6 +59,19 @@ export function CardsScreen() {
 
   // Card to delete state
   const [cardToDelete, setCardToDelete] = useState<Card | null>(null);
+
+  // Card filter: 'all' | 'due' | 'safe'
+  const [cardFilter, setCardFilter] = useState<'all' | 'due' | 'safe'>('all');
+
+  // Edit Card State
+  const [cardToEdit, setCardToEdit] = useState<Card | null>(null);
+  const [editCardName, setEditCardName] = useState('');
+  const [editCardBank, setEditCardBank] = useState('');
+  const [editLast4, setEditLast4] = useState('');
+  const [editLimitRupees, setEditLimitRupees] = useState('');
+  const [editStatementDay, setEditStatementDay] = useState('15');
+  const [editDueDay, setEditDueDay] = useState('5');
+  const [copiedReminderId, setCopiedReminderId] = useState<string | null>(null);
 
   // Billing Report calculation across all deduplicated cards
   const billingReport = calculateAllCardsBillingReport(cards, ledger);
@@ -139,6 +155,48 @@ export function CardsScreen() {
       setPayAccountId(accounts[0].id);
     }
     setShowPayBillModal(true);
+  };
+
+  const handleOpenEditCard = (card: Card) => {
+    setCardToEdit(card);
+    setEditCardName(card.name);
+    setEditCardBank(card.bank);
+    setEditLast4(card.last4);
+    setEditLimitRupees(paiseToRupees(card.credit_limit).toString());
+    setEditStatementDay((card.statement_day || 15).toString());
+    setEditDueDay((card.due_day || 5).toString());
+  };
+
+  const handleSaveEditCard = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cardToEdit || !editCardName.trim() || editLast4.length !== 4) return;
+
+    syncEngine.updateCard(cardToEdit.id, {
+      name: editCardName.trim(),
+      bank: editCardBank.trim() || 'Bank',
+      last4: editLast4.trim(),
+      credit_limit: parseToPaise(editLimitRupees),
+      statement_day: parseInt(editStatementDay, 10) || 15,
+      due_day: parseInt(editDueDay, 10) || 5,
+    });
+
+    setCardToEdit(null);
+  };
+
+  const handleShareCardReminder = (card: Card, summary: CardBillingSummary) => {
+    const formattedDueDate = summary.dueDate.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+    const text = `💳 *Credit Card Bill Reminder*\n*Card:* ${card.name} (${card.bank} •••• ${card.last4})\n*🔴 Billed Due:* ${formatPaise(summary.billedDue)}\n*⏰ Due Date:* ${formattedDueDate} (${summary.reminderMessage})\n*🟣 Unbilled Spends:* ${formatPaise(summary.netUnbilled)}\n*🟢 Available Limit:* ${formatPaise(summary.availableCredit)} / ${formatPaise(card.credit_limit)}\n\n_Tracked in Record Book_`;
+    if (navigator.share) {
+      navigator.share({ title: `${card.name} Payment Reminder`, text }).catch(() => {});
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
+    setCopiedReminderId(card.id);
+    setTimeout(() => setCopiedReminderId(null), 2000);
   };
 
   const handleAddCard = (e: React.FormEvent) => {
@@ -460,7 +518,46 @@ export function CardsScreen() {
 
       {/* TAB 1: LUXURY HIGH-END CREDIT CARDS GRID */}
       {activeTab === 'cards' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-4">
+          {/* Quick Filter Pills */}
+          {cards.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setCardFilter('all')}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  cardFilter === 'all'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+                }`}
+              >
+                All Cards ({billingReport.cardSummaries.length})
+              </button>
+              <button
+                onClick={() => setCardFilter('due')}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  cardFilter === 'due'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                Bills Due ({billingReport.cardSummaries.filter((s) => s.billedDue > 0).length})
+              </button>
+              <button
+                onClick={() => setCardFilter('safe')}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  cardFilter === 'safe'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                No Bill Due ({billingReport.cardSummaries.filter((s) => s.billedDue <= 0).length})
+              </button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {cards.length === 0 ? (
             <div className="col-span-full text-center py-16 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 p-6 text-xs text-slate-400 space-y-3">
               <div className="w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center mx-auto shadow-inner">
@@ -481,7 +578,13 @@ export function CardsScreen() {
               </button>
             </div>
           ) : (
-            billingReport.cardSummaries.map((summary, idx) => {
+            billingReport.cardSummaries
+              .filter((summary) => {
+                if (cardFilter === 'due') return summary.billedDue > 0;
+                if (cardFilter === 'safe') return summary.billedDue <= 0;
+                return true;
+              })
+              .map((summary, idx) => {
               const card = summary.card;
               const theme = cardThemes[idx % cardThemes.length];
               const formattedDueDate = summary.dueDate.toLocaleDateString('en-IN', {
@@ -665,6 +768,34 @@ export function CardsScreen() {
                       <Eye className="w-4 h-4" />
                     </button>
 
+                    {/* Share WhatsApp Reminder */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShareCardReminder(card, summary);
+                      }}
+                      className="p-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-200 hover:text-white transition-all touch-press"
+                      title="Share Bill Reminder via WhatsApp"
+                    >
+                      {copiedReminderId === card.id ? (
+                        <Check className="w-4 h-4 text-emerald-300" />
+                      ) : (
+                        <Share2 className="w-4 h-4" />
+                      )}
+                    </button>
+
+                    {/* Edit Card Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditCard(card);
+                      }}
+                      className="p-2.5 rounded-xl bg-white/10 hover:bg-amber-500/30 text-white/70 hover:text-amber-200 transition-all touch-press"
+                      title="Edit Card Details (Limit, Dates)"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+
                     {/* Delete Card Button */}
                     <button
                       onClick={(e) => {
@@ -682,6 +813,7 @@ export function CardsScreen() {
             })
           )}
         </div>
+      </div>
       )}
 
       {/* TAB 2: Systematic Billed & Unbilled Report Table */}
@@ -909,6 +1041,7 @@ export function CardsScreen() {
           syncEngine.deleteCard(cardId);
           setSelectedCardForDetail(null);
         }}
+        onEditCard={(c) => handleOpenEditCard(c)}
       />
 
       {/* Modal: Add Card */}
@@ -1046,6 +1179,131 @@ export function CardsScreen() {
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 text-white font-bold text-xs shadow-md shadow-purple-500/25"
                 >
                   Save Card
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT CARD */}
+      {cardToEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3 shrink-0">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-purple-500" />
+                <span>Edit Credit Card</span>
+              </h3>
+              <button
+                onClick={() => setCardToEdit(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditCard} className="space-y-4 overflow-y-auto pr-1 flex-1">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Card Nickname
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editCardName}
+                  onChange={(e) => setEditCardName(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Bank Issuer
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editCardBank}
+                    onChange={(e) => setEditCardBank(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Last 4 Digits
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    required
+                    value={editLast4}
+                    onChange={(e) => setEditLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Statement Day (Cutoff)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    required
+                    value={editStatementDay}
+                    onChange={(e) => setEditStatementDay(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Payment Due Day
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    required
+                    value={editDueDay}
+                    onChange={(e) => setEditDueDay(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Total Credit Limit (₹)
+                </label>
+                <input
+                  type="number"
+                  required
+                  value={editLimitRupees}
+                  onChange={(e) => setEditLimitRupees(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setCardToEdit(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/25 transition-all touch-press"
+                >
+                  Save Changes
                 </button>
               </div>
             </form>
