@@ -63,12 +63,28 @@ const DEFAULT_DUES: PeopleDue[] = [
   },
 ];
 
+// Helper to deduplicate items by ID
+function dedupeById<T extends { id: string }>(items: T[]): T[] {
+  const map = new Map<string, T>();
+  for (const item of items) {
+    if (item && item.id) {
+      map.set(item.id, item);
+    }
+  }
+  return Array.from(map.values());
+}
+
 export const useCustomerStore = create<CustomerState>((set) => ({
   customers: (() => {
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
-        if (stored) return JSON.parse(stored);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return dedupeById(parsed);
+          }
+        }
       } catch {}
     }
     return DEFAULT_CUSTOMERS;
@@ -77,7 +93,12 @@ export const useCustomerStore = create<CustomerState>((set) => ({
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem(STORAGE_KEY_DUES);
-        if (stored) return JSON.parse(stored);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return dedupeById(parsed);
+          }
+        }
       } catch {}
     }
     return DEFAULT_DUES;
@@ -85,44 +106,55 @@ export const useCustomerStore = create<CustomerState>((set) => ({
   isLoading: false,
 
   setCustomers: (customers) => {
+    const deduped = dedupeById(customers);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(customers));
+      localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(deduped));
     }
-    set({ customers });
+    set({ customers: deduped });
   },
 
   setDues: (dues) => {
+    const deduped = dedupeById(dues);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(dues));
+      localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(deduped));
     }
-    set({ dues });
+    set({ dues: deduped });
   },
 
   addCustomerOptimistic: (customer) =>
     set((state) => {
-      const updated = [...state.customers, customer];
+      const exists = state.customers.some((c) => c.id === customer.id);
+      const updated = exists
+        ? state.customers.map((c) => (c.id === customer.id ? customer : c))
+        : [...state.customers, customer];
+      const deduped = dedupeById(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(deduped));
       }
-      return { customers: updated };
+      return { customers: deduped };
     }),
 
   addDueOptimistic: (due) =>
     set((state) => {
-      const updated = [due, ...state.dues];
+      const exists = state.dues.some((d) => d.id === due.id);
+      const updated = exists
+        ? state.dues.map((d) => (d.id === due.id ? due : d))
+        : [due, ...state.dues];
+      const deduped = dedupeById(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(deduped));
       }
-      return { dues: updated };
+      return { dues: deduped };
     }),
 
   updateDueStatusOptimistic: (dueId, status) =>
     set((state) => {
       const updated = state.dues.map((d) => (d.id === dueId ? { ...d, status } : d));
+      const deduped = dedupeById(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(deduped));
       }
-      return { dues: updated };
+      return { dues: deduped };
     }),
 
   clearCustomerData: () => {

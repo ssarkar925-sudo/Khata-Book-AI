@@ -49,12 +49,28 @@ const DEFAULT_ENTRIES: LedgerEntry[] = [
   },
 ];
 
+// Helper to deduplicate ledger entries by ID
+function dedupeEntries(entries: LedgerEntry[]): LedgerEntry[] {
+  const map = new Map<string, LedgerEntry>();
+  for (const e of entries) {
+    if (e && e.id) {
+      map.set(e.id, e);
+    }
+  }
+  return Array.from(map.values());
+}
+
 export const useLedgerStore = create<LedgerState>((set) => ({
   entries: (() => {
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) return JSON.parse(stored);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return dedupeEntries(parsed);
+          }
+        }
       } catch {}
     }
     return DEFAULT_ENTRIES;
@@ -62,28 +78,34 @@ export const useLedgerStore = create<LedgerState>((set) => ({
   isLoading: false,
 
   setEntries: (entries) => {
+    const deduped = dedupeEntries(entries);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(deduped));
     }
-    set({ entries, isLoading: false });
+    set({ entries: deduped, isLoading: false });
   },
 
   addEntryOptimistic: (entry) =>
     set((state) => {
-      const updated = [entry, ...state.entries];
+      const exists = state.entries.some((e) => e.id === entry.id);
+      const updated = exists
+        ? state.entries.map((e) => (e.id === entry.id ? entry : e))
+        : [entry, ...state.entries];
+      const deduped = dedupeEntries(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(deduped));
       }
-      return { entries: updated };
+      return { entries: deduped };
     }),
 
   updateEntryOptimistic: (id, updates) =>
     set((state) => {
       const updated = state.entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
+      const deduped = dedupeEntries(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(deduped));
       }
-      return { entries: updated };
+      return { entries: deduped };
     }),
 
   removeEntryOptimistic: (id) =>

@@ -19,6 +19,40 @@ interface QueueItem {
 
 const QUEUE_STORAGE_KEY = 'rb_sync_queue';
 
+// Whitelist of columns physically present in public.ledger_entries Supabase table
+const LEDGER_ENTRY_VALID_COLUMNS = new Set([
+  'id',
+  'workspace_id',
+  'type',
+  'amount',
+  'category_id',
+  'cash_location_id',
+  'customer_id',
+  'card_id',
+  'mode',
+  'note',
+  'entry_date',
+  'idempotency_key',
+  'created_by',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+]);
+
+function sanitizeLedgerPayload(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeLedgerPayload);
+  }
+  const clean: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (LEDGER_ENTRY_VALID_COLUMNS.has(k) && v !== undefined) {
+      clean[k] = v;
+    }
+  }
+  return clean;
+}
+
 class SyncEngine {
   private isSyncing = false;
   private channel: ReturnType<typeof supabase.channel> | null = null;
@@ -76,19 +110,29 @@ class SyncEngine {
     for (const item of queue) {
       try {
         let cleanPayload = item.payload;
-        if (item.table === 'ledger_entries' && cleanPayload) {
-          const { is_billed, ...rest } = cleanPayload;
-          cleanPayload = rest;
+        if (item.table === 'ledger_entries') {
+          cleanPayload = sanitizeLedgerPayload(cleanPayload);
         }
 
         if (item.action === 'upsert') {
           const { error } = await supabase.from(item.table).upsert(cleanPayload);
-          if (error) throw error;
+          if (error) {
+            // Drop unrecoverable schema mismatch errors so the offline queue doesn't lock up
+            if (error.code === 'PGRST204' || (error as any).code === '42703') {
+              console.warn(`[SyncEngine] Purging incompatible schema entry for ${item.table}:`, error.message);
+              continue;
+            }
+            throw error;
+          }
         } else if (item.action === 'delete') {
           const { error } = await supabase.from(item.table).delete().eq('id', cleanPayload.id);
           if (error) throw error;
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.code === 'PGRST204' || err?.code === '42703') {
+          console.warn(`[SyncEngine] Purged obsolete schema error for ${item.table}`);
+          continue;
+        }
         console.warn(`[SyncEngine] Failed to flush item for table ${item.table}:`, err);
         remaining.push(item);
       }
@@ -499,21 +543,9 @@ class SyncEngine {
   // Ledger
   public async pushLedgerEntry(entry: LedgerEntry) {
     useLedgerStore.getState().addEntryOptimistic(entry);
-    const { is_billed, ...cleanEntry } = entry;
+    const cleanEntry = sanitizeLedgerPayload(entry);
     try {
-      const { error } = await supabase.from('ledger_entries').upsert({
-        id: cleanEntry.id,
-        workspace_id: cleanEntry.workspace_id,
-        type: cleanEntry.type,
-        amount: cleanEntry.amount,
-        category_id: cleanEntry.category_id,
-        cash_location_id: cleanEntry.cash_location_id,
-        customer_id: cleanEntry.customer_id,
-        card_id: cleanEntry.card_id,
-        mode: cleanEntry.mode,
-        note: cleanEntry.note,
-        entry_date: cleanEntry.entry_date,
-      });
+      const { error } = await supabase.from('ledger_entries').upsert(cleanEntry);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
     } catch {
@@ -523,7 +555,7 @@ class SyncEngine {
 
   public async updateLedgerEntry(id: string, updates: Partial<LedgerEntry>) {
     useLedgerStore.getState().updateEntryOptimistic(id, updates);
-    const { is_billed, ...cleanUpdates } = updates;
+    const cleanUpdates = sanitizeLedgerPayload(updates);
     if (Object.keys(cleanUpdates).length === 0) return;
     try {
       const { error } = await supabase

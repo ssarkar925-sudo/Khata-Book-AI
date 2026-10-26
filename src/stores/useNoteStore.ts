@@ -44,12 +44,28 @@ const DEFAULT_NOTES: NoteItem[] = [
   },
 ];
 
+// Helper to deduplicate notes array by ID
+function dedupeNotes(notes: NoteItem[]): NoteItem[] {
+  const map = new Map<string, NoteItem>();
+  for (const n of notes) {
+    if (n && n.id) {
+      map.set(n.id, n);
+    }
+  }
+  return Array.from(map.values());
+}
+
 export const useNoteStore = create<NoteState>((set) => ({
   notes: (() => {
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem(STORAGE_KEY_NOTES);
-        if (stored) return JSON.parse(stored);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return dedupeNotes(parsed);
+          }
+        }
       } catch {}
     }
     return DEFAULT_NOTES;
@@ -57,28 +73,34 @@ export const useNoteStore = create<NoteState>((set) => ({
   isLoading: false,
 
   setNotes: (notes) => {
+    const deduped = dedupeNotes(notes);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(notes));
+      localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(deduped));
     }
-    set({ notes });
+    set({ notes: deduped });
   },
 
   addNoteOptimistic: (note) =>
     set((state) => {
-      const updated = [note, ...state.notes];
+      const exists = state.notes.some((n) => n.id === note.id);
+      const updated = exists
+        ? state.notes.map((n) => (n.id === note.id ? note : n))
+        : [note, ...state.notes];
+      const deduped = dedupeNotes(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(deduped));
       }
-      return { notes: updated };
+      return { notes: deduped };
     }),
 
   updateNoteOptimistic: (id, updates) =>
     set((state) => {
       const updated = state.notes.map((n) => (n.id === id ? { ...n, ...updates } : n));
+      const deduped = dedupeNotes(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(deduped));
       }
-      return { notes: updated };
+      return { notes: deduped };
     }),
 
   deleteNoteOptimistic: (id) =>

@@ -239,6 +239,11 @@ export function NotesScreen() {
       return a.is_pinned ? -1 : 1;
     });
 
+  // Strict deduplication by ID to prevent duplicate React keys
+  const dedupedFilteredNotes = Array.from(
+    new Map(filteredNotes.map((n) => [n.id, n])).values()
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -286,7 +291,7 @@ export function NotesScreen() {
 
       {/* Notes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredNotes.length === 0 ? (
+        {dedupedFilteredNotes.length === 0 ? (
           <div className="col-span-full text-center py-12 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 p-6 text-xs text-slate-400 space-y-2">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
               <StickyNote className="w-6 h-6" />
@@ -299,7 +304,7 @@ export function NotesScreen() {
             </p>
           </div>
         ) : (
-          filteredNotes.map((note) => {
+          dedupedFilteredNotes.map((note) => {
             const matchedColor = colorOptions.find((c) => c.id === note.color) || colorOptions[0];
             const checklistCount = note.checklist_items ? note.checklist_items.length : 0;
             const completedCount = note.checklist_items

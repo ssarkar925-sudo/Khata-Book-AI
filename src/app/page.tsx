@@ -99,6 +99,7 @@ export default function HomePage() {
 
   return (
     <div
+      suppressHydrationWarning
       className={`min-h-screen flex flex-col transition-colors duration-200 relative ${
         isLight ? 'bg-slate-50 modern-mesh-light text-slate-900' : 'bg-[#090d16] modern-mesh-dark text-slate-100'
       }`}
