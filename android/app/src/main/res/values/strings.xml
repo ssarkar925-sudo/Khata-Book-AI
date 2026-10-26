@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Khata Book AI</string>
-    <string name="title_activity_main">Khata Book AI</string>
-    <string name="package_name">com.khatabook.ai</string>
-    <string name="custom_url_scheme">com.khatabook.ai</string>
+    <string name="app_name">Record Book</string>
+    <string name="title_activity_main">Record Book</string>
+    <string name="package_name">com.recordbook.app</string>
+    <string name="custom_url_scheme">com.recordbook.app</string>
 </resources>
