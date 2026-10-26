@@ -7,7 +7,7 @@ import { useCardStore } from '@/stores/useCardStore';
 import { useNoteStore } from '@/stores/useNoteStore';
 import { useSheetStore } from '@/stores/useSheetStore';
 import { useVaultStore } from '@/stores/useVaultStore';
-import { CashLocation, Customer, PeopleDue, Card, LedgerEntry, NoteItem, RecordSheet, VaultItem, DueStatus } from '@/types';
+import { CashLocation, Customer, PeopleDue, Card, LedgerEntry, NoteItem, RecordSheet, VaultItem, DueStatus, PaymentMode } from '@/types';
 
 interface QueueItem {
   id: string;
@@ -709,6 +709,31 @@ class SyncEngine {
     }
   }
 
+  public async updateCustomer(id: string, updates: Partial<Customer>) {
+    useCustomerStore.getState().updateCustomerOptimistic(id, updates);
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+    } catch {
+      this.enqueue('customers', 'upsert', { id, ...updates });
+    }
+  }
+
+  public async deleteCustomer(id: string) {
+    useCustomerStore.getState().deleteCustomerOptimistic(id);
+    try {
+      const { error } = await supabase.from('customers').delete().eq('id', id);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+    } catch {
+      this.enqueue('customers', 'delete', { id });
+    }
+  }
+
   public async pushDue(due: PeopleDue) {
     useCustomerStore.getState().addDueOptimistic(due);
     try {
@@ -729,6 +754,31 @@ class SyncEngine {
     }
   }
 
+  public async updateDue(id: string, updates: Partial<PeopleDue>) {
+    useCustomerStore.getState().updateDueOptimistic(id, updates);
+    try {
+      const { error } = await supabase
+        .from('people_dues')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+    } catch {
+      this.enqueue('people_dues', 'upsert', { id, ...updates });
+    }
+  }
+
+  public async deleteDue(id: string) {
+    useCustomerStore.getState().deleteDueOptimistic(id);
+    try {
+      const { error } = await supabase.from('people_dues').delete().eq('id', id);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+    } catch {
+      this.enqueue('people_dues', 'delete', { id });
+    }
+  }
+
   public async updateDueStatus(id: string, status: DueStatus) {
     useCustomerStore.getState().updateDueStatusOptimistic(id, status);
     try {
@@ -740,6 +790,65 @@ class SyncEngine {
       useSessionStore.getState().setSyncStatus('synced');
     } catch {
       this.enqueue('people_dues', 'upsert', { id, status });
+    }
+  }
+
+  public async settleDue(
+    dueId: string,
+    paidAmountPaise: number,
+    paymentMode: PaymentMode,
+    cashLocationId?: string,
+    remark?: string
+  ) {
+    const due = useCustomerStore.getState().dues.find((d) => d.id === dueId);
+    if (!due) return;
+
+    const isFullSettlement = paidAmountPaise >= due.amount;
+    const isReceivable = due.direction === 'you_will_get';
+    const customer = useCustomerStore.getState().customers.find((c) => c.id === due.customer_id);
+
+    // 1. Update Due state
+    if (isFullSettlement) {
+      useCustomerStore.getState().updateDueStatusOptimistic(dueId, 'settled');
+    } else {
+      useCustomerStore.getState().partialSettleDueOptimistic(dueId, paidAmountPaise);
+    }
+
+    // 2. Record ledger entry (auto-updates linked bank account / till balance!)
+    const ledgerEntry: LedgerEntry = {
+      id: crypto.randomUUID(),
+      workspace_id: due.workspace_id,
+      type: isReceivable ? 'cash_in' : 'cash_out',
+      amount: paidAmountPaise,
+      mode: paymentMode,
+      cash_location_id: cashLocationId || undefined,
+      customer_id: due.customer_id,
+      note: `${isReceivable ? 'Udhar Received' : 'Udhar Paid'} from ${customer?.name || 'Contact'}${
+        remark ? ': ' + remark : ''
+      }${!isFullSettlement ? ' (Partial Payment)' : ''}`,
+      entry_date: new Date().toISOString(),
+    };
+    await this.pushLedgerEntry(ledgerEntry);
+
+    // 3. Persist due update to cloud/queue
+    try {
+      if (isFullSettlement) {
+        await supabase
+          .from('people_dues')
+          .update({ status: 'settled', updated_at: new Date().toISOString() })
+          .eq('id', dueId);
+      } else {
+        await supabase
+          .from('people_dues')
+          .update({ amount: due.amount - paidAmountPaise, updated_at: new Date().toISOString() })
+          .eq('id', dueId);
+      }
+    } catch {
+      if (isFullSettlement) {
+        this.enqueue('people_dues', 'upsert', { id: dueId, status: 'settled' });
+      } else {
+        this.enqueue('people_dues', 'upsert', { id: dueId, amount: due.amount - paidAmountPaise });
+      }
     }
   }
 

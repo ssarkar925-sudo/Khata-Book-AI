@@ -9,8 +9,13 @@ interface CustomerState {
   setCustomers: (customers: Customer[]) => void;
   setDues: (dues: PeopleDue[]) => void;
   addCustomerOptimistic: (customer: Customer) => void;
+  updateCustomerOptimistic: (id: string, updates: Partial<Customer>) => void;
+  deleteCustomerOptimistic: (id: string) => void;
   addDueOptimistic: (due: PeopleDue) => void;
+  updateDueOptimistic: (id: string, updates: Partial<PeopleDue>) => void;
+  deleteDueOptimistic: (id: string) => void;
   updateDueStatusOptimistic: (dueId: string, status: DueStatus) => void;
+  partialSettleDueOptimistic: (dueId: string, paidAmountPaise: number) => void;
   clearCustomerData: () => void;
 }
 
@@ -134,6 +139,28 @@ export const useCustomerStore = create<CustomerState>((set) => ({
       return { customers: deduped };
     }),
 
+  updateCustomerOptimistic: (id, updates) =>
+    set((state) => {
+      const updated = state.customers.map((c) => (c.id === id ? { ...c, ...updates } : c));
+      const deduped = dedupeById(updated);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(deduped));
+      }
+      return { customers: deduped };
+    }),
+
+  deleteCustomerOptimistic: (id) =>
+    set((state) => {
+      const updated = state.customers.filter((c) => c.id !== id);
+      const updatedDues = state.dues.filter((d) => d.customer_id !== id);
+      const deduped = dedupeById(updated);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(deduped));
+        localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(updatedDues));
+      }
+      return { customers: deduped, dues: updatedDues };
+    }),
+
   addDueOptimistic: (due) =>
     set((state) => {
       const exists = state.dues.some((d) => d.id === due.id);
@@ -150,6 +177,42 @@ export const useCustomerStore = create<CustomerState>((set) => ({
   updateDueStatusOptimistic: (dueId, status) =>
     set((state) => {
       const updated = state.dues.map((d) => (d.id === dueId ? { ...d, status } : d));
+      const deduped = dedupeById(updated);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(deduped));
+      }
+      return { dues: deduped };
+    }),
+
+  updateDueOptimistic: (id, updates) =>
+    set((state) => {
+      const updated = state.dues.map((d) => (d.id === id ? { ...d, ...updates } : d));
+      const deduped = dedupeById(updated);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(deduped));
+      }
+      return { dues: deduped };
+    }),
+
+  deleteDueOptimistic: (id) =>
+    set((state) => {
+      const updated = state.dues.filter((d) => d.id !== id);
+      const deduped = dedupeById(updated);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(deduped));
+      }
+      return { dues: deduped };
+    }),
+
+  partialSettleDueOptimistic: (dueId, paidAmountPaise) =>
+    set((state) => {
+      const updated = state.dues.map((d) => {
+        if (d.id !== dueId) return d;
+        if (paidAmountPaise >= d.amount) {
+          return { ...d, status: 'settled' as DueStatus };
+        }
+        return { ...d, amount: d.amount - paidAmountPaise };
+      });
       const deduped = dedupeById(updated);
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(deduped));
