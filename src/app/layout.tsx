@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Khata Book AI — Smart Personal Ledger & Accounting',
-  description: 'Ultra-fast Next.js personal khata with multi-bank tracking, credit cards, customer udhar, encrypted vault, and Ask AI accountant.',
+  title: 'Record Book — Smart Financial Ledger & AI Accountant',
+  description: 'Ultra-fast Next.js personal and business record book with multi-bank tracking, credit cards, udhar dues, encrypted vault, and Ask AI accountant.',
   manifest: '/manifest.json',
   icons: {
     icon: '/icon-192.svg',

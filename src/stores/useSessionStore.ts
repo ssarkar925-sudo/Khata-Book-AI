@@ -2,6 +2,31 @@ import { create } from 'zustand';
 import { User } from '@supabase/supabase-js';
 import { Workspace, SyncStatus } from '@/types';
 
+export const DEFAULT_LOCAL_USER: User = {
+  id: '00000000-0000-0000-0000-000000000001',
+  aud: 'authenticated',
+  role: 'authenticated',
+  email: 'owner@recordbook.local',
+  email_confirmed_at: new Date().toISOString(),
+  phone: '',
+  confirmed_at: new Date().toISOString(),
+  last_sign_in_at: new Date().toISOString(),
+  app_metadata: { provider: 'email', providers: ['email'] },
+  user_metadata: { full_name: 'Record Book Owner' },
+  identities: [],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+export const DEFAULT_LOCAL_WORKSPACE: Workspace = {
+  id: '00000000-0000-0000-0000-000000000010',
+  name: 'Primary Record Book',
+  currency: 'INR',
+  owner_id: '00000000-0000-0000-0000-000000000001',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 interface SessionState {
   user: User | null;
   authLoading: boolean;
@@ -25,49 +50,37 @@ export const useSessionStore = create<SessionState>((set) => ({
   user: (() => {
     if (typeof window !== 'undefined') {
       try {
-        const cached = localStorage.getItem('khata_cached_user');
+        const cached = localStorage.getItem('rb_cached_user');
         if (cached) return JSON.parse(cached);
       } catch {}
     }
-    return null;
+    // Default to active local owner without requiring login
+    return DEFAULT_LOCAL_USER;
   })(),
-  authLoading: (() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem('khata_cached_user');
-        const hasSession = Object.keys(localStorage).some((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
-        if (!cached && !hasSession) return false;
-        if (cached) return false;
-      } catch {}
-    }
-    return false;
-  })(),
-  workspaces: [],
-  activeWorkspaceId: '',
+  authLoading: false,
+  workspaces: [DEFAULT_LOCAL_WORKSPACE],
+  activeWorkspaceId: DEFAULT_LOCAL_WORKSPACE.id,
   syncStatus: 'synced',
   theme: (() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('khata_theme') as 'light' | 'dark') || 'light';
+      return (localStorage.getItem('rb_theme') as 'light' | 'dark') || 'light';
     }
     return 'light';
   })(),
   language: 'en',
 
   setUser: (user) => {
+    const activeUser = user || DEFAULT_LOCAL_USER;
     if (typeof window !== 'undefined') {
-      if (user) {
-        localStorage.setItem('khata_cached_user', JSON.stringify({
-          id: user.id,
-          email: user.email,
-          user_metadata: user.user_metadata,
-          aud: user.aud,
-          created_at: user.created_at,
-        }));
-      } else {
-        localStorage.removeItem('khata_cached_user');
-      }
+      localStorage.setItem('rb_cached_user', JSON.stringify({
+        id: activeUser.id,
+        email: activeUser.email,
+        user_metadata: activeUser.user_metadata,
+        aud: activeUser.aud,
+        created_at: activeUser.created_at,
+      }));
     }
-    set({ user, authLoading: false });
+    set({ user: activeUser, authLoading: false });
   },
 
   setAuthLoading: (authLoading) => set({ authLoading }),
@@ -76,7 +89,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   setSyncStatus: (syncStatus) => set({ syncStatus }),
   setTheme: (theme) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('khata_theme', theme);
+      localStorage.setItem('rb_theme', theme);
       if (theme === 'dark') {
         document.documentElement.classList.add('dark');
         document.documentElement.classList.remove('light');
@@ -90,13 +103,13 @@ export const useSessionStore = create<SessionState>((set) => ({
   setLanguage: (language) => set({ language }),
   resetSession: () => {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('khata_cached_user');
+      localStorage.removeItem('rb_cached_user');
     }
     set({
-      user: null,
+      user: DEFAULT_LOCAL_USER,
       authLoading: false,
-      workspaces: [],
-      activeWorkspaceId: '',
+      workspaces: [DEFAULT_LOCAL_WORKSPACE],
+      activeWorkspaceId: DEFAULT_LOCAL_WORKSPACE.id,
       syncStatus: 'synced',
     });
   },

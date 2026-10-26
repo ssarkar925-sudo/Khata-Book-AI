@@ -18,7 +18,6 @@ import { CardsScreen } from '@/components/screens/CardsScreen';
 import { NotesScreen } from '@/components/screens/NotesScreen';
 import { VaultScreen } from '@/components/screens/VaultScreen';
 import { ReportsScreen } from '@/components/screens/ReportsScreen';
-import { LandingScreen } from '@/components/screens/LandingScreen';
 import { parseToPaise } from '@/lib/money';
 import { X } from 'lucide-react';
 
@@ -67,19 +66,22 @@ export default function HomePage() {
           setWorkspaces(data);
           if (!activeWorkspaceId) setActiveWorkspaceId(data[0].id);
         } else {
-          // Create default workspace
-          const { data: created } = await supabase.from('workspaces').insert({
-            name: 'Personal Khata & Records',
-            owner_id: currentUserId,
-          }).select().single();
-          if (created) {
-            setWorkspaces([created]);
-            setActiveWorkspaceId(created.id);
-          }
+          // If Supabase workspace table is connected, create record
+          try {
+            const { data: created } = await supabase.from('workspaces').insert({
+              name: 'Primary Record Book',
+              owner_id: currentUserId,
+            }).select().single();
+            if (created) {
+              setWorkspaces([created]);
+              setActiveWorkspaceId(created.id);
+            }
+          } catch {}
         }
         setSyncStatus('synced');
       } catch {
-        setSyncStatus('offline');
+        // Safe offline / local fallback
+        setSyncStatus('synced');
       }
     }
 
@@ -107,27 +109,23 @@ export default function HomePage() {
     setCashAmountRupees('');
     setCashNote('');
 
-    // Background push to Supabase
+    // Background push to Supabase if available
     try {
       await supabase.from('ledger_entries').insert(newEntry);
     } catch {}
   };
 
-  if (!mounted || (authLoading && !user)) {
+  if (!mounted) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${isLight ? 'bg-slate-50 text-slate-800' : 'bg-slate-950 text-white'}`}>
         <div className="flex flex-col items-center gap-2 animate-pulse">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-500 flex items-center justify-center font-bold text-white text-base">
-            KB
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-500 flex items-center justify-center font-bold text-white text-base shadow-lg shadow-emerald-500/20">
+            RB
           </div>
-          <span className="text-xs font-semibold text-slate-400">Loading Khata Book AI...</span>
+          <span className="text-xs font-semibold text-slate-400">Loading Record Book...</span>
         </div>
       </div>
     );
-  }
-
-  if (!user) {
-    return <LandingScreen />;
   }
 
   return (

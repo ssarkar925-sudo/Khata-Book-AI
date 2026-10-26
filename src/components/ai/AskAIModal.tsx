@@ -91,7 +91,7 @@ export function AskAIModal({ isOpen, onClose }: AskAIModalProps) {
                 </span>
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Instant financial intelligence on your Khata
+                Instant financial intelligence on your Record Book
               </p>
             </div>
           </div>
@@ -149,7 +149,7 @@ export function AskAIModal({ isOpen, onClose }: AskAIModalProps) {
           {isThinking && (
             <div className="flex items-center gap-2 text-xs text-slate-400 pl-9 animate-pulse">
               <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Analyzing your khata records...</span>
+              <span>Analyzing your records...</span>
             </div>
           )}
         </div>

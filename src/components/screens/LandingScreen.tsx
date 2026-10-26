@@ -41,7 +41,7 @@ export function LandingScreen() {
         if (error) throw error;
         if (data.user) {
           setUser(data.user);
-          setSuccessMessage('Account created! Welcome to Khata Book AI.');
+          setSuccessMessage('Account created! Welcome to Record Book.');
         } else {
           setSuccessMessage('Registration successful! Please sign in.');
           setIsSignUp(false);
@@ -73,10 +73,10 @@ export function LandingScreen() {
       <header className="w-full px-6 py-4 flex items-center justify-between border-b border-slate-200/80 dark:border-white/10 backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
           <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-amber-500 via-emerald-500 to-teal-400 flex items-center justify-center font-extrabold text-sm text-white shadow-md shadow-emerald-500/25">
-            KB
+            RB
           </div>
           <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-emerald-600 to-teal-500 dark:from-emerald-400 dark:to-cyan-400 bg-clip-text text-transparent">
-            Khata Book AI
+            Record Book
           </span>
         </div>
 
@@ -97,10 +97,10 @@ export function LandingScreen() {
               <span>Ask AI Accountant Enabled</span>
             </div>
             <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-              {isSignUp ? 'Create Cloud Account' : 'Sign In to Khata Book'}
+              {isSignUp ? 'Create Cloud Account' : 'Sign In to Record Book'}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Access your bank balances, Udhar Khata, cards, and encrypted vault anywhere.
+              Access your bank balances, dues & credits, cards, and encrypted vault anywhere.
             </p>
           </div>
 

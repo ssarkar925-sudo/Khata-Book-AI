@@ -83,7 +83,7 @@ export function DuesScreen() {
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
             <Users className="w-5 h-5 text-teal-500" />
-            <span>Udhar Khata (Customer & Supplier Dues)</span>
+            <span>Dues & Udhar Book (Customer & Supplier Records)</span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Track who owes you money (*Receivables*), who you owe (*Payables*), and send WhatsApp reminders.

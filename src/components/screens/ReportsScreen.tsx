@@ -35,7 +35,7 @@ export function ReportsScreen() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Khata_Statement_${activeWs?.name || 'Workspace'}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `RecordBook_Statement_${activeWs?.name || 'Records'}_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -29,7 +29,7 @@ export function MobileNav({ activeTab, setActiveTab, onOpenMore }: MobileNavProp
   const items: { id: TabType; label: string; icon: React.ElementType; badge?: number }[] = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
     { id: 'cash', label: 'Accounts', icon: Wallet },
-    { id: 'dues', label: 'Khata', icon: Users, badge: pendingDuesCount || undefined },
+    { id: 'dues', label: 'Dues', icon: Users, badge: pendingDuesCount || undefined },
     { id: 'cards', label: 'Cards', icon: CreditCard },
     { id: 'notes', label: 'Notes', icon: StickyNote },
   ];

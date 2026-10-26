@@ -35,11 +35,11 @@ export function Navbar({ onOpenAskAI, onRefresh }: NavbarProps) {
       {/* Brand & Workspace Switcher */}
       <div className="flex items-center gap-2.5">
         <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-amber-500 via-emerald-500 to-teal-400 flex items-center justify-center font-extrabold text-sm text-white shadow-md shadow-emerald-500/25 shrink-0">
-          KB
+          RB
         </div>
         <div className="hidden sm:block">
           <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 dark:from-emerald-400 dark:via-teal-300 dark:to-cyan-400 bg-clip-text text-transparent">
-            Khata Book AI
+            Record Book
           </span>
         </div>
 
@@ -55,7 +55,7 @@ export function Navbar({ onOpenAskAI, onRefresh }: NavbarProps) {
           >
             <Building className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
             <span className="max-w-[120px] sm:max-w-[180px] truncate">
-              {activeWs?.name || 'Personal Khata'}
+              {activeWs?.name || 'Primary Record Book'}
             </span>
           </button>
 

@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.khatabook.ai',
-  appName: 'Khata Book AI',
+  appId: 'com.recordbook.app',
+  appName: 'Record Book',
   webDir: 'out',
 };
 

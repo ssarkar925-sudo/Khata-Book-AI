@@ -32,7 +32,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const navItems = [
     { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'cash' as TabType, label: 'Bank & Accounts', icon: Wallet },
-    { id: 'dues' as TabType, label: 'Udhar Khata', icon: Users, badge: pendingDuesCount || undefined },
+    { id: 'dues' as TabType, label: 'Dues & Udhar', icon: Users, badge: pendingDuesCount || undefined },
     { id: 'cards' as TabType, label: 'Credit Cards', icon: CreditCard, badge: activeCardsCount || undefined },
     { id: 'notes' as TabType, label: 'Daily Notes', icon: StickyNote },
     { id: 'vault' as TabType, label: 'Encrypted Vault', icon: Lock },
