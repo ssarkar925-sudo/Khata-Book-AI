@@ -295,3 +295,17 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.vault_items;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
+-- ============================================================================
+-- REPLICA IDENTITY FULL (Ensures Full Record Broadcast on Updates/Deletes)
+-- ============================================================================
+ALTER TABLE public.workspaces REPLICA IDENTITY FULL;
+ALTER TABLE public.cash_locations REPLICA IDENTITY FULL;
+ALTER TABLE public.customers REPLICA IDENTITY FULL;
+ALTER TABLE public.people_dues REPLICA IDENTITY FULL;
+ALTER TABLE public.cards REPLICA IDENTITY FULL;
+ALTER TABLE public.categories REPLICA IDENTITY FULL;
+ALTER TABLE public.ledger_entries REPLICA IDENTITY FULL;
+ALTER TABLE public.notes REPLICA IDENTITY FULL;
+ALTER TABLE public.sheets REPLICA IDENTITY FULL;
+ALTER TABLE public.vault_items REPLICA IDENTITY FULL;

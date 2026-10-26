@@ -17,6 +17,7 @@ import { formatPaise, parseToPaise } from '@/lib/money';
 import { useCardStore } from '@/stores/useCardStore';
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useSessionStore } from '@/stores/useSessionStore';
+import { syncEngine } from '@/lib/syncEngine';
 import { CardDetailModal } from '@/components/modals/CardDetailModal';
 
 export function CardsScreen() {
@@ -71,7 +72,7 @@ export function CardsScreen() {
       is_active: true,
     };
 
-    addCardOptimistic(newCard);
+    syncEngine.pushCard(newCard);
     setShowAddModal(false);
     setCardName('');
     setCardBank('');
@@ -97,7 +98,7 @@ export function CardsScreen() {
       created_by: user?.id || 'owner',
     };
 
-    addEntryOptimistic(entry);
+    syncEngine.pushLedgerEntry(entry);
     setShowSpendModal(false);
     setSpendAmountRupees('');
     setSpendMerchant('');
@@ -121,7 +122,7 @@ export function CardsScreen() {
       created_by: user?.id || 'owner',
     };
 
-    addEntryOptimistic(entry);
+    syncEngine.pushLedgerEntry(entry);
     setShowPayBillModal(false);
     setPayAmountRupees('');
     setPayNote('');

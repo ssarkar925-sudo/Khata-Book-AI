@@ -15,6 +15,7 @@ import { Customer, PeopleDue } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
 import { useCustomerStore } from '@/stores/useCustomerStore';
 import { useSessionStore } from '@/stores/useSessionStore';
+import { syncEngine } from '@/lib/syncEngine';
 import { ContactDetailModal } from '@/components/modals/ContactDetailModal';
 
 export function DuesScreen() {
@@ -48,7 +49,7 @@ export function DuesScreen() {
       type: 'customer',
     };
 
-    addCustomerOptimistic(newCust);
+    syncEngine.pushCustomer(newCust);
     setShowAddCustomerModal(false);
     setCustName('');
     setCustPhone('');
@@ -70,7 +71,7 @@ export function DuesScreen() {
       notes: dueNotes.trim() || null,
     };
 
-    addDueOptimistic(newDue);
+    syncEngine.pushDue(newDue);
     setShowAddDueModal(false);
     setDueAmountRupees('');
     setDueNotes('');
@@ -264,7 +265,7 @@ export function DuesScreen() {
 
                     {/* Settle Button */}
                     <button
-                      onClick={() => updateDueStatusOptimistic(due.id, 'settled')}
+                      onClick={() => syncEngine.updateDueStatus(due.id, 'settled')}
                       className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-600 dark:hover:text-emerald-400 font-bold text-xs text-slate-700 dark:text-slate-200 transition-colors"
                     >
                       Settle

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { LedgerEntry } from '@/types';
 import { formatPaise } from '@/lib/money';
-import { useLedgerStore } from '@/stores/useLedgerStore';
+import { syncEngine } from '@/lib/syncEngine';
 
 interface TransactionDetailModalProps {
   entry: LedgerEntry | null;
@@ -22,15 +22,13 @@ interface TransactionDetailModalProps {
 }
 
 export function TransactionDetailModal({ entry, onClose }: TransactionDetailModalProps) {
-  const { removeEntryOptimistic } = useLedgerStore();
-
   if (!entry) return null;
 
   const isInflow = entry.type === 'cash_in';
 
   const handleDelete = () => {
     if (confirm('Are you sure you want to delete this transaction record?')) {
-      removeEntryOptimistic(entry.id);
+      syncEngine.deleteLedgerEntry(entry.id);
       onClose();
     }
   };

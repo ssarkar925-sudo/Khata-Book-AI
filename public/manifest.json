@@ -1,13 +1,13 @@
 {
-  "name": "Khata Book — Personal Ledger & Smart Records",
-  "short_name": "Khata Book",
-  "description": "Ultra-fast personal ledger, PAN card document register, credit card organizer, and encrypted vault.",
+  "name": "Record Book — Finance & Smart Records",
+  "short_name": "Record Book",
+  "description": "Ultra-fast personal ledger, bank account manager, credit cards, document sheets register, and AES-256 encrypted vault.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#059669",
+  "background_color": "#090d16",
+  "theme_color": "#4f46e5",
   "orientation": "portrait-primary",
-  "categories": ["finance", "productivity", "utilities"],
+  "categories": ["finance", "productivity", "business"],
   "icons": [
     {
       "src": "/icon-192.svg",

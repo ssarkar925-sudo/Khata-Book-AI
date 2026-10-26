@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#059669',
+  themeColor: '#4f46e5',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -27,8 +27,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="light h-full" suppressHydrationWarning>
-      <body className="min-h-full flex flex-col antialiased selection:bg-emerald-500 selection:text-white" suppressHydrationWarning>
+      <body className="min-h-full flex flex-col antialiased selection:bg-indigo-500 selection:text-white" suppressHydrationWarning>
         {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function() {});
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

@@ -1,12 +1,12 @@
-// Khata Book Offline Service Worker
-const CACHE_NAME = 'khata-cache-v1';
+const CACHE_NAME = 'record-book-v2';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
   '/icon-192.svg',
-  '/icon-512.svg'
+  '/icon-512.svg',
 ];
 
+// Install: Cache essential assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -16,6 +16,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
+// Activate: Clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -31,36 +32,62 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Fetch: Smart caching strategy
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
-  if (event.request.method !== 'GET') return;
-
   const url = new URL(event.request.url);
 
-  // Skip chrome-extension and external analytics
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  // Bypass API and Supabase Realtime / REST endpoints
+  if (
+    url.hostname.includes('supabase.co') ||
+    url.pathname.startsWith('/api/') ||
+    event.request.method !== 'GET'
+  ) {
+    return;
+  }
 
-  event.respondWith(
-    fetch(event.request)
-      .then((networkResponse) => {
-        // Cache successful responses for local offline usage
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
+  // Static Assets (_next/static, css, js, fonts, images) -> Cache-First
+  if (
+    url.pathname.startsWith('/_next/static/') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.svg') ||
+    url.pathname.endsWith('.png') ||
+    url.pathname.endsWith('.woff2')
+  ) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        });
+      })
+    );
+    return;
+  }
+
+  // HTML Page Navigation -> Stale-While-Revalidate with offline fallback
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cached) => {
+            return cached || caches.match('/');
           });
-        }
-        return networkResponse;
-      })
-      .catch(async () => {
-        // When offline, fall back to cache
-        const cachedResponse = await caches.match(event.request);
-        if (cachedResponse) return cachedResponse;
-
-        // Return offline root for navigation requests
-        if (event.request.mode === 'navigate') {
-          return caches.match('/');
-        }
-      })
-  );
+        })
+    );
+    return;
+  }
 });

@@ -1,5 +1,27 @@
 import { create } from 'zustand';
 import { RecordSheet, SheetRow, SheetColumn } from '@/types';
+import { supabase } from '@/lib/supabase';
+
+function syncSheetToCloud(sheet: RecordSheet) {
+  try {
+    supabase.from('sheets').upsert({
+      id: sheet.id,
+      workspace_id: sheet.workspace_id || '00000000-0000-0000-0000-000000000010',
+      title: sheet.title,
+      category: sheet.category,
+      color: sheet.color,
+      columns: sheet.columns,
+      rows: sheet.rows,
+      updated_at: new Date().toISOString(),
+    }).then();
+  } catch {}
+}
+
+function deleteSheetFromCloud(sheetId: string) {
+  try {
+    supabase.from('sheets').delete().eq('id', sheetId).then();
+  } catch {}
+}
 
 interface SheetState {
   sheets: RecordSheet[];
@@ -137,6 +159,7 @@ export const useSheetStore = create<SheetState>((set) => ({
       if (typeof window !== 'undefined') {
         localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
       }
+      syncSheetToCloud(newSheet);
       return { sheets: updated, activeSheetId: newSheet.id };
     });
 
@@ -149,6 +172,7 @@ export const useSheetStore = create<SheetState>((set) => ({
       if (typeof window !== 'undefined') {
         localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
       }
+      deleteSheetFromCloud(id);
       return {
         sheets: updated,
         activeSheetId: updated[0]?.id || null,
@@ -157,6 +181,7 @@ export const useSheetStore = create<SheetState>((set) => ({
 
   addRow: (sheetId, rowData) =>
     set((state) => {
+      let targetSheet: RecordSheet | undefined;
       const updated = state.sheets.map((s) => {
         if (s.id !== sheetId) return s;
         const newRow: SheetRow = {
@@ -164,60 +189,74 @@ export const useSheetStore = create<SheetState>((set) => ({
           data: rowData,
           created_at: new Date().toISOString(),
         };
-        return { ...s, rows: [newRow, ...s.rows] };
+        targetSheet = { ...s, rows: [newRow, ...s.rows] };
+        return targetSheet;
       });
       if (typeof window !== 'undefined') {
         localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
       }
+      if (targetSheet) syncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
   updateRow: (sheetId, rowId, rowData) =>
     set((state) => {
+      let targetSheet: RecordSheet | undefined;
       const updated = state.sheets.map((s) => {
         if (s.id !== sheetId) return s;
         const rows = s.rows.map((r) => (r.id === rowId ? { ...r, data: { ...r.data, ...rowData } } : r));
-        return { ...s, rows };
+        targetSheet = { ...s, rows };
+        return targetSheet;
       });
       if (typeof window !== 'undefined') {
         localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
       }
+      if (targetSheet) syncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
   deleteRow: (sheetId, rowId) =>
     set((state) => {
+      let targetSheet: RecordSheet | undefined;
       const updated = state.sheets.map((s) => {
         if (s.id !== sheetId) return s;
-        return { ...s, rows: s.rows.filter((r) => r.id !== rowId) };
+        targetSheet = { ...s, rows: s.rows.filter((r) => r.id !== rowId) };
+        return targetSheet;
       });
       if (typeof window !== 'undefined') {
         localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
       }
+      if (targetSheet) syncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
   addColumn: (sheetId, column) =>
     set((state) => {
+      let targetSheet: RecordSheet | undefined;
       const updated = state.sheets.map((s) => {
         if (s.id !== sheetId) return s;
-        return { ...s, columns: [...s.columns, column] };
+        targetSheet = { ...s, columns: [...s.columns, column] };
+        return targetSheet;
       });
       if (typeof window !== 'undefined') {
         localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
       }
+      if (targetSheet) syncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
   deleteColumn: (sheetId, columnId) =>
     set((state) => {
+      let targetSheet: RecordSheet | undefined;
       const updated = state.sheets.map((s) => {
         if (s.id !== sheetId) return s;
-        return { ...s, columns: s.columns.filter((c) => c.id !== columnId) };
+        targetSheet = { ...s, columns: s.columns.filter((c) => c.id !== columnId) };
+        return targetSheet;
       });
       if (typeof window !== 'undefined') {
         localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
       }
+      if (targetSheet) syncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 }));

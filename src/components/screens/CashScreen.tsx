@@ -14,6 +14,7 @@ import { CashLocation } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { useAccountStore } from '@/stores/useAccountStore';
+import { syncEngine } from '@/lib/syncEngine';
 import { AccountDetailModal } from '@/components/modals/AccountDetailModal';
 
 export function CashScreen() {
@@ -47,7 +48,7 @@ export function CashScreen() {
       gradient: 'from-teal-500/20 via-emerald-500/10 to-transparent',
       iconColor: 'bg-teal-600 text-white',
     };
-    addAccount(newAcc);
+    syncEngine.pushAccount(newAcc);
     setShowAddModal(false);
     setNewAccName('');
     setNewAccBalanceRupees('');
@@ -61,8 +62,8 @@ export function CashScreen() {
     const fromAcc = accounts.find((a) => a.id === fromAccId);
     const toAcc = accounts.find((a) => a.id === toAccId);
     if (fromAcc && toAcc) {
-      updateAccountBalance(fromAccId, fromAcc.balance - amountPaise);
-      updateAccountBalance(toAccId, toAcc.balance + amountPaise);
+      syncEngine.updateAccountBalance(fromAccId, fromAcc.balance - amountPaise);
+      syncEngine.updateAccountBalance(toAccId, toAcc.balance + amountPaise);
     }
 
     setShowTransferModal(false);

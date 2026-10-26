@@ -13,6 +13,7 @@ import {
 import { NoteItem } from '@/types';
 import { useNoteStore } from '@/stores/useNoteStore';
 import { useSessionStore } from '@/stores/useSessionStore';
+import { syncEngine } from '@/lib/syncEngine';
 
 export function NotesScreen() {
   const { notes, addNoteOptimistic, updateNoteOptimistic, deleteNoteOptimistic } = useNoteStore();
@@ -58,7 +59,7 @@ export function NotesScreen() {
       checklist_items: checklistItems,
     };
 
-    addNoteOptimistic(newNote);
+    syncEngine.pushNote(newNote);
     setShowAddModal(false);
     setNoteTitle('');
     setNoteBody('');
@@ -73,7 +74,7 @@ export function NotesScreen() {
       item.id === itemId ? { ...item, is_done: !item.is_done } : item
     );
 
-    updateNoteOptimistic(noteId, { checklist_items: updatedItems });
+    syncEngine.updateNote(noteId, { checklist_items: updatedItems });
   };
 
   return (
@@ -126,7 +127,7 @@ export function NotesScreen() {
                   </h3>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
-                      onClick={() => updateNoteOptimistic(note.id, { is_pinned: !note.is_pinned })}
+                      onClick={() => syncEngine.updateNote(note.id, { is_pinned: !note.is_pinned })}
                       className={`p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${
                         note.is_pinned ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'
                       }`}
@@ -134,7 +135,7 @@ export function NotesScreen() {
                       <Pin className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => deleteNoteOptimistic(note.id)}
+                      onClick={() => syncEngine.deleteNote(note.id)}
                       className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-rose-500 transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

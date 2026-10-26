@@ -75,28 +75,22 @@ export default function HomePage() {
   const handleRecordQuickCash = async (e: React.FormEvent) => {
     e.preventDefault();
     const paise = parseToPaise(cashAmountRupees);
-    if (paise <= 0 || !showCashModal || !user) return;
+    if (paise <= 0 || !showCashModal) return;
 
     const newEntry: LedgerEntry = {
       id: crypto.randomUUID(),
-      workspace_id: activeWorkspaceId || crypto.randomUUID(),
+      workspace_id: activeWorkspaceId || '00000000-0000-0000-0000-000000000010',
       type: showCashModal === 'in' ? 'cash_in' : 'cash_out',
       amount: paise,
       mode: 'cash',
       note: cashNote.trim() || (showCashModal === 'in' ? 'Cash Received' : 'Cash Paid'),
       entry_date: new Date().toISOString(),
-      created_by: user.id,
     };
 
-    addEntryOptimistic(newEntry);
+    syncEngine.pushLedgerEntry(newEntry);
     setShowCashModal(null);
     setCashAmountRupees('');
     setCashNote('');
-
-    // Background push to Supabase if available
-    try {
-      await supabase.from('ledger_entries').insert(newEntry);
-    } catch {}
   };
 
   if (!mounted) {
