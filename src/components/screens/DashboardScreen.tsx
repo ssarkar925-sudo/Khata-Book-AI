@@ -15,6 +15,7 @@ import {
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useCustomerStore } from '@/stores/useCustomerStore';
 import { useCardStore } from '@/stores/useCardStore';
+import { useAccountStore } from '@/stores/useAccountStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { formatPaise } from '@/lib/money';
 import { TabType, LedgerEntry } from '@/types';
@@ -36,6 +37,7 @@ export function DashboardScreen({
   const { entries: ledger } = useLedgerStore();
   const { dues, customers } = useCustomerStore();
   const { cards } = useCardStore();
+  const { accounts } = useAccountStore();
   const { theme } = useSessionStore();
   const isLight = theme === 'light';
 
@@ -66,7 +68,8 @@ export function DashboardScreen({
   const totalOutflow = ledger
     .filter((e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment')
     .reduce((s, e) => s + Number(e.amount), 0);
-  const totalCash = Math.max(0, totalInflow - totalOutflow);
+  const totalAccountBalance = accounts.reduce((s, a) => s + Number(a.balance), 0);
+  const totalCash = totalAccountBalance > 0 ? totalAccountBalance : Math.max(0, totalInflow - totalOutflow);
 
   const netPosition = totalCash + totalReceivables - (totalPayables + totalCardDues);
 

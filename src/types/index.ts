@@ -89,7 +89,7 @@ export interface LedgerEntry {
   note?: string | null;
   entry_date: string;
   idempotency_key?: string | null;
-  created_by: string;
+  created_by?: string;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;

@@ -20,6 +20,7 @@ import { VaultScreen } from '@/components/screens/VaultScreen';
 import { ReportsScreen } from '@/components/screens/ReportsScreen';
 import { SheetsScreen } from '@/components/screens/SheetsScreen';
 import { parseToPaise } from '@/lib/money';
+import { syncEngine } from '@/lib/syncEngine';
 import { X } from 'lucide-react';
 
 export default function HomePage() {
@@ -54,40 +55,22 @@ export default function HomePage() {
     };
   }, [setUser]);
 
-  // Workspace hydration
+  // Cloud Sync & Realtime Engine
   useEffect(() => {
-    if (!user) return;
-    const currentUserId = user.id;
+    if (!mounted) return;
+    const wsId = activeWorkspaceId || '00000000-0000-0000-0000-000000000010';
+    syncEngine.pullAll(wsId);
+    syncEngine.subscribeRealtime(wsId);
 
-    async function loadWorkspaces() {
-      setSyncStatus('syncing');
-      try {
-        const { data, error } = await supabase.from('workspaces').select('*');
-        if (data && data.length > 0) {
-          setWorkspaces(data);
-          if (!activeWorkspaceId) setActiveWorkspaceId(data[0].id);
-        } else {
-          // If Supabase workspace table is connected, create record
-          try {
-            const { data: created } = await supabase.from('workspaces').insert({
-              name: 'Primary Record Book',
-              owner_id: currentUserId,
-            }).select().single();
-            if (created) {
-              setWorkspaces([created]);
-              setActiveWorkspaceId(created.id);
-            }
-          } catch {}
-        }
-        setSyncStatus('synced');
-      } catch {
-        // Safe offline / local fallback
-        setSyncStatus('synced');
-      }
-    }
+    return () => {
+      syncEngine.destroy();
+    };
+  }, [mounted, activeWorkspaceId]);
 
-    loadWorkspaces();
-  }, [user, activeWorkspaceId, setWorkspaces, setActiveWorkspaceId, setSyncStatus]);
+  const handleRefresh = async () => {
+    const wsId = activeWorkspaceId || '00000000-0000-0000-0000-000000000010';
+    await syncEngine.pullAll(wsId);
+  };
 
   const handleRecordQuickCash = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,10 +120,7 @@ export default function HomePage() {
     >
       <Navbar
         onOpenAskAI={() => setIsAskAIOpen(true)}
-        onRefresh={() => {
-          setSyncStatus('syncing');
-          setTimeout(() => setSyncStatus('synced'), 400);
-        }}
+        onRefresh={handleRefresh}
       />
 
       <div className="flex-1 flex overflow-hidden">

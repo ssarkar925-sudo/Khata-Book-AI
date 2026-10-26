@@ -113,18 +113,29 @@ export function Navbar({ onOpenAskAI, onRefresh }: NavbarProps) {
         {/* Sync Status Badge */}
         <button
           onClick={onRefresh}
-          title={`Sync status: ${syncStatus}. Click to refresh.`}
+          title={`Status: ${syncStatus}. Tap to sync now with Supabase.`}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all touch-press ${
-            isLight
-              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-700'
-              : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+            syncStatus === 'syncing'
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+              : syncStatus === 'synced'
+              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-700 dark:text-emerald-400'
+              : 'bg-slate-200/50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-500'
           }`}
         >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          {syncStatus === 'syncing' ? (
+            <RefreshCw className="w-3 h-3 animate-spin text-amber-500 shrink-0" />
+          ) : syncStatus === 'synced' ? (
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+          ) : (
+            <span className="h-2 w-2 rounded-full bg-slate-400" />
+          )}
+          <span className="hidden sm:inline">
+            {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'synced' ? 'Cloud Synced' : 'Local Mode'}
           </span>
-          <RefreshCw className="w-3 h-3 hover:rotate-180 transition-transform duration-500" />
+          <RefreshCw className="w-3 h-3 hover:rotate-180 transition-transform duration-500 hidden sm:inline" />
         </button>
 
         {/* Theme Toggle */}

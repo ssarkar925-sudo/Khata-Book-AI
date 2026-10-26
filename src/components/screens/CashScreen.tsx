@@ -13,41 +13,13 @@ import {
 import { CashLocation } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
 import { useSessionStore } from '@/stores/useSessionStore';
+import { useAccountStore } from '@/stores/useAccountStore';
 import { AccountDetailModal } from '@/components/modals/AccountDetailModal';
 
 export function CashScreen() {
   const { activeWorkspaceId, theme } = useSessionStore();
+  const { accounts, addAccount, updateAccountBalance } = useAccountStore();
   const isLight = theme === 'light';
-
-  const [accounts, setAccounts] = useState<Array<CashLocation & { gradient?: string; iconColor?: string }>>([
-    {
-      id: 'default-cash',
-      workspace_id: activeWorkspaceId,
-      name: 'Physical Cash Drawer',
-      balance: 1500000,
-      is_default: true,
-      gradient: 'from-amber-500/20 via-orange-500/10 to-transparent',
-      iconColor: 'bg-amber-500 text-white',
-    },
-    {
-      id: 'default-sbi',
-      workspace_id: activeWorkspaceId,
-      name: 'SBI Savings Account',
-      balance: 4500000,
-      is_default: false,
-      gradient: 'from-blue-600/20 via-cyan-500/10 to-transparent',
-      iconColor: 'bg-blue-600 text-white',
-    },
-    {
-      id: 'default-hdfc',
-      workspace_id: activeWorkspaceId,
-      name: 'HDFC Business Current',
-      balance: 8200000,
-      is_default: false,
-      gradient: 'from-indigo-600/20 via-purple-500/10 to-transparent',
-      iconColor: 'bg-indigo-600 text-white',
-    },
-  ]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -75,7 +47,7 @@ export function CashScreen() {
       gradient: 'from-teal-500/20 via-emerald-500/10 to-transparent',
       iconColor: 'bg-teal-600 text-white',
     };
-    setAccounts((prev) => [...prev, newAcc]);
+    addAccount(newAcc);
     setShowAddModal(false);
     setNewAccName('');
     setNewAccBalanceRupees('');
@@ -86,13 +58,12 @@ export function CashScreen() {
     const amountPaise = parseToPaise(transferAmountRupees);
     if (amountPaise <= 0 || !fromAccId || !toAccId || fromAccId === toAccId) return;
 
-    setAccounts((prev) =>
-      prev.map((acc) => {
-        if (acc.id === fromAccId) return { ...acc, balance: acc.balance - amountPaise };
-        if (acc.id === toAccId) return { ...acc, balance: acc.balance + amountPaise };
-        return acc;
-      })
-    );
+    const fromAcc = accounts.find((a) => a.id === fromAccId);
+    const toAcc = accounts.find((a) => a.id === toAccId);
+    if (fromAcc && toAcc) {
+      updateAccountBalance(fromAccId, fromAcc.balance - amountPaise);
+      updateAccountBalance(toAccId, toAcc.balance + amountPaise);
+    }
 
     setShowTransferModal(false);
     setTransferAmountRupees('');
