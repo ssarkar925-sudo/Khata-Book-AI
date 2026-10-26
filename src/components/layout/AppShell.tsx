@@ -19,7 +19,7 @@ import { ReportsScreen } from '@/components/screens/ReportsScreen';
 import { SheetsScreen } from '@/components/screens/SheetsScreen';
 import { ReceiptScannerModal } from '@/components/modals/ReceiptScannerModal';
 import { VoiceExpenseModal } from '@/components/modals/VoiceExpenseModal';
-import { parseToPaise } from '@/lib/money';
+import { QuickTransactionModal } from '@/components/modals/QuickTransactionModal';
 import { syncEngine } from '@/lib/syncEngine';
 import { X, Camera, Mic } from 'lucide-react';
 
@@ -36,8 +36,6 @@ export function AppShell() {
 
   // Quick transaction modals
   const [showCashModal, setShowCashModal] = useState<'in' | 'out' | null>(null);
-  const [cashAmountRupees, setCashAmountRupees] = useState('');
-  const [cashNote, setCashNote] = useState('');
 
   useEffect(() => {
     // Supabase auth subscription
@@ -68,27 +66,6 @@ export function AppShell() {
   const handleRefresh = async () => {
     const wsId = activeWorkspaceId || '00000000-0000-0000-0000-000000000010';
     await syncEngine.pullAll(wsId);
-  };
-
-  const handleRecordQuickCash = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const paise = parseToPaise(cashAmountRupees);
-    if (paise <= 0 || !showCashModal) return;
-
-    const newEntry: LedgerEntry = {
-      id: crypto.randomUUID(),
-      workspace_id: activeWorkspaceId || '00000000-0000-0000-0000-000000000010',
-      type: showCashModal === 'in' ? 'cash_in' : 'cash_out',
-      amount: paise,
-      mode: 'cash',
-      note: cashNote.trim() || (showCashModal === 'in' ? 'Cash Received' : 'Cash Paid'),
-      entry_date: new Date().toISOString(),
-    };
-
-    syncEngine.pushLedgerEntry(newEntry);
-    setShowCashModal(null);
-    setCashAmountRupees('');
-    setCashNote('');
   };
 
   return (
@@ -231,74 +208,27 @@ export function AppShell() {
         </div>
       )}
 
-      {/* Quick Cash Modal */}
-      {showCashModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-3">
-              <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
-                {showCashModal === 'in' ? 'Record Inflow (+)' : 'Record Outflow (-)'}
-              </h3>
-              <button
-                onClick={() => setShowCashModal(null)}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleRecordQuickCash} className="space-y-3.5">
-              <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">
-                  Amount (₹)
-                </label>
-                <input
-                  type="number"
-                  required
-                  autoFocus
-                  placeholder="0.00"
-                  value={cashAmountRupees}
-                  onChange={(e) => setCashAmountRupees(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-zinc-900 dark:text-zinc-100 font-mono text-lg font-semibold focus:outline-none focus:border-zinc-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1">
-                  Note
-                </label>
-                <input
-                  type="text"
-                  placeholder="Description..."
-                  value={cashNote}
-                  onChange={(e) => setCashNote(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-500"
-                />
-              </div>
-
-              <div className="pt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCashModal(null)}
-                  className="flex-1 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className={`flex-1 py-2 rounded-lg font-medium text-xs text-white transition-opacity ${
-                    showCashModal === 'in'
-                      ? 'bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white'
-                      : 'bg-rose-600 hover:bg-rose-700'
-                  }`}
-                >
-                  Confirm
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Quick Transaction Modal (Inflow / Outflow / Expense) */}
+      <QuickTransactionModal
+        isOpen={showCashModal !== null}
+        type={showCashModal || 'out'}
+        onClose={() => setShowCashModal(null)}
+        onSubmit={({ amountPaise, categoryId, accountId, mode, note, entryDate }) => {
+          const newEntry: LedgerEntry = {
+            id: crypto.randomUUID(),
+            workspace_id: activeWorkspaceId || '00000000-0000-0000-0000-000000000010',
+            type: showCashModal === 'in' ? 'cash_in' : 'cash_out',
+            amount: amountPaise,
+            category_id: categoryId,
+            cash_location_id: accountId,
+            mode,
+            note: note.trim() || (showCashModal === 'in' ? 'Cash Received' : 'Expense Recorded'),
+            entry_date: entryDate,
+          };
+          syncEngine.pushLedgerEntry(newEntry);
+          setShowCashModal(null);
+        }}
+      />
     </div>
   );
 }

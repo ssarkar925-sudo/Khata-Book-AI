@@ -22,6 +22,7 @@ import { useSessionStore } from '@/stores/useSessionStore';
 import { formatPaise } from '@/lib/money';
 import { TabType, LedgerEntry } from '@/types';
 import { TransactionDetailModal } from '@/components/modals/TransactionDetailModal';
+import { getCategoryById } from '@/lib/categories';
 
 interface DashboardProps {
   onNavigateTab: (tab: TabType) => void;
@@ -83,6 +84,27 @@ export function DashboardScreen({
   const totalAssets = Math.max(1, totalCash + totalReceivables);
   const cashPct = Math.round((totalCash / totalAssets) * 100);
   const recPct = Math.round((totalReceivables / totalAssets) * 100);
+
+  // Top Expense Categories Breakdown
+  const expenseEntries = ledger.filter(
+    (e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment'
+  );
+  const totalExpenses = expenseEntries.reduce((s, e) => s + Number(e.amount), 0);
+
+  const categoryMap = new Map<string, number>();
+  for (const e of expenseEntries) {
+    const catId = e.category_id || 'general';
+    categoryMap.set(catId, (categoryMap.get(catId) || 0) + Number(e.amount));
+  }
+
+  const topCategories = Array.from(categoryMap.entries())
+    .map(([catId, amount]) => ({
+      category: getCategoryById(catId),
+      amount,
+      pct: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 4);
 
   return (
     <div className="space-y-6">
@@ -311,6 +333,50 @@ export function DashboardScreen({
         </div>
       </div>
 
+      {/* Expense Categories Breakdown Strip */}
+      {topCategories.length > 0 && (
+        <div
+          className={`rounded-3xl border p-5 transition-all ${
+            isLight ? 'bg-white border-slate-200/90 shadow-sm' : 'bg-slate-900/80 border-white/10 shadow-lg'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Top Expense Categories ({formatPaise(totalExpenses)} total spent)
+            </span>
+            <span className="text-[11px] font-semibold text-slate-400">This Period</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {topCategories.map(({ category, amount, pct }) => (
+              <div
+                key={category.id}
+                className="p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 space-y-1.5"
+              >
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                    {category.name}
+                  </span>
+                  <span className="font-bold text-slate-500 text-[11px]">{pct}%</span>
+                </div>
+                <div className="text-sm font-black tabular-nums text-slate-900 dark:text-white">
+                  {formatPaise(amount)}
+                </div>
+                <div className="h-1.5 w-full bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: category.color,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 3. RECENT TRANSACTIONS WITH COLORFUL AVATARS */}
       <div
         className={`rounded-3xl border p-5 sm:p-6 transition-all ${
@@ -341,6 +407,9 @@ export function DashboardScreen({
           <div className="divide-y divide-slate-100 dark:divide-white/5">
             {ledger.slice(0, 8).map((entry) => {
               const isInflow = entry.type === 'cash_in';
+              const cat = getCategoryById(entry.category_id);
+              const acc = accounts.find((a) => a.id === entry.cash_location_id);
+
               return (
                 <div
                   key={entry.id}
@@ -358,8 +427,17 @@ export function DashboardScreen({
                       {isInflow ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                     </div>
                     <div>
-                      <div className="font-bold text-slate-900 dark:text-white text-sm">
-                        {entry.note || (isInflow ? 'Cash Received' : 'Cash Paid')}
+                      <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+                        <span>{entry.note || (isInflow ? 'Cash Received' : 'Expense Recorded')}</span>
+                        <span
+                          className="text-[10px] font-semibold px-2 py-0.2 rounded-full"
+                          style={{
+                            backgroundColor: cat.color + '18',
+                            color: cat.color,
+                          }}
+                        >
+                          {cat.name}
+                        </span>
                       </div>
                       <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
                         <span className="font-semibold text-slate-500 dark:text-slate-400">
@@ -372,6 +450,14 @@ export function DashboardScreen({
                         <span className="uppercase text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300">
                           {entry.mode}
                         </span>
+                        {acc && (
+                          <>
+                            <span>•</span>
+                            <span className="font-medium text-slate-500 dark:text-slate-400 truncate max-w-[120px]">
+                              {acc.name}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -13,12 +13,19 @@ export interface Workspace {
   updated_at?: string;
 }
 
+export type AccountType = 'savings' | 'current' | 'cash_counter' | 'wallet' | 'od_cc';
+
 export interface CashLocation {
   id: string;
   workspace_id: string;
   name: string;
   balance: number; // in paise
   is_default: boolean;
+  account_type?: AccountType;
+  bank_name?: string;
+  account_number_last4?: string;
+  ifsc?: string;
+  color_theme?: string;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;

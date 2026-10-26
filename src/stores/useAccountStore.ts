@@ -13,6 +13,10 @@ const DEFAULT_ACCOUNTS: BankAccountItem[] = [
     name: 'Physical Cash Drawer',
     balance: 1500000, // ₹15,000.00
     is_default: true,
+    account_type: 'cash_counter',
+    bank_name: 'Cash In Hand',
+    account_number_last4: '0001',
+    color_theme: 'amber',
     gradient: 'from-amber-500/20 via-orange-500/10 to-transparent',
     iconColor: 'bg-amber-500 text-white',
   },
@@ -22,6 +26,10 @@ const DEFAULT_ACCOUNTS: BankAccountItem[] = [
     name: 'SBI Savings Account',
     balance: 4500000, // ₹45,000.00
     is_default: false,
+    account_type: 'savings',
+    bank_name: 'State Bank of India',
+    account_number_last4: '3819',
+    color_theme: 'blue',
     gradient: 'from-blue-600/20 via-cyan-500/10 to-transparent',
     iconColor: 'bg-blue-600 text-white',
   },
@@ -31,6 +39,10 @@ const DEFAULT_ACCOUNTS: BankAccountItem[] = [
     name: 'HDFC Business Current',
     balance: 8200000, // ₹82,000.00
     is_default: false,
+    account_type: 'current',
+    bank_name: 'HDFC Bank',
+    account_number_last4: '9420',
+    color_theme: 'indigo',
     gradient: 'from-indigo-600/20 via-purple-500/10 to-transparent',
     iconColor: 'bg-indigo-600 text-white',
   },
@@ -42,6 +54,7 @@ interface AccountState {
 
   setAccounts: (accounts: BankAccountItem[]) => void;
   addAccount: (account: BankAccountItem) => void;
+  updateAccount: (id: string, updates: Partial<BankAccountItem>) => void;
   updateAccountBalance: (id: string, newBalance: number) => void;
   deleteAccount: (id: string) => void;
   clearAccounts: () => void;
@@ -71,6 +84,17 @@ export const useAccountStore = create<AccountState>((set) => ({
   addAccount: (account) =>
     set((state) => {
       const updated = [...state.accounts, account];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      }
+      return { accounts: updated };
+    }),
+
+  updateAccount: (id, updates) =>
+    set((state) => {
+      const updated = state.accounts.map((acc) =>
+        acc.id === id ? { ...acc, ...updates } : acc
+      );
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       }

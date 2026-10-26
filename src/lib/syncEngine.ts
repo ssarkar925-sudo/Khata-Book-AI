@@ -440,7 +440,7 @@ class SyncEngine {
           if (payload.eventType === 'INSERT') {
             useAccountStore.getState().addAccount(payload.new as BankAccountItem);
           } else if (payload.eventType === 'UPDATE') {
-            useAccountStore.getState().updateAccountBalance(payload.new.id, payload.new.balance);
+            useAccountStore.getState().updateAccount(payload.new.id, payload.new as Partial<BankAccountItem>);
           } else if (payload.eventType === 'DELETE') {
             useAccountStore.getState().deleteAccount(payload.old.id);
           }
@@ -551,6 +551,25 @@ class SyncEngine {
   // Ledger
   public async pushLedgerEntry(entry: LedgerEntry) {
     useLedgerStore.getState().addEntryOptimistic(entry);
+
+    // Auto-update linked bank account or cash counter balance
+    if (entry.cash_location_id) {
+      const acc = useAccountStore.getState().accounts.find((a) => a.id === entry.cash_location_id);
+      if (acc) {
+        let newBalance = acc.balance;
+        if (entry.type === 'cash_in') {
+          newBalance += entry.amount;
+        } else if (
+          entry.type === 'cash_out' ||
+          entry.type === 'expense' ||
+          entry.type === 'bill_payment'
+        ) {
+          newBalance -= entry.amount;
+        }
+        this.updateAccountBalance(entry.cash_location_id, newBalance);
+      }
+    }
+
     const cleanEntry = sanitizeLedgerPayload(entry);
     try {
       const { error } = await supabase.from('ledger_entries').upsert(cleanEntry);
@@ -578,6 +597,25 @@ class SyncEngine {
   }
 
   public async deleteLedgerEntry(id: string) {
+    // Reverse linked bank account balance if entry was linked
+    const existing = useLedgerStore.getState().entries.find((e) => e.id === id);
+    if (existing && existing.cash_location_id) {
+      const acc = useAccountStore.getState().accounts.find((a) => a.id === existing.cash_location_id);
+      if (acc) {
+        let restoredBalance = acc.balance;
+        if (existing.type === 'cash_in') {
+          restoredBalance -= existing.amount;
+        } else if (
+          existing.type === 'cash_out' ||
+          existing.type === 'expense' ||
+          existing.type === 'bill_payment'
+        ) {
+          restoredBalance += existing.amount;
+        }
+        this.updateAccountBalance(existing.cash_location_id, restoredBalance);
+      }
+    }
+
     useLedgerStore.getState().removeEntryOptimistic(id);
     try {
       const { error } = await supabase.from('ledger_entries').delete().eq('id', id);
@@ -605,6 +643,36 @@ class SyncEngine {
       useSessionStore.getState().setSyncStatus('synced');
     } catch {
       this.enqueue('cash_locations', 'upsert', account);
+    }
+  }
+
+  public async updateAccount(id: string, updates: Partial<BankAccountItem>) {
+    useAccountStore.getState().updateAccount(id, updates);
+    try {
+      const { error } = await supabase
+        .from('cash_locations')
+        .update({
+          name: updates.name,
+          balance: updates.balance,
+          is_default: updates.is_default,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+    } catch {
+      this.enqueue('cash_locations', 'upsert', { id, ...updates });
+    }
+  }
+
+  public async deleteAccount(id: string) {
+    useAccountStore.getState().deleteAccount(id);
+    try {
+      const { error } = await supabase.from('cash_locations').delete().eq('id', id);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+    } catch {
+      this.enqueue('cash_locations', 'delete', { id });
     }
   }
 

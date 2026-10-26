@@ -15,9 +15,11 @@ import {
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useCustomerStore } from '@/stores/useCustomerStore';
 import { useCardStore } from '@/stores/useCardStore';
+import { useAccountStore } from '@/stores/useAccountStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { paiseToRupees, formatPaise } from '@/lib/money';
 import { calculateAllCardsBillingReport } from '@/lib/cardBilling';
+import { getCategoryById } from '@/lib/categories';
 
 export function ReportsScreen() {
   const { entries: ledger } = useLedgerStore();
@@ -26,18 +28,25 @@ export function ReportsScreen() {
   const { workspaces, activeWorkspaceId, theme } = useSessionStore();
   const isLight = theme === 'light';
 
+  const { accounts } = useAccountStore();
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
   const cardBillingReport = calculateAllCardsBillingReport(cards, ledger);
 
   const handleExportCSV = () => {
-    const headers = ['Date', 'Type', 'Amount (Rupees)', 'Payment Mode', 'Notes'];
-    const rows = ledger.map((entry) => [
-      entry.entry_date,
-      entry.type,
-      paiseToRupees(entry.amount).toFixed(2),
-      entry.mode,
-      `"${(entry.note || '').replace(/"/g, '""')}"`,
-    ]);
+    const headers = ['Date', 'Type', 'Category', 'Account', 'Amount (Rupees)', 'Payment Mode', 'Notes'];
+    const rows = ledger.map((entry) => {
+      const cat = getCategoryById(entry.category_id);
+      const acc = accounts.find((a) => a.id === entry.cash_location_id);
+      return [
+        entry.entry_date,
+        entry.type,
+        `"${cat.name.replace(/"/g, '""')}"`,
+        `"${(acc?.name || 'Unassigned').replace(/"/g, '""')}"`,
+        paiseToRupees(entry.amount).toFixed(2),
+        entry.mode,
+        `"${(entry.note || '').replace(/"/g, '""')}"`,
+      ];
+    });
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

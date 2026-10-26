@@ -11,10 +11,16 @@ import {
   Tag,
   Trash2,
   Share2,
+  Building,
+  Smartphone,
+  Coins,
+  Landmark,
 } from 'lucide-react';
 import { LedgerEntry } from '@/types';
 import { formatPaise } from '@/lib/money';
 import { syncEngine } from '@/lib/syncEngine';
+import { useAccountStore } from '@/stores/useAccountStore';
+import { getCategoryById } from '@/lib/categories';
 
 interface TransactionDetailModalProps {
   entry: LedgerEntry | null;
@@ -22,32 +28,36 @@ interface TransactionDetailModalProps {
 }
 
 export function TransactionDetailModal({ entry, onClose }: TransactionDetailModalProps) {
+  const { accounts } = useAccountStore();
+
   if (!entry) return null;
 
   const isInflow = entry.type === 'cash_in';
+  const category = getCategoryById(entry.category_id);
+  const linkedAccount = accounts.find((a) => a.id === entry.cash_location_id);
 
   const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this transaction record?')) {
+    if (confirm('Are you sure you want to delete this transaction record? Linked bank account balance will be restored automatically.')) {
       syncEngine.deleteLedgerEntry(entry.id);
       onClose();
     }
   };
 
-  const handleShareReceipt = async () => {
-    const text = `Transaction Receipt — Record Book\nAmount: ${isInflow ? '+' : '-'}${formatPaise(
-      entry.amount
-    )}\nType: ${isInflow ? 'Inflow (Cash In)' : 'Outflow (Cash Out)'}\nDate: ${new Date(
-      entry.entry_date
-    ).toLocaleDateString()}\nNote: ${entry.note || 'None'}\nPayment Mode: ${entry.mode.toUpperCase()}`;
+  const handleShareReceipt = () => {
+    const text = `🧾 *Transaction Receipt — Record Book*\n` +
+      `------------------------------\n` +
+      `Amount: *${isInflow ? '+' : '-'}${formatPaise(entry.amount)}*\n` +
+      `Type: ${isInflow ? '🟢 Cash Inflow / Income' : '🔴 Outflow / Expense'}\n` +
+      `Category: ${category.name}\n` +
+      (linkedAccount ? `Account: ${linkedAccount.name}\n` : '') +
+      `Date: ${new Date(entry.entry_date).toLocaleDateString()}\n` +
+      `Payment Mode: ${entry.mode.toUpperCase()}\n` +
+      `Note: ${entry.note || 'None'}\n` +
+      `------------------------------\n` +
+      `_Recorded in Record Book_`;
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Transaction Receipt', text });
-      } catch {}
-    } else {
-      await navigator.clipboard.writeText(text);
-      alert('Receipt copied to clipboard!');
-    }
+    const encoded = encodeURIComponent(text);
+    window.open(`https://wa.me/?text=${encoded}`, '_blank');
   };
 
   return (
@@ -55,15 +65,15 @@ export function TransactionDetailModal({ entry, onClose }: TransactionDetailModa
       <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-5 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <div
-              className={`w-9 h-9 rounded-2xl flex items-center justify-center text-white shadow-md ${
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md ${
                 isInflow
-                  ? 'bg-gradient-to-tr from-emerald-500 to-teal-400'
-                  : 'bg-gradient-to-tr from-rose-500 to-red-500'
+                  ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 shadow-emerald-500/25'
+                  : 'bg-gradient-to-tr from-rose-500 to-red-500 shadow-rose-500/25'
               }`}
             >
-              {isInflow ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+              {isInflow ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
             </div>
             <div>
               <h3 className="font-bold text-sm text-slate-900 dark:text-white">Transaction Details</h3>
@@ -85,17 +95,42 @@ export function TransactionDetailModal({ entry, onClose }: TransactionDetailModa
           >
             {isInflow ? '+' : '-'}{formatPaise(entry.amount)}
           </div>
-          <span
-            className={`inline-block text-[11px] font-bold px-3 py-0.5 rounded-full ${
-              isInflow ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-            }`}
-          >
-            {isInflow ? 'Cash Inflow' : 'Cash Outflow / Expense'}
-          </span>
+          <div className="flex items-center justify-center gap-1.5 pt-0.5">
+            <span
+              className={`inline-block text-[11px] font-bold px-3 py-0.5 rounded-full ${
+                isInflow
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+              }`}
+            >
+              {isInflow ? 'Cash Inflow' : 'Cash Outflow / Expense'}
+            </span>
+
+            <span
+              className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full"
+              style={{
+                backgroundColor: category.color + '15',
+                color: category.color,
+              }}
+            >
+              {category.name}
+            </span>
+          </div>
         </div>
 
         {/* Metadata Details */}
         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-3 text-xs">
+          {/* Linked Bank/Cash Account */}
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 flex items-center gap-1.5">
+              <Building className="w-3.5 h-3.5" /> Account
+            </span>
+            <span className="font-bold text-slate-800 dark:text-slate-200">
+              {linkedAccount ? linkedAccount.name : 'Unassigned Account'}
+            </span>
+          </div>
+
+          {/* Date & Time */}
           <div className="flex items-center justify-between">
             <span className="text-slate-400 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5" /> Date & Time
@@ -108,6 +143,7 @@ export function TransactionDetailModal({ entry, onClose }: TransactionDetailModa
             </span>
           </div>
 
+          {/* Payment Mode */}
           <div className="flex items-center justify-between">
             <span className="text-slate-400 flex items-center gap-1.5">
               <Wallet className="w-3.5 h-3.5" /> Mode of Payment
@@ -117,6 +153,7 @@ export function TransactionDetailModal({ entry, onClose }: TransactionDetailModa
             </span>
           </div>
 
+          {/* Note / Description */}
           <div className="flex items-center justify-between">
             <span className="text-slate-400 flex items-center gap-1.5">
               <Tag className="w-3.5 h-3.5" /> Note / Description
