@@ -19,9 +19,11 @@ import { NotesScreen } from '@/components/screens/NotesScreen';
 import { VaultScreen } from '@/components/screens/VaultScreen';
 import { ReportsScreen } from '@/components/screens/ReportsScreen';
 import { SheetsScreen } from '@/components/screens/SheetsScreen';
+import { ReceiptScannerModal } from '@/components/modals/ReceiptScannerModal';
+import { VoiceExpenseModal } from '@/components/modals/VoiceExpenseModal';
 import { parseToPaise } from '@/lib/money';
 import { syncEngine } from '@/lib/syncEngine';
-import { X } from 'lucide-react';
+import { X, Camera, Mic } from 'lucide-react';
 
 export default function HomePage() {
   const { user, authLoading, theme, activeWorkspaceId, setWorkspaces, setActiveWorkspaceId, setSyncStatus, setUser } = useSessionStore();
@@ -32,6 +34,8 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [isAskAIOpen, setIsAskAIOpen] = useState(false);
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
 
   // Quick transaction modals
   const [showCashModal, setShowCashModal] = useState<'in' | 'out' | null>(null);
@@ -127,6 +131,8 @@ export default function HomePage() {
               onOpenAskAI={() => setIsAskAIOpen(true)}
               onQuickCashIn={() => setShowCashModal('in')}
               onQuickCashOut={() => setShowCashModal('out')}
+              onOpenScanner={() => setIsScannerOpen(true)}
+              onOpenVoice={() => setIsVoiceOpen(true)}
             />
           )}
           {activeTab === 'cash' && <CashScreen />}
@@ -146,7 +152,30 @@ export default function HomePage() {
       />
 
       {/* Ask AI Modal */}
-      <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />
+      <AskAIModal
+        isOpen={isAskAIOpen}
+        onClose={() => setIsAskAIOpen(false)}
+        onOpenScanner={() => {
+          setIsAskAIOpen(false);
+          setIsScannerOpen(true);
+        }}
+        onOpenVoice={() => {
+          setIsAskAIOpen(false);
+          setIsVoiceOpen(true);
+        }}
+      />
+
+      {/* Receipt Scanner Modal */}
+      <ReceiptScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+      />
+
+      {/* Voice Expense Dictation Modal */}
+      <VoiceExpenseModal
+        isOpen={isVoiceOpen}
+        onClose={() => setIsVoiceOpen(false)}
+      />
 
       {/* Mobile More Sheet */}
       {isMobileMoreOpen && (
@@ -167,6 +196,24 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => {
+                  setIsMobileMoreOpen(false);
+                  setIsScannerOpen(true);
+                }}
+                className="p-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-center font-bold text-xs text-emerald-600 dark:text-emerald-400"
+              >
+                📸 Scan Bill
+              </button>
+              <button
+                onClick={() => {
+                  setIsMobileMoreOpen(false);
+                  setIsVoiceOpen(true);
+                }}
+                className="p-3 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 text-center font-bold text-xs text-indigo-600 dark:text-indigo-400"
+              >
+                🎙️ Voice Entry
+              </button>
               <button
                 onClick={() => {
                   setActiveTab('sheets');

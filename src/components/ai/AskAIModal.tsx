@@ -11,6 +11,8 @@ import {
   Users,
   CreditCard,
   Wallet,
+  Camera,
+  Mic,
 } from 'lucide-react';
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useCustomerStore } from '@/stores/useCustomerStore';
@@ -20,9 +22,11 @@ import { answerFinancialQuery } from '@/lib/aiAssistant';
 interface AskAIModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenScanner?: () => void;
+  onOpenVoice?: () => void;
 }
 
-export function AskAIModal({ isOpen, onClose }: AskAIModalProps) {
+export function AskAIModal({ isOpen, onClose, onOpenScanner, onOpenVoice }: AskAIModalProps) {
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string; action?: any }>>([
     {
@@ -178,15 +182,37 @@ export function AskAIModal({ isOpen, onClose }: AskAIModalProps) {
               e.preventDefault();
               handleSend();
             }}
-            className="flex items-center gap-2"
+            className="flex items-center gap-1.5"
           >
+            {onOpenScanner && (
+              <button
+                type="button"
+                onClick={onOpenScanner}
+                title="Scan Receipt / Bill with Camera"
+                className="p-2.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all hover-lift touch-press"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+            )}
+
+            {onOpenVoice && (
+              <button
+                type="button"
+                onClick={onOpenVoice}
+                title="Voice Expense Dictation"
+                className="p-2.5 rounded-2xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 transition-all hover-lift touch-press"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+            )}
+
             <input
               type="text"
               autoFocus
-              placeholder="Ask anything about your money, dues, or bank accounts..."
+              placeholder="Ask anything or record spends..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="flex-1 px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <button
               type="submit"

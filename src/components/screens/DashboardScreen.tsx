@@ -11,6 +11,8 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowRight,
+  Camera,
+  Mic,
 } from 'lucide-react';
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useCustomerStore } from '@/stores/useCustomerStore';
@@ -26,6 +28,8 @@ interface DashboardProps {
   onOpenAskAI: () => void;
   onQuickCashIn: () => void;
   onQuickCashOut: () => void;
+  onOpenScanner?: () => void;
+  onOpenVoice?: () => void;
 }
 
 export function DashboardScreen({
@@ -33,6 +37,8 @@ export function DashboardScreen({
   onOpenAskAI,
   onQuickCashIn,
   onQuickCashOut,
+  onOpenScanner,
+  onOpenVoice,
 }: DashboardProps) {
   const { entries: ledger } = useLedgerStore();
   const { dues, customers } = useCustomerStore();
@@ -147,13 +153,25 @@ export function DashboardScreen({
               <span>− Outflow</span>
             </button>
 
-            <button
-              onClick={() => onNavigateTab('dues')}
-              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/30 transition-all hover-lift touch-press"
-            >
-              <Users className="w-4 h-4 stroke-[2]" />
-              <span>Add Due</span>
-            </button>
+            {onOpenScanner && (
+              <button
+                onClick={onOpenScanner}
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-400 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-teal-500/30 transition-all hover-lift touch-press"
+              >
+                <Camera className="w-4 h-4 stroke-[2.5]" />
+                <span>Scan Bill</span>
+              </button>
+            )}
+
+            {onOpenVoice && (
+              <button
+                onClick={onOpenVoice}
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-violet-500/30 transition-all hover-lift touch-press"
+              >
+                <Mic className="w-4 h-4 stroke-[2.5]" />
+                <span>Voice Entry</span>
+              </button>
+            )}
 
             <button
               onClick={onOpenAskAI}
