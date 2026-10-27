@@ -41,18 +41,12 @@ export function AppLockScreen() {
   };
 
   const handleBiometricClick = async () => {
+    setErrorMsg('');
     const success = await unlockWithBiometrics();
     if (!success) {
-      setErrorMsg('Biometric authentication failed. Use PIN.');
+      setErrorMsg('Biometric verification not available or cancelled. Please enter your 4-digit PIN.');
     }
   };
-
-  // Auto trigger biometrics on screen appear if supported
-  useEffect(() => {
-    if (isLocked && isLockEnabled && isBiometricSupported) {
-      unlockWithBiometrics().catch(() => {});
-    }
-  }, [isLocked, isLockEnabled, isBiometricSupported]);
 
   // Don't render if not locked
   if (!isLocked || !isLockEnabled) return null;

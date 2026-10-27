@@ -96,7 +96,7 @@ export function InterSphereTransferModal({
 
     // Outflow entry from source sphere
     const outEntry: LedgerEntry = {
-      id: `tf-out-${Date.now()}`,
+      id: crypto.randomUUID(),
       workspace_id: selectedFromAccount.workspace_id,
       type: 'cash_out',
       amount: amountPaise,
@@ -111,7 +111,7 @@ export function InterSphereTransferModal({
 
     // Inflow entry to destination sphere
     const inEntry: LedgerEntry = {
-      id: `tf-in-${Date.now() + 1}`,
+      id: crypto.randomUUID(),
       workspace_id: selectedToAccount.workspace_id,
       type: 'cash_in',
       amount: amountPaise,

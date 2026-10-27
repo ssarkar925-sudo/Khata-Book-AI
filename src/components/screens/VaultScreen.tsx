@@ -87,6 +87,7 @@ function generateRandomSecret(type: 'password' | 'pin'): string {
 export function VaultScreen() {
   const {
     vaultItems,
+    setVaultItems,
     masterPassword,
     isUnlocked,
     hasConfiguredPassword,
@@ -191,7 +192,7 @@ export function VaultScreen() {
     }
   };
 
-  const handleChangePin = (e: React.FormEvent) => {
+  const handleChangePin = async (e: React.FormEvent) => {
     e.preventDefault();
     setChangePinError('');
     setChangePinSuccess('');
@@ -205,11 +206,46 @@ export function VaultScreen() {
       return;
     }
 
-    const ok = changeMasterPassword(currentPinInput, newPinInput);
-    if (!ok) {
-      setChangePinError('Current Master PIN is incorrect.');
-    } else {
-      setChangePinSuccess('Master PIN updated successfully!');
+    try {
+      // Re-encrypt all existing vault items with the new PIN so data is preserved
+      const updatedVaultItems: VaultItem[] = [];
+      for (const item of vaultItems) {
+        if (item.encrypted_password && item.iv && item.salt) {
+          try {
+            const decrypted = await decryptSecretsPayload(
+              item.encrypted_password,
+              item.iv,
+              item.salt,
+              currentPinInput
+            );
+            const reEncrypted = await encryptSecretsPayload(decrypted, newPinInput);
+            updatedVaultItems.push({
+              ...item,
+              encrypted_password: reEncrypted.encrypted,
+              iv: reEncrypted.iv,
+              salt: reEncrypted.salt,
+              updated_at: new Date().toISOString(),
+            });
+          } catch {
+            setChangePinError('Current Master PIN is incorrect.');
+            return;
+          }
+        } else {
+          updatedVaultItems.push(item);
+        }
+      }
+
+      const ok = changeMasterPassword(currentPinInput, newPinInput);
+      if (!ok) {
+        setChangePinError('Current Master PIN is incorrect.');
+        return;
+      }
+
+      if (updatedVaultItems.length > 0) {
+        setVaultItems(updatedVaultItems);
+      }
+
+      setChangePinSuccess('Master PIN & vault items re-encrypted successfully!');
       setTimeout(() => {
         setShowChangePinModal(false);
         setCurrentPinInput('');
@@ -217,6 +253,8 @@ export function VaultScreen() {
         setConfirmNewPinInput('');
         setChangePinSuccess('');
       }, 1000);
+    } catch (err: any) {
+      setChangePinError(err?.message || 'Failed to update Master PIN.');
     }
   };
 
