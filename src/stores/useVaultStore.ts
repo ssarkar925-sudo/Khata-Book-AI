@@ -12,6 +12,7 @@ interface VaultState {
   setMasterPassword: (password: string | null) => void;
   setIsUnlocked: (unlocked: boolean) => void;
   addVaultItemOptimistic: (item: VaultItem) => void;
+  updateVaultItemOptimistic: (id: string, updates: Partial<VaultItem>) => void;
   deleteVaultItemOptimistic: (id: string) => void;
   lockVault: () => void;
 
@@ -67,6 +68,17 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   addVaultItemOptimistic: (item) =>
     set((state) => {
       const updated = [item, ...state.vaultItems];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(VAULT_ITEMS_KEY, JSON.stringify(updated));
+      }
+      return { vaultItems: updated };
+    }),
+
+  updateVaultItemOptimistic: (id, updates) =>
+    set((state) => {
+      const updated = state.vaultItems.map((v) =>
+        v.id === id ? { ...v, ...updates, updated_at: new Date().toISOString() } : v
+      );
       if (typeof window !== 'undefined') {
         localStorage.setItem(VAULT_ITEMS_KEY, JSON.stringify(updated));
       }

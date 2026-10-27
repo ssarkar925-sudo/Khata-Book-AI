@@ -137,13 +137,22 @@ export interface NoteItem {
   deleted_at?: string | null;
 }
 
+export interface VaultSecretField {
+  id: string;
+  label: string;
+  value: string;
+}
+
 export interface VaultItem {
   id: string;
   workspace_id: string;
   title: string;
   item_type: 'password' | 'pin' | 'secure_note' | 'id_card';
+  category?: string;
+  color?: string;
   username?: string | null;
   encrypted_password?: string;
+  secrets?: VaultSecretField[];
   iv?: string;
   salt?: string;
   auth_tag?: string;
@@ -152,6 +161,7 @@ export interface VaultItem {
   notes?: string | null;
   created_at?: string;
   updated_at?: string;
+  deleted_at?: string | null;
 }
 
 export type SheetColumnType = 'text' | 'number' | 'date' | 'amount' | 'status' | 'phone';

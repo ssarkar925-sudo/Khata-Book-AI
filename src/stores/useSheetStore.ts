@@ -29,10 +29,18 @@ interface SheetState {
 
   setSheets: (sheets: RecordSheet[]) => void;
   setActiveSheetId: (id: string) => void;
-  createSheet: (title: string, category?: string, color?: string, columns?: SheetColumn[]) => RecordSheet;
+  createSheet: (
+    title: string,
+    category?: string,
+    color?: string,
+    columns?: SheetColumn[],
+    rows?: SheetRow[]
+  ) => RecordSheet;
+  updateSheet: (id: string, updates: Partial<RecordSheet>) => void;
   deleteSheet: (id: string) => void;
   addRow: (sheetId: string, rowData: Record<string, any>) => void;
   updateRow: (sheetId: string, rowId: string, rowData: Record<string, any>) => void;
+  updateCell: (sheetId: string, rowId: string, colId: string, value: any) => void;
   deleteRow: (sheetId: string, rowId: string) => void;
   addColumn: (sheetId: string, column: SheetColumn) => void;
   deleteColumn: (sheetId: string, columnId: string) => void;
@@ -137,7 +145,7 @@ export const useSheetStore = create<SheetState>((set) => ({
 
   setActiveSheetId: (activeSheetId) => set({ activeSheetId }),
 
-  createSheet: (title, category = 'General', color = '#6366F1', columns) => {
+  createSheet: (title, category = 'General', color = '#6366F1', columns, rows = []) => {
     const newSheet: RecordSheet = {
       id: crypto.randomUUID(),
       workspace_id: 'default',
@@ -150,7 +158,7 @@ export const useSheetStore = create<SheetState>((set) => ({
         { id: crypto.randomUUID(), name: 'Amount (₹)', type: 'amount' },
         { id: crypto.randomUUID(), name: 'Status', type: 'status' },
       ],
-      rows: [],
+      rows,
       created_at: new Date().toISOString(),
     };
 
@@ -165,6 +173,21 @@ export const useSheetStore = create<SheetState>((set) => ({
 
     return newSheet;
   },
+
+  updateSheet: (id, updates) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== id) return s;
+        targetSheet = { ...s, ...updates, updated_at: new Date().toISOString() };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
 
   deleteSheet: (id) =>
     set((state) => {
@@ -205,6 +228,24 @@ export const useSheetStore = create<SheetState>((set) => ({
       const updated = state.sheets.map((s) => {
         if (s.id !== sheetId) return s;
         const rows = s.rows.map((r) => (r.id === rowId ? { ...r, data: { ...r.data, ...rowData } } : r));
+        targetSheet = { ...s, rows };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
+
+  updateCell: (sheetId, rowId, colId, value) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== sheetId) return s;
+        const rows = s.rows.map((r) =>
+          r.id === rowId ? { ...r, data: { ...r.data, [colId]: value } } : r
+        );
         targetSheet = { ...s, rows };
         return targetSheet;
       });
