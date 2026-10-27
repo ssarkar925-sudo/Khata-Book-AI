@@ -52,6 +52,7 @@ export function LoginPage() {
   const [emailConfirmationNeeded, setEmailConfirmationNeeded] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   const isLight = theme === 'light';
 
@@ -144,6 +145,30 @@ export function LoginPage() {
     } catch (err: any) {
       setIsSubmitting(false);
       setErrorMsg(err?.message || 'Failed to send password reset email.');
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setErrorMsg('Please enter your email address to resend confirmation link.');
+      return;
+    }
+    setIsResending(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: cleanEmail,
+      });
+      setIsResending(false);
+      if (error) {
+        setErrorMsg(error.message);
+      } else {
+        setSuccessMsg(`Confirmation email resent to ${cleanEmail}! Please check your inbox.`);
+      }
+    } catch (err: any) {
+      setIsResending(false);
+      setErrorMsg(err?.message || 'Failed to resend confirmation email.');
     }
   };
 
@@ -315,7 +340,17 @@ export function LoginPage() {
                 </p>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 space-y-3">
+                <button
+                  type="button"
+                  onClick={handleResendConfirmation}
+                  disabled={isResending}
+                  className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isResending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  <span>Resend Confirmation Email</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -327,6 +362,10 @@ export function LoginPage() {
                   <ArrowLeft className="w-4 h-4" />
                   <span>Return to Sign In</span>
                 </button>
+
+                <p className="text-[10px] text-slate-400 pt-1">
+                  💡 <em>To bypass email verification in development, run <code className="px-1 py-0.5 rounded bg-black/10 dark:bg-black/30 font-mono text-[9px]">UPDATE auth.users SET email_confirmed_at = now();</code> in Supabase SQL Editor.</em>
+                </p>
               </div>
             </div>
           ) : (
@@ -383,12 +422,36 @@ export function LoginPage() {
               </div>
 
               {/* Error & Success Messages */}
-              {errorMsg && (
+              {errorMsg && errorMsg.toLowerCase().includes('email not confirmed') ? (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs space-y-2 animate-in fade-in">
+                  <div className="flex items-center gap-2 font-bold text-amber-600 dark:text-amber-400">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>Email Confirmation Required</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    Supabase sent a confirmation email to <strong>{email.trim() || 'your email'}</strong>. You must click the confirmation link in your inbox before signing in.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleResendConfirmation}
+                      disabled={isResending}
+                      className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                    >
+                      {isResending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                      <span>Resend Confirmation Email</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-amber-500/10">
+                    💡 <em>Instant dev bypass: Run <code className="px-1 py-0.5 rounded bg-black/10 dark:bg-black/30 font-mono text-[9px]">UPDATE auth.users SET email_confirmed_at = now();</code> in your Supabase SQL Editor.</em>
+                  </p>
+                </div>
+              ) : errorMsg ? (
                 <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{errorMsg}</span>
                 </div>
-              )}
+              ) : null}
               {successMsg && (
                 <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
