@@ -58,6 +58,9 @@ interface SessionState {
   workspaces: Workspace[];
   activeWorkspaceId: string;
   syncStatus: SyncStatus;
+  lastSyncTime: string | null;
+  pendingSyncCount: number;
+  lastSyncError: string | null;
   theme: 'light' | 'dark';
   language: 'en' | 'bn' | 'hi';
   
@@ -66,6 +69,9 @@ interface SessionState {
   setWorkspaces: (workspaces: Workspace[]) => void;
   setActiveWorkspaceId: (id: string) => void;
   setSyncStatus: (status: SyncStatus) => void;
+  setLastSyncTime: (time: string | null) => void;
+  setPendingSyncCount: (count: number) => void;
+  setLastSyncError: (error: string | null) => void;
   setTheme: (theme: 'light' | 'dark') => void;
   setLanguage: (lang: 'en' | 'bn' | 'hi') => void;
   resetSession: () => void;
@@ -92,6 +98,14 @@ export const useSessionStore = create<SessionState>((set) => ({
     return ws.id;
   })(),
   syncStatus: 'synced',
+  lastSyncTime: (() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('rb_last_sync_time') || null;
+    }
+    return null;
+  })(),
+  pendingSyncCount: 0,
+  lastSyncError: null,
   theme: (() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('rb_theme') as 'light' | 'dark') || 'light';
@@ -118,6 +132,14 @@ export const useSessionStore = create<SessionState>((set) => ({
   setWorkspaces: (workspaces) => set({ workspaces }),
   setActiveWorkspaceId: (activeWorkspaceId) => set({ activeWorkspaceId }),
   setSyncStatus: (syncStatus) => set({ syncStatus }),
+  setLastSyncTime: (time) => {
+    if (typeof window !== 'undefined' && time) {
+      localStorage.setItem('rb_last_sync_time', time);
+    }
+    set({ lastSyncTime: time });
+  },
+  setPendingSyncCount: (count) => set({ pendingSyncCount: count }),
+  setLastSyncError: (error) => set({ lastSyncError: error }),
   setTheme: (theme) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('rb_theme', theme);

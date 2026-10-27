@@ -31,6 +31,7 @@ import {
   ExternalLink,
   ChevronRight,
   Plus,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useCustomerStore } from '@/stores/useCustomerStore';
@@ -81,6 +82,7 @@ export function DashboardScreen({
   // Modals state
   const [selectedEntryForDetail, setSelectedEntryForDetail] = useState<LedgerEntry | null>(null);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [showMoreActions, setShowMoreActions] = useState(false);
 
   // ==========================================
   // SPHERE POSITIONS CALCULATION (Independent)
@@ -193,15 +195,20 @@ export function DashboardScreen({
     );
     const totalExpenses = expenseEntries.reduce((s, e) => s + Number(e.amount), 0);
 
-    const categoryMap = new Map<string, number>();
+    const categoryAggMap = new Map<string, { category: ReturnType<typeof getCategoryById>; amount: number }>();
     for (const e of expenseEntries) {
-      const catId = e.category_id || 'cat-general';
-      categoryMap.set(catId, (categoryMap.get(catId) || 0) + Number(e.amount));
+      const def = getCategoryById(e.category_id);
+      const existing = categoryAggMap.get(def.id);
+      if (existing) {
+        existing.amount += Number(e.amount);
+      } else {
+        categoryAggMap.set(def.id, { category: def, amount: Number(e.amount) });
+      }
     }
 
-    const categories = Array.from(categoryMap.entries())
-      .map(([catId, amount]) => ({
-        category: getCategoryById(catId),
+    const categories = Array.from(categoryAggMap.values())
+      .map(({ category, amount }) => ({
+        category,
         amount,
         pct: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0,
       }))
@@ -551,60 +558,89 @@ export function DashboardScreen({
       </div>
 
       {/* ========================================================= */}
-      {/* QUICK ACTION DOCK                                         */}
+      {/* MODERN EXECUTIVE ACTION DOCK                              */}
+      {/* Primary: Inflow & Expense | Overflow: Tools & Transfer    */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-        <button
-          onClick={onQuickCashIn}
-          className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-500/25 transition-all hover-lift touch-press"
-        >
-          <ArrowDownLeft className="w-4 h-4 stroke-[2.5]" />
-          <span>+ Inflow</span>
-        </button>
-
-        <button
-          onClick={onQuickCashOut}
-          className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white font-bold text-xs shadow-lg shadow-rose-500/25 transition-all hover-lift touch-press"
-        >
-          <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-          <span>− Expense</span>
-        </button>
-
-        <button
-          onClick={() => onNavigateTab('dues')}
-          className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/25 transition-all hover-lift touch-press"
-        >
-          <Users className="w-4 h-4 stroke-[2.5]" />
-          <span>+ Khata Udhar</span>
-        </button>
-
-        <button
-          onClick={() => setIsTransferModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 transition-all hover-lift touch-press"
-        >
-          <Repeat className="w-4 h-4 stroke-[2.5]" />
-          <span>⇄ Transfer</span>
-        </button>
-
-        {onOpenScanner && (
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 sm:p-3.5 rounded-3xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs backdrop-blur-md">
+        {/* Core Primary Financial Actions */}
+        <div className="flex items-center gap-2 flex-1">
           <button
-            onClick={onOpenScanner}
-            className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs shadow-lg shadow-teal-600/25 transition-all hover-lift touch-press"
+            onClick={onQuickCashIn}
+            className="flex-1 py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all hover-lift touch-press cursor-pointer"
           >
-            <Camera className="w-4 h-4 stroke-[2.5]" />
-            <span>Scan Bill</span>
+            <ArrowDownLeft className="w-4 h-4 stroke-[3]" />
+            <span>+ Add Income</span>
           </button>
-        )}
 
-        {onOpenVoice && (
           <button
-            onClick={onOpenVoice}
-            className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-violet-600/25 transition-all hover-lift touch-press"
+            onClick={onQuickCashOut}
+            className="flex-1 py-3 px-4 rounded-2xl bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-black text-xs sm:text-sm shadow-md shadow-rose-600/25 flex items-center justify-center gap-2 transition-all hover-lift touch-press cursor-pointer"
           >
-            <Mic className="w-4 h-4 stroke-[2.5]" />
-            <span>Voice Entry</span>
+            <ArrowUpRight className="w-4 h-4 stroke-[3]" />
+            <span>− Add Expense</span>
           </button>
-        )}
+        </div>
+
+        {/* Secondary Contextual & Overflow Actions */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onNavigateTab('dues')}
+            className="flex-1 sm:flex-initial py-3 px-3.5 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Users className="w-4 h-4 text-cyan-500" />
+            <span>+ Udhar</span>
+          </button>
+
+          <button
+            onClick={() => setIsTransferModalOpen(true)}
+            className="flex-1 sm:flex-initial py-3 px-3.5 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Repeat className="w-4 h-4 text-indigo-500" />
+            <span>Transfer</span>
+          </button>
+
+          {/* Overflow Menu for AI Tools */}
+          {(onOpenScanner || onOpenVoice) && (
+            <div className="relative">
+              <button
+                onClick={() => setShowMoreActions(!showMoreActions)}
+                className="py-3 px-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center transition-all cursor-pointer"
+                title="More Actions"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+
+              {showMoreActions && (
+                <div className="absolute right-0 bottom-full mb-2 w-48 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95">
+                  {onOpenScanner && (
+                    <button
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        onOpenScanner();
+                      }}
+                      className="w-full px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4 text-teal-500" />
+                      <span>Scan Receipt (OCR)</span>
+                    </button>
+                  )}
+                  {onOpenVoice && (
+                    <button
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        onOpenVoice();
+                      }}
+                      className="w-full px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Mic className="w-4 h-4 text-violet-500" />
+                      <span>Voice Assistant</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Priority Smart Alerts */}

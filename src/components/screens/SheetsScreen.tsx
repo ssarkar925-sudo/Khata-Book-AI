@@ -44,7 +44,6 @@ import {
   Lock,
   Unlock,
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { useSheetStore } from '@/stores/useSheetStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { SheetColumn, SheetColumnType, SheetRow } from '@/types';
@@ -647,8 +646,9 @@ export function SheetsScreen() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
+        const XLSX = await import('xlsx');
         const data = evt.target?.result;
         const workbook = XLSX.read(data, {
           type: 'array',
@@ -803,8 +803,9 @@ export function SheetsScreen() {
   };
 
   // Export to Excel (.xlsx)
-  const handleExportXLSX = () => {
+  const handleExportXLSX = async () => {
     if (!activeSheet) return;
+    const XLSX = await import('xlsx');
     const headers = activeSheet.columns.map((c) => c.name);
     const data = activeSheet.rows.map((r) =>
       activeSheet.columns.map((c) => r.data[c.id] || '')

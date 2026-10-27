@@ -88,3 +88,38 @@ export async function decryptData(
   const dec = new TextDecoder();
   return dec.decode(decryptedBuffer);
 }
+
+/**
+ * Computes a secure PBKDF2-SHA256 (100,000 rounds) hash for PIN/passphrase storage.
+ * Eliminates weak 32-bit FNV hashing and resists brute-force attacks.
+ */
+export async function computeSecurePinHash(
+  pin: string,
+  providedSalt?: string
+): Promise<{ hash: string; salt: string }> {
+  const salt = providedSalt
+    ? new Uint8Array(base64ToArrayBuffer(providedSalt))
+    : crypto.getRandomValues(new Uint8Array(16));
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(pin),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits']
+  );
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt as any,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    256
+  );
+  return {
+    hash: arrayBufferToBase64(derivedBits),
+    salt: arrayBufferToBase64(salt.buffer as ArrayBuffer),
+  };
+}

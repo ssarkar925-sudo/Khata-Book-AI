@@ -21,11 +21,24 @@ interface NavbarProps {
 }
 
 export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarProps) {
-  const { theme, setTheme, syncStatus, workspaces, activeWorkspaceId, setActiveWorkspaceId } = useSessionStore();
+  const {
+    theme,
+    setTheme,
+    syncStatus,
+    workspaces,
+    activeWorkspaceId,
+    setActiveWorkspaceId,
+    pendingSyncCount,
+    lastSyncTime,
+    lastSyncError,
+  } = useSessionStore();
   const [showWsMenu, setShowWsMenu] = useState(false);
   const isLight = theme === 'light';
 
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
+  const formattedSyncTime = lastSyncTime
+    ? new Date(lastSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null;
 
   return (
     <header
@@ -116,10 +129,20 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
         {/* Sync Status Badge */}
         <button
           onClick={onRefresh}
-          title={`Status: ${syncStatus}. Tap to sync now with Supabase.`}
+          title={
+            syncStatus === 'error'
+              ? `Sync Error: ${lastSyncError || 'Check connection'}. Tap to retry.`
+              : syncStatus === 'offline' && pendingSyncCount > 0
+              ? `${pendingSyncCount} changes queued offline. Tap to sync.`
+              : `Status: ${syncStatus}. ${formattedSyncTime ? 'Last synced at ' + formattedSyncTime : ''}`
+          }
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all touch-press ${
-            syncStatus === 'syncing'
+            syncStatus === 'error'
+              ? 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400'
+              : syncStatus === 'syncing'
               ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+              : pendingSyncCount > 0
+              ? 'bg-amber-500/15 border-amber-500/35 text-amber-700 dark:text-amber-300'
               : syncStatus === 'synced'
               ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-700 dark:text-emerald-400'
               : 'bg-slate-200/50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-500'
@@ -127,6 +150,10 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
         >
           {syncStatus === 'syncing' ? (
             <RefreshCw className="w-3 h-3 animate-spin text-amber-500 shrink-0" />
+          ) : syncStatus === 'error' ? (
+            <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 animate-pulse" />
+          ) : pendingSyncCount > 0 ? (
+            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
           ) : syncStatus === 'synced' ? (
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -135,8 +162,19 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
           ) : (
             <span className="h-2 w-2 rounded-full bg-slate-400" />
           )}
+
           <span className="hidden sm:inline">
-            {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'synced' ? 'Cloud Synced' : 'Local Mode'}
+            {syncStatus === 'syncing'
+              ? 'Syncing...'
+              : syncStatus === 'error'
+              ? 'Sync Error'
+              : pendingSyncCount > 0
+              ? `${pendingSyncCount} Pending`
+              : syncStatus === 'synced'
+              ? formattedSyncTime
+                ? `Synced ${formattedSyncTime}`
+                : 'Cloud Synced'
+              : 'Offline Mode'}
           </span>
           <RefreshCw className="w-3 h-3 hover:rotate-180 transition-transform duration-500 hidden sm:inline" />
         </button>

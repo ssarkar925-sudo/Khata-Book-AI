@@ -291,7 +291,7 @@ export function BackupRestoreModal({
   };
 
   // App Lock Setup Handlers
-  const handleConfigurePin = (e: React.FormEvent) => {
+  const handleConfigurePin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLockError('');
     setLockMsg('');
@@ -305,18 +305,18 @@ export function BackupRestoreModal({
       return;
     }
 
-    configurePin(newPin);
+    await configurePin(newPin);
     setLockMsg('App Lock PIN configured & activated!');
     setNewPin('');
     setConfirmPin('');
   };
 
-  const handleDisableLock = (e: React.FormEvent) => {
+  const handleDisableLock = async (e: React.FormEvent) => {
     e.preventDefault();
     setLockError('');
     setLockMsg('');
 
-    const ok = removeLock(removePinInput);
+    const ok = await removeLock(removePinInput);
     if (!ok) {
       setLockError('Incorrect current PIN');
     } else {

@@ -62,7 +62,7 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEdi
   ) || 0;
 
   // Filter transactions based on active tab
-  let displayTransactions: { entry: LedgerEntry; isBilled: boolean; isPayment: boolean }[] = [];
+  const displayTransactions: { entry: LedgerEntry; isBilled: boolean; isPayment: boolean }[] = [];
 
   const allCardEntries = ledger
     .filter((e) => e.card_id === card.id && (e.type === 'card_spend' || e.type === 'bill_payment'))

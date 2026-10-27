@@ -30,8 +30,10 @@ const LEDGER_ENTRY_VALID_COLUMNS = new Set([
   'customer_id',
   'card_id',
   'mode',
+  'scope',
   'note',
   'entry_date',
+  'is_billed',
   'idempotency_key',
   'created_by',
   'created_at',
@@ -61,6 +63,7 @@ class SyncEngine {
   constructor() {
     if (typeof window !== 'undefined') {
       this.currentWorkspaceId = useSessionStore.getState().activeWorkspaceId || '';
+      useSessionStore.getState().setPendingSyncCount(this.getQueue().length);
       window.addEventListener('online', () => {
         console.log('[SyncEngine] Device back online. Flushing queue...');
         this.flushQueue();
@@ -85,6 +88,7 @@ class SyncEngine {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
+      useSessionStore.getState().setPendingSyncCount(queue.length);
     } catch {}
   }
 
@@ -246,10 +250,25 @@ class SyncEngine {
         useVaultStore.getState().setVaultItems(vaultResult.value.data);
       }
 
+      // Check all results for Supabase errors
+      const fetchErrors = [accResult, custResult, duesResult, cardResult, ledgerResult, noteResult, sheetResult, vaultResult]
+        .filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && (r.value as any).error))
+        .map((r) => (r.status === 'rejected' ? String(r.reason) : (r as any).value.error.message));
+
+      if (fetchErrors.length > 0) {
+        console.warn('[SyncEngine] Cloud sync had errors:', fetchErrors);
+        useSessionStore.getState().setSyncStatus('error');
+        useSessionStore.getState().setLastSyncError(fetchErrors[0]);
+        this.isSyncing = false;
+        return false;
+      }
+
       // Flush any queued offline mutations
       await this.flushQueue();
 
       useSessionStore.getState().setSyncStatus('synced');
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
       this.isSyncing = false;
       return true;
     } catch (err) {
@@ -262,7 +281,7 @@ class SyncEngine {
 
   // ==========================================
   // REALTIME WEBSOCKET SUBSCRIPTION
-  // Listens without fragile server-side filters
+  // Server-side filtered by workspace_id
   // ==========================================
   public subscribeRealtime(workspaceId: string) {
     if (this.channel) {
@@ -273,14 +292,11 @@ class SyncEngine {
 
     this.channel = supabase
       .channel(`recordbook-realtime-${workspaceId}`)
-      // Ledger Entries
+      // Ledger Entries (Server-Side Filtered)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'ledger_entries' },
+        { event: '*', schema: 'public', table: 'ledger_entries', filter: `workspace_id=eq.${workspaceId}` },
         (payload) => {
-          const item = (payload.new || payload.old) as LedgerEntry;
-          if (item?.workspace_id && item.workspace_id !== this.currentWorkspaceId) return;
-
           console.log('[SyncEngine] Realtime ledger update received:', payload.eventType);
           if (payload.eventType === 'INSERT') {
             useLedgerStore.getState().addEntryOptimistic(payload.new as LedgerEntry);
@@ -293,14 +309,11 @@ class SyncEngine {
           }
         }
       )
-      // Bank Accounts
+      // Bank Accounts (Server-Side Filtered)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'cash_locations' },
+        { event: '*', schema: 'public', table: 'cash_locations', filter: `workspace_id=eq.${workspaceId}` },
         (payload) => {
-          const item = (payload.new || payload.old) as CashLocation;
-          if (item?.workspace_id && item.workspace_id !== this.currentWorkspaceId) return;
-
           console.log('[SyncEngine] Realtime account update received:', payload.eventType);
           if (payload.eventType === 'INSERT') {
             useAccountStore.getState().addAccount(payload.new as BankAccountItem);
@@ -311,28 +324,22 @@ class SyncEngine {
           }
         }
       )
-      // Customers
+      // Customers (Server-Side Filtered)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'customers' },
+        { event: '*', schema: 'public', table: 'customers', filter: `workspace_id=eq.${workspaceId}` },
         (payload) => {
-          const item = (payload.new || payload.old) as Customer;
-          if (item?.workspace_id && item.workspace_id !== this.currentWorkspaceId) return;
-
           console.log('[SyncEngine] Realtime customer update received:', payload.eventType);
           if (payload.eventType === 'INSERT') {
             useCustomerStore.getState().addCustomerOptimistic(payload.new as Customer);
           }
         }
       )
-      // People Dues
+      // People Dues (Server-Side Filtered)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'people_dues' },
+        { event: '*', schema: 'public', table: 'people_dues', filter: `workspace_id=eq.${workspaceId}` },
         (payload) => {
-          const item = (payload.new || payload.old) as PeopleDue;
-          if (item?.workspace_id && item.workspace_id !== this.currentWorkspaceId) return;
-
           console.log('[SyncEngine] Realtime dues update received:', payload.eventType);
           if (payload.eventType === 'INSERT') {
             useCustomerStore.getState().addDueOptimistic(payload.new as PeopleDue);
@@ -341,14 +348,11 @@ class SyncEngine {
           }
         }
       )
-      // Cards
+      // Cards (Server-Side Filtered)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'cards' },
+        { event: '*', schema: 'public', table: 'cards', filter: `workspace_id=eq.${workspaceId}` },
         (payload) => {
-          const item = (payload.new || payload.old) as Card;
-          if (item?.workspace_id && item.workspace_id !== this.currentWorkspaceId) return;
-
           console.log('[SyncEngine] Realtime card update received:', payload.eventType);
           if (payload.eventType === 'INSERT') {
             useCardStore.getState().addCardOptimistic(payload.new as Card);
@@ -359,14 +363,11 @@ class SyncEngine {
           }
         }
       )
-      // Notes
+      // Notes (Server-Side Filtered)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'notes' },
+        { event: '*', schema: 'public', table: 'notes', filter: `workspace_id=eq.${workspaceId}` },
         (payload) => {
-          const item = (payload.new || payload.old) as NoteItem;
-          if (item?.workspace_id && item.workspace_id !== this.currentWorkspaceId) return;
-
           console.log('[SyncEngine] Realtime note update received:', payload.eventType);
           if (payload.eventType === 'INSERT') {
             useNoteStore.getState().addNoteOptimistic(payload.new as NoteItem);
@@ -377,14 +378,11 @@ class SyncEngine {
           }
         }
       )
-      // Sheets
+      // Sheets (Server-Side Filtered)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'sheets' },
+        { event: '*', schema: 'public', table: 'sheets', filter: `workspace_id=eq.${workspaceId}` },
         (payload) => {
-          const item = (payload.new || payload.old) as RecordSheet;
-          if (item?.workspace_id && item.workspace_id !== this.currentWorkspaceId) return;
-
           console.log('[SyncEngine] Realtime sheet update received:', payload.eventType);
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const currentSheets = useSheetStore.getState().sheets;
@@ -415,32 +413,55 @@ class SyncEngine {
 
   // Ledger
   public async pushLedgerEntry(entry: LedgerEntry) {
-    useLedgerStore.getState().addEntryOptimistic(entry);
+    const entryWithMeta: LedgerEntry = {
+      ...entry,
+      scope: entry.scope || 'business',
+      idempotency_key: entry.idempotency_key || crypto.randomUUID(),
+    };
+    useLedgerStore.getState().addEntryOptimistic(entryWithMeta);
 
-    // Auto-update linked bank account or cash counter balance
-    if (entry.cash_location_id) {
-      const acc = useAccountStore.getState().accounts.find((a) => a.id === entry.cash_location_id);
+    // Auto-update linked bank account or cash counter balance optimistically
+    if (entryWithMeta.cash_location_id) {
+      const acc = useAccountStore.getState().accounts.find((a) => a.id === entryWithMeta.cash_location_id);
       if (acc) {
         let newBalance = acc.balance;
-        if (entry.type === 'cash_in') {
-          newBalance += entry.amount;
+        if (entryWithMeta.type === 'cash_in') {
+          newBalance += entryWithMeta.amount;
         } else if (
-          entry.type === 'cash_out' ||
-          entry.type === 'expense' ||
-          entry.type === 'bill_payment'
+          entryWithMeta.type === 'cash_out' ||
+          entryWithMeta.type === 'expense' ||
+          entryWithMeta.type === 'bill_payment'
         ) {
-          newBalance -= entry.amount;
+          newBalance -= entryWithMeta.amount;
         }
-        this.updateAccountBalance(entry.cash_location_id, newBalance);
+        useAccountStore.getState().updateAccountBalance(entryWithMeta.cash_location_id, newBalance);
       }
     }
 
-    const cleanEntry = sanitizeLedgerPayload(entry);
+    const cleanEntry = sanitizeLedgerPayload(entryWithMeta);
     try {
-      const { error } = await supabase.from('ledger_entries').upsert(cleanEntry);
-      if (error) throw error;
+      // 1. Try atomic RPC transaction in Supabase
+      const { error } = await supabase.rpc('record_ledger_entry_and_update_balance', {
+        p_entry: cleanEntry,
+      });
+
+      if (error) {
+        // Fallback to direct upsert if RPC is not yet created in remote DB
+        if (error.code === 'PGRST202' || error.message?.includes('function') || error.code === '42883') {
+          const { error: upsertErr } = await supabase.from('ledger_entries').upsert(cleanEntry);
+          if (upsertErr) throw upsertErr;
+        } else {
+          throw error;
+        }
+      }
+
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      console.warn('[SyncEngine] Ledger push failed, enqueuing offline:', err);
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Transaction queued offline');
       this.enqueue('ledger_entries', 'upsert', cleanEntry);
     }
   }
@@ -456,7 +477,11 @@ class SyncEngine {
         .eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Update queued offline');
       this.enqueue('ledger_entries', 'upsert', { id, ...cleanUpdates });
     }
   }
@@ -477,7 +502,7 @@ class SyncEngine {
         ) {
           restoredBalance += existing.amount;
         }
-        this.updateAccountBalance(existing.cash_location_id, restoredBalance);
+        useAccountStore.getState().updateAccountBalance(existing.cash_location_id, restoredBalance);
       }
     }
 
@@ -486,7 +511,11 @@ class SyncEngine {
       const { error } = await supabase.from('ledger_entries').delete().eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Delete queued offline');
       this.enqueue('ledger_entries', 'delete', { id });
     }
   }
@@ -494,39 +523,62 @@ class SyncEngine {
   // Bank Accounts
   public async pushAccount(account: BankAccountItem) {
     useAccountStore.getState().addAccount(account);
+    const payload = {
+      id: account.id,
+      workspace_id: account.workspace_id,
+      name: account.name,
+      balance: account.balance,
+      is_default: account.is_default,
+      scope: account.scope || 'business',
+      account_type: account.account_type || 'savings',
+      bank_name: account.bank_name || null,
+      account_number_last4: account.account_number_last4 || null,
+      ifsc: account.ifsc || null,
+      gradient: account.gradient || null,
+      icon_color: account.iconColor || null,
+    };
     try {
-      const { error } = await supabase.from('cash_locations').upsert({
-        id: account.id,
-        workspace_id: account.workspace_id,
-        name: account.name,
-        balance: account.balance,
-        is_default: account.is_default,
-        gradient: account.gradient,
-        icon_color: account.iconColor,
-      });
+      const { error } = await supabase.from('cash_locations').upsert(payload);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
-      this.enqueue('cash_locations', 'upsert', account);
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Account queued offline');
+      this.enqueue('cash_locations', 'upsert', payload);
     }
   }
 
   public async updateAccount(id: string, updates: Partial<BankAccountItem>) {
     useAccountStore.getState().updateAccount(id, updates);
+    const payload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.balance !== undefined) payload.balance = updates.balance;
+    if (updates.is_default !== undefined) payload.is_default = updates.is_default;
+    if (updates.scope !== undefined) payload.scope = updates.scope;
+    if (updates.account_type !== undefined) payload.account_type = updates.account_type;
+    if (updates.bank_name !== undefined) payload.bank_name = updates.bank_name;
+    if (updates.account_number_last4 !== undefined) payload.account_number_last4 = updates.account_number_last4;
+    if (updates.ifsc !== undefined) payload.ifsc = updates.ifsc;
+    if (updates.gradient !== undefined) payload.gradient = updates.gradient;
+    if (updates.iconColor !== undefined) payload.icon_color = updates.iconColor;
+
     try {
       const { error } = await supabase
         .from('cash_locations')
-        .update({
-          name: updates.name,
-          balance: updates.balance,
-          is_default: updates.is_default,
-          updated_at: new Date().toISOString(),
-        })
+        .update(payload)
         .eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
-      this.enqueue('cash_locations', 'upsert', { id, ...updates });
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Account update queued offline');
+      this.enqueue('cash_locations', 'upsert', { id, ...payload });
     }
   }
 
@@ -536,7 +588,11 @@ class SyncEngine {
       const { error } = await supabase.from('cash_locations').delete().eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Account delete queued offline');
       this.enqueue('cash_locations', 'delete', { id });
     }
   }
@@ -550,27 +606,40 @@ class SyncEngine {
         .eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Balance update queued offline');
       this.enqueue('cash_locations', 'upsert', { id, balance: newBalance });
     }
   }
 
   // Customers & Dues
   public async pushCustomer(customer: Customer) {
-    useCustomerStore.getState().addCustomerOptimistic(customer);
+    const custWithScope: Customer = {
+      ...customer,
+      scope: customer.scope || 'business',
+    };
+    useCustomerStore.getState().addCustomerOptimistic(custWithScope);
     try {
       const { error } = await supabase.from('customers').upsert({
-        id: customer.id,
-        workspace_id: customer.workspace_id,
-        name: customer.name,
-        phone: customer.phone,
-        address: customer.address,
-        type: customer.type,
+        id: custWithScope.id,
+        workspace_id: custWithScope.workspace_id,
+        name: custWithScope.name,
+        phone: custWithScope.phone,
+        address: custWithScope.address,
+        type: custWithScope.type,
+        scope: custWithScope.scope,
       });
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
-      this.enqueue('customers', 'upsert', customer);
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Customer queued offline');
+      this.enqueue('customers', 'upsert', custWithScope);
     }
   }
 
@@ -583,7 +652,11 @@ class SyncEngine {
         .eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Customer update queued offline');
       this.enqueue('customers', 'upsert', { id, ...updates });
     }
   }
@@ -594,28 +667,41 @@ class SyncEngine {
       const { error } = await supabase.from('customers').delete().eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Customer delete queued offline');
       this.enqueue('customers', 'delete', { id });
     }
   }
 
   public async pushDue(due: PeopleDue) {
-    useCustomerStore.getState().addDueOptimistic(due);
+    const dueWithScope: PeopleDue = {
+      ...due,
+      scope: due.scope || 'business',
+    };
+    useCustomerStore.getState().addDueOptimistic(dueWithScope);
     try {
       const { error } = await supabase.from('people_dues').upsert({
-        id: due.id,
-        workspace_id: due.workspace_id,
-        customer_id: due.customer_id,
-        direction: due.direction,
-        amount: due.amount,
-        due_date: due.due_date,
-        status: due.status,
-        notes: due.notes,
+        id: dueWithScope.id,
+        workspace_id: dueWithScope.workspace_id,
+        customer_id: dueWithScope.customer_id,
+        direction: dueWithScope.direction,
+        amount: dueWithScope.amount,
+        due_date: dueWithScope.due_date,
+        status: dueWithScope.status,
+        scope: dueWithScope.scope,
+        notes: dueWithScope.notes,
       });
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
-      this.enqueue('people_dues', 'upsert', due);
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Due queued offline');
+      this.enqueue('people_dues', 'upsert', dueWithScope);
     }
   }
 
@@ -628,7 +714,11 @@ class SyncEngine {
         .eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Due update queued offline');
       this.enqueue('people_dues', 'upsert', { id, ...updates });
     }
   }
@@ -639,7 +729,11 @@ class SyncEngine {
       const { error } = await supabase.from('people_dues').delete().eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Due delete queued offline');
       this.enqueue('people_dues', 'delete', { id });
     }
   }
@@ -653,7 +747,11 @@ class SyncEngine {
         .eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Due status update queued offline');
       this.enqueue('people_dues', 'upsert', { id, status });
     }
   }
@@ -672,69 +770,101 @@ class SyncEngine {
     const isReceivable = due.direction === 'you_will_get';
     const customer = useCustomerStore.getState().customers.find((c) => c.id === due.customer_id);
 
-    // 1. Update Due state
+    // 1. Update Due state optimistically
     if (isFullSettlement) {
       useCustomerStore.getState().updateDueStatusOptimistic(dueId, 'settled');
     } else {
       useCustomerStore.getState().partialSettleDueOptimistic(dueId, paidAmountPaise);
     }
 
-    // 2. Record ledger entry (auto-updates linked bank account / till balance!)
+    // 2. Prepare Ledger entry
     const ledgerEntry: LedgerEntry = {
       id: crypto.randomUUID(),
       workspace_id: due.workspace_id,
       type: isReceivable ? 'cash_in' : 'cash_out',
       amount: paidAmountPaise,
       mode: paymentMode,
+      scope: due.scope || 'business',
       cash_location_id: cashLocationId || undefined,
       customer_id: due.customer_id,
       note: `${isReceivable ? 'Udhar Received' : 'Udhar Paid'} from ${customer?.name || 'Contact'}${
         remark ? ': ' + remark : ''
       }${!isFullSettlement ? ' (Partial Payment)' : ''}`,
       entry_date: new Date().toISOString(),
+      idempotency_key: crypto.randomUUID(),
     };
-    await this.pushLedgerEntry(ledgerEntry);
 
-    // 3. Persist due update to cloud/queue
+    const cleanLedger = sanitizeLedgerPayload(ledgerEntry);
+
+    // 3. Persist atomically via RPC (with robust fallback)
     try {
-      if (isFullSettlement) {
-        await supabase
-          .from('people_dues')
-          .update({ status: 'settled', updated_at: new Date().toISOString() })
-          .eq('id', dueId);
-      } else {
-        await supabase
-          .from('people_dues')
-          .update({ amount: due.amount - paidAmountPaise, updated_at: new Date().toISOString() })
-          .eq('id', dueId);
+      const { error } = await supabase.rpc('settle_due_atomically', {
+        p_due_id: dueId,
+        p_paid_amount: paidAmountPaise,
+        p_ledger_entry: cleanLedger,
+      });
+
+      if (error) {
+        if (error.code === 'PGRST202' || error.message?.includes('function') || error.code === '42883') {
+          await this.pushLedgerEntry(ledgerEntry);
+          const updatePayload = isFullSettlement
+            ? { status: 'settled', updated_at: new Date().toISOString() }
+            : { amount: due.amount - paidAmountPaise, updated_at: new Date().toISOString() };
+          const { error: dueErr } = await supabase
+            .from('people_dues')
+            .update(updatePayload)
+            .eq('id', dueId);
+          if (dueErr) throw dueErr;
+        } else {
+          throw error;
+        }
       }
-    } catch {
+
+      useSessionStore.getState().setSyncStatus('synced');
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      console.warn('[SyncEngine] Due settlement cloud push failed, enqueuing offline:', err);
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Settlement queued offline');
+      this.enqueue('ledger_entries', 'upsert', cleanLedger);
       if (isFullSettlement) {
-        this.enqueue('people_dues', 'upsert', { id: dueId, status: 'settled' });
+        this.enqueue('people_dues', 'upsert', { id: dueId, status: 'settled', scope: due.scope });
       } else {
-        this.enqueue('people_dues', 'upsert', { id: dueId, amount: due.amount - paidAmountPaise });
+        this.enqueue('people_dues', 'upsert', { id: dueId, amount: due.amount - paidAmountPaise, scope: due.scope });
       }
     }
   }
 
   // Cards
   public async pushCard(card: Card) {
-    useCardStore.getState().addCardOptimistic(card);
+    const cardWithScope: Card = {
+      ...card,
+      scope: card.scope || 'business',
+      due_day: card.due_day || 5,
+    };
+    useCardStore.getState().addCardOptimistic(cardWithScope);
     try {
       const { error } = await supabase.from('cards').upsert({
-        id: card.id,
-        workspace_id: card.workspace_id,
-        name: card.name,
-        bank: card.bank,
-        last4: card.last4,
-        credit_limit: card.credit_limit,
-        statement_day: card.statement_day,
-        is_active: card.is_active,
+        id: cardWithScope.id,
+        workspace_id: cardWithScope.workspace_id,
+        name: cardWithScope.name,
+        bank: cardWithScope.bank,
+        last4: cardWithScope.last4,
+        credit_limit: cardWithScope.credit_limit,
+        statement_day: cardWithScope.statement_day,
+        due_day: cardWithScope.due_day,
+        is_active: cardWithScope.is_active,
+        scope: cardWithScope.scope,
       });
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
-      this.enqueue('cards', 'upsert', card);
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Card queued offline');
+      this.enqueue('cards', 'upsert', cardWithScope);
     }
   }
 
@@ -747,7 +877,11 @@ class SyncEngine {
         .eq('id', cardId);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Card update queued offline');
       this.enqueue('cards', 'upsert', { id: cardId, ...updates });
     }
   }
@@ -758,7 +892,11 @@ class SyncEngine {
       const { error } = await supabase.from('cards').delete().eq('id', cardId);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Card delete queued offline');
       this.enqueue('cards', 'delete', { id: cardId });
     }
   }
@@ -811,21 +949,30 @@ class SyncEngine {
 
   // Sheets
   public async pushSheet(sheet: RecordSheet) {
+    const payload = {
+      id: sheet.id,
+      workspace_id: sheet.workspace_id || this.currentWorkspaceId,
+      title: sheet.title,
+      category: sheet.category,
+      color: sheet.color,
+      scope: sheet.scope || 'business',
+      columns: sheet.columns,
+      rows: sheet.rows,
+      frozen_row_count: sheet.frozenRowCount || 0,
+      row_height: sheet.rowHeight || 'normal',
+      show_gridlines: sheet.showGridlines ?? true,
+      updated_at: new Date().toISOString(),
+    };
     try {
-      const { error } = await supabase.from('sheets').upsert({
-        id: sheet.id,
-        workspace_id: sheet.workspace_id || this.currentWorkspaceId,
-        title: sheet.title,
-        category: sheet.category,
-        color: sheet.color,
-        columns: sheet.columns,
-        rows: sheet.rows,
-        updated_at: new Date().toISOString(),
-      });
+      const { error } = await supabase.from('sheets').upsert(payload);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
-      this.enqueue('sheets', 'upsert', sheet);
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Sheet queued offline');
+      this.enqueue('sheets', 'upsert', payload);
     }
   }
 
@@ -835,7 +982,11 @@ class SyncEngine {
       const { error } = await supabase.from('sheets').delete().eq('id', id);
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
-    } catch {
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Sheet delete queued offline');
       this.enqueue('sheets', 'delete', { id });
     }
   }

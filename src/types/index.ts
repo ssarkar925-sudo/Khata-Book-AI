@@ -53,6 +53,7 @@ export interface Customer {
   phone?: string | null;
   address?: string | null;
   type: CustomerType;
+  scope?: EntityScope;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;

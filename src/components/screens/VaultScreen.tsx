@@ -162,7 +162,7 @@ export function VaultScreen() {
   const [genTargetIndex, setGenTargetIndex] = useState<{ isEdit: boolean; index: number } | null>(null);
 
   // Authentication Handlers
-  const handleInitialSetup = (e: React.FormEvent) => {
+  const handleInitialSetup = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
     if (!enteredPin.trim() || enteredPin.length < 4) {
@@ -174,18 +174,20 @@ export function VaultScreen() {
       return;
     }
 
-    setupMasterPassword(enteredPin.trim());
+    await setupMasterPassword(enteredPin.trim());
     setEnteredPin('');
     setConfirmPin('');
   };
 
-  const handleUnlock = (e: React.FormEvent) => {
+  const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
     if (!enteredPin.trim()) return;
 
-    const ok = verifyAndUnlock(enteredPin.trim());
-    if (!ok) {
+    const res = await verifyAndUnlock(enteredPin.trim());
+    if (res.lockedOut) {
+      setAuthError(`Too many failed attempts. Locked for ${res.remainingSec || 30}s.`);
+    } else if (!res.success) {
       setAuthError('Incorrect Master Password / PIN. Please try again.');
     } else {
       setEnteredPin('');
@@ -235,7 +237,7 @@ export function VaultScreen() {
         }
       }
 
-      const ok = changeMasterPassword(currentPinInput, newPinInput);
+      const ok = await changeMasterPassword(currentPinInput, newPinInput);
       if (!ok) {
         setChangePinError('Current Master PIN is incorrect.');
         return;
