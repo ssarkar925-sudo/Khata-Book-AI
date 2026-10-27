@@ -13,6 +13,7 @@ const DEFAULT_ACCOUNTS: BankAccountItem[] = [
     name: 'Physical Cash Drawer',
     balance: 1500000, // ₹15,000.00
     is_default: true,
+    scope: 'business',
     account_type: 'cash_counter',
     bank_name: 'Cash In Hand',
     account_number_last4: '0001',
@@ -26,6 +27,7 @@ const DEFAULT_ACCOUNTS: BankAccountItem[] = [
     name: 'SBI Savings Account',
     balance: 4500000, // ₹45,000.00
     is_default: false,
+    scope: 'personal',
     account_type: 'savings',
     bank_name: 'State Bank of India',
     account_number_last4: '3819',
@@ -39,12 +41,27 @@ const DEFAULT_ACCOUNTS: BankAccountItem[] = [
     name: 'HDFC Business Current',
     balance: 8200000, // ₹82,000.00
     is_default: false,
+    scope: 'business',
     account_type: 'current',
     bank_name: 'HDFC Bank',
     account_number_last4: '9420',
     color_theme: 'indigo',
     gradient: 'from-indigo-600/20 via-purple-500/10 to-transparent',
     iconColor: 'bg-indigo-600 text-white',
+  },
+  {
+    id: '00000000-0000-0000-0000-000000000104',
+    workspace_id: '00000000-0000-0000-0000-000000000010',
+    name: 'Family Household Pool',
+    balance: 2800000, // ₹28,000.00
+    is_default: false,
+    scope: 'family',
+    account_type: 'savings',
+    bank_name: 'ICICI Bank',
+    account_number_last4: '5512',
+    color_theme: 'emerald',
+    gradient: 'from-emerald-600/20 via-teal-500/10 to-transparent',
+    iconColor: 'bg-emerald-600 text-white',
   },
 ];
 

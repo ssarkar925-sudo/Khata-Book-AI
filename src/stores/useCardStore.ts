@@ -18,25 +18,40 @@ const DEFAULT_CARDS: Card[] = [
   {
     id: '00000000-0000-0000-0000-000000000101',
     workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'HDFC Regalia Gold',
+    name: 'HDFC Regalia Gold (Business)',
     bank: 'HDFC Bank',
     last4: '4892',
     credit_limit: 30000000, // ₹3,00,000.00
     statement_day: 15,
     due_day: 5,
     is_active: true,
+    scope: 'business',
     created_at: new Date().toISOString(),
   },
   {
     id: '00000000-0000-0000-0000-000000000102',
     workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'SBI Cashback Card',
+    name: 'SBI Cashback (Personal)',
     bank: 'State Bank of India',
     last4: '1043',
     credit_limit: 15000000, // ₹1,50,000.00
     statement_day: 20,
     due_day: 10,
     is_active: true,
+    scope: 'personal',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '00000000-0000-0000-0000-000000000103',
+    workspace_id: '00000000-0000-0000-0000-000000000010',
+    name: 'ICICI Amazon Pay (Family)',
+    bank: 'ICICI Bank',
+    last4: '8834',
+    credit_limit: 20000000, // ₹2,00,000.00
+    statement_day: 25,
+    due_day: 15,
+    is_active: true,
+    scope: 'family',
     created_at: new Date().toISOString(),
   },
 ];

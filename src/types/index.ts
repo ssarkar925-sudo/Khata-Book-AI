@@ -3,6 +3,7 @@ export type PaymentMode = 'cash' | 'upi' | 'bank' | 'card';
 export type LedgerEntryType = 'cash_in' | 'cash_out' | 'expense' | 'bill_payment' | 'card_spend';
 export type DueDirection = 'you_will_get' | 'you_will_give';
 export type CustomerType = 'customer' | 'supplier';
+export type EntityScope = 'business' | 'personal' | 'family';
 
 export interface Workspace {
   id: string;
@@ -21,6 +22,7 @@ export interface CashLocation {
   name: string;
   balance: number; // in paise
   is_default: boolean;
+  scope?: EntityScope;
   account_type?: AccountType;
   bank_name?: string;
   account_number_last4?: string;
@@ -64,6 +66,7 @@ export interface PeopleDue {
   amount: number; // in paise
   due_date: string;
   status: DueStatus;
+  scope?: EntityScope;
   notes?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -80,6 +83,7 @@ export interface Card {
   statement_day: number;
   due_day?: number;
   is_active: boolean;
+  scope?: EntityScope;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -107,6 +111,7 @@ export interface LedgerEntry {
   customer_id?: string | null;
   card_id?: string | null;
   mode: PaymentMode;
+  scope?: EntityScope;
   note?: string | null;
   entry_date: string;
   is_billed?: boolean;
@@ -188,6 +193,7 @@ export interface RecordSheet {
   title: string;
   category?: string;
   color?: string;
+  scope?: EntityScope;
   columns: SheetColumn[];
   rows: SheetRow[];
   frozenRowCount?: number;

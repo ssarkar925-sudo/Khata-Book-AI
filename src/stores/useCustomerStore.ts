@@ -41,6 +41,15 @@ const DEFAULT_CUSTOMERS: Customer[] = [
     type: 'supplier',
     created_at: new Date().toISOString(),
   },
+  {
+    id: 'cust-103',
+    workspace_id: '00000000-0000-0000-0000-000000000010',
+    name: 'Rajiv Sharma (Friend)',
+    phone: '9845112233',
+    address: 'Personal Circle',
+    type: 'customer',
+    created_at: new Date().toISOString(),
+  },
 ];
 
 const DEFAULT_DUES: PeopleDue[] = [
@@ -52,6 +61,7 @@ const DEFAULT_DUES: PeopleDue[] = [
     amount: 1450000, // ₹14,500.00
     due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5).toISOString(),
     status: 'pending',
+    scope: 'business',
     notes: 'Order #4092 Silk Sarees delivery payment balance',
     created_at: new Date().toISOString(),
   },
@@ -63,7 +73,20 @@ const DEFAULT_DUES: PeopleDue[] = [
     amount: 620000, // ₹6,200.00
     due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString(),
     status: 'pending',
+    scope: 'business',
     notes: 'Batch #88 Invoice components raw material supply',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'due-103',
+    workspace_id: '00000000-0000-0000-0000-000000000010',
+    customer_id: 'cust-103',
+    direction: 'you_will_get',
+    amount: 500000, // ₹5,000.00
+    due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 12).toISOString(),
+    status: 'pending',
+    scope: 'personal',
+    notes: 'Personal friendly advance returned next week',
     created_at: new Date().toISOString(),
   },
 ];

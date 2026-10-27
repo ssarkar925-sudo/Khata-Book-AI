@@ -22,7 +22,9 @@ const DEFAULT_ENTRIES: LedgerEntry[] = [
     type: 'cash_in',
     amount: 1850000, // ₹18,500.00
     mode: 'upi',
+    scope: 'business',
     note: 'Consulting fee received from Client Apex Corp',
+    category_id: 'cat-sales',
     entry_date: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
     created_at: new Date().toISOString(),
   },
@@ -32,7 +34,9 @@ const DEFAULT_ENTRIES: LedgerEntry[] = [
     type: 'cash_out',
     amount: 420000, // ₹4,200.00
     mode: 'bank',
+    scope: 'business',
     note: 'Office High-Speed Internet & Fiber Bill',
+    category_id: 'cat-utilities',
     entry_date: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
     created_at: new Date().toISOString(),
   },
@@ -43,8 +47,34 @@ const DEFAULT_ENTRIES: LedgerEntry[] = [
     amount: 345000, // ₹3,450.00
     card_id: '00000000-0000-0000-0000-000000000101',
     mode: 'card',
+    scope: 'business',
     note: 'Team Dinner at Mainland China',
+    category_id: 'cat-food',
     entry_date: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(),
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'tx-104',
+    workspace_id: '00000000-0000-0000-0000-000000000010',
+    type: 'cash_out',
+    amount: 580000, // ₹5,800.00
+    mode: 'upi',
+    scope: 'family',
+    note: 'Monthly Grocery & Dairy Supplies',
+    category_id: 'cat-food',
+    entry_date: new Date(Date.now() - 1000 * 60 * 60 * 50).toISOString(),
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'tx-105',
+    workspace_id: '00000000-0000-0000-0000-000000000010',
+    type: 'cash_in',
+    amount: 3500000, // ₹35,000.00
+    mode: 'bank',
+    scope: 'personal',
+    note: 'Monthly Salary / Business Drawing Credit',
+    category_id: 'cat-sales',
+    entry_date: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
     created_at: new Date().toISOString(),
   },
 ];

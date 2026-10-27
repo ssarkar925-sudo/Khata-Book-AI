@@ -88,6 +88,7 @@ const DEFAULT_SHEETS: RecordSheet[] = [
     title: 'PAN & Aadhaar Register',
     category: 'Documents',
     color: '#3B82F6',
+    scope: 'business',
     columns: [
       { id: 'col_name', name: 'Person Name', type: 'text' },
       { id: 'col_pan', name: 'PAN Number', type: 'text' },
@@ -127,6 +128,7 @@ const DEFAULT_SHEETS: RecordSheet[] = [
     title: 'Monthly Utility & Bills',
     category: 'Bills',
     color: '#10B981',
+    scope: 'family',
     columns: [
       { id: 'col_bill', name: 'Bill Name / Service', type: 'text' },
       { id: 'col_consumer', name: 'Consumer / Account ID', type: 'text' },
