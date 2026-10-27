@@ -299,12 +299,16 @@ SET search_path = public, pg_temp;
 ALTER TABLE public.workspaces ENABLE ROW LEVEL SECURITY;
 
 -- 1. Helper with row_security = off to check membership without triggering workspace_members RLS
-CREATE OR REPLACE FUNCTION public.check_user_is_member(p_workspace_id UUID)
+DROP FUNCTION IF EXISTS public.check_user_is_member(UUID);
+CREATE OR REPLACE FUNCTION public.check_user_is_member(ws_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
+    IF auth.uid() IS NULL THEN
+        RETURN FALSE;
+    END IF;
     RETURN EXISTS (
         SELECT 1 FROM public.workspace_members
-        WHERE workspace_id = p_workspace_id AND user_id = auth.uid()
+        WHERE workspace_id = ws_id AND user_id = auth.uid()
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
@@ -312,12 +316,15 @@ SET search_path = public, pg_temp
 SET row_security = off;
 
 -- 2. Helper with row_security = off to check ownership without triggering workspaces RLS
-CREATE OR REPLACE FUNCTION public.is_workspace_owner(p_workspace_id UUID)
+CREATE OR REPLACE FUNCTION public.is_workspace_owner(ws_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
+    IF auth.uid() IS NULL THEN
+        RETURN FALSE;
+    END IF;
     RETURN EXISTS (
         SELECT 1 FROM public.workspaces
-        WHERE id = p_workspace_id AND owner_id = auth.uid()
+        WHERE id = ws_id AND owner_id = auth.uid()
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
