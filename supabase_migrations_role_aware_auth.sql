@@ -533,13 +533,26 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp;
 
+-- Add is_default column if missing
+DO $$
+BEGIN
+    ALTER TABLE public.workspaces ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT false;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- Database-backed uniqueness guarantee: only one default workspace per owner
+CREATE UNIQUE INDEX IF NOT EXISTS idx_workspaces_owner_default 
+ON public.workspaces(owner_id) 
+WHERE is_default = true;
+
 -- ============================================================================
--- HELPER RPC: Safely Auto-Provision Exactly One Workspace for Authenticated User
+-- HELPER RPC: Concurrency-Safe Workspace Provisioning
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.get_or_create_default_workspace()
 RETURNS jsonb AS $$
 DECLARE
     v_user_id UUID;
+    v_user_email TEXT;
     v_ws RECORD;
 BEGIN
     v_user_id := auth.uid();
@@ -547,18 +560,22 @@ BEGIN
         RAISE EXCEPTION 'Authentication required';
     END IF;
 
-    -- 1. Check if user already owns any workspace
+    -- Concurrency Lock: Transaction-level advisory lock serializes workspace initialization per user
+    PERFORM pg_advisory_xact_lock(hashtext('workspace_prov_' || v_user_id::text));
+
+    -- 1. Check if user already owns any workspace (default or regular)
     SELECT w.* INTO v_ws
     FROM public.workspaces w
     WHERE w.owner_id = v_user_id
-    ORDER BY w.created_at ASC
+    ORDER BY (w.is_default IS TRUE) DESC, w.created_at ASC
     LIMIT 1;
 
     IF FOUND THEN
         RETURN to_jsonb(v_ws);
     END IF;
 
-    -- 2. Check if user belongs to any workspace as a member
+    -- 2. Preserve existing membership: if user is already a member of another workspace, return that workspace
+    -- DO NOT create an unnecessary owned workspace if the user is already collaborating!
     SELECT w.* INTO v_ws
     FROM public.workspaces w
     JOIN public.workspace_members m ON m.workspace_id = w.id
@@ -570,10 +587,41 @@ BEGIN
         RETURN to_jsonb(v_ws);
     END IF;
 
-    -- 3. If none exists, create exactly one workspace owned by the authenticated user
-    INSERT INTO public.workspaces (name, currency, owner_id)
-    VALUES ('Personal Record Book', 'INR', v_user_id)
+    -- 3. Check if user has pending invitations by email in workspace_members
+    SELECT email INTO v_user_email FROM auth.users WHERE id = v_user_id;
+    IF v_user_email IS NOT NULL AND v_user_email <> '' THEN
+        -- Claim pending invitation
+        UPDATE public.workspace_members
+        SET user_id = v_user_id
+        WHERE member_email = lower(v_user_email) AND user_id <> v_user_id;
+
+        SELECT w.* INTO v_ws
+        FROM public.workspaces w
+        JOIN public.workspace_members m ON m.workspace_id = w.id
+        WHERE m.user_id = v_user_id
+        ORDER BY m.created_at ASC
+        LIMIT 1;
+
+        IF FOUND THEN
+            RETURN to_jsonb(v_ws);
+        END IF;
+    END IF;
+
+    -- 4. User neither owns any workspace nor is a member of any workspace.
+    -- Atomically insert exactly one default workspace with ON CONFLICT guard.
+    INSERT INTO public.workspaces (name, currency, owner_id, is_default)
+    VALUES ('Personal Record Book', 'INR', v_user_id, true)
+    ON CONFLICT (owner_id) WHERE is_default = true
+    DO NOTHING
     RETURNING * INTO v_ws;
+
+    -- If concurrent insert succeeded in another transaction before lock, select it
+    IF v_ws IS NULL THEN
+        SELECT w.* INTO v_ws
+        FROM public.workspaces w
+        WHERE w.owner_id = v_user_id AND w.is_default = true
+        LIMIT 1;
+    END IF;
 
     RETURN to_jsonb(v_ws);
 END;

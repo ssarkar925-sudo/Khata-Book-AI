@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { User } from '@supabase/supabase-js';
-import { Workspace, WorkspaceRole, SyncStatus } from '@/types';
+import { Workspace, WorkspaceRole, SyncStatus, MigrationProgress, MigrationResult } from '@/types';
 import { supabase } from '@/lib/supabase';
+import {
+  migrationEngine,
+  registerLocalWorkspaceId,
+  countUnmigratedLocalRecords,
+} from '@/lib/migrationEngine';
 
 export const DEFAULT_LOCAL_WORKSPACE: Workspace = {
   id: '00000000-0000-0000-0000-000000000010',
@@ -19,7 +24,10 @@ function getOrCreateLocalWorkspace(): Workspace {
       const stored = localStorage.getItem('rb_active_workspace');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed && parsed.id) return parsed;
+        if (parsed && parsed.id) {
+          registerLocalWorkspaceId(parsed.id);
+          return parsed;
+        }
       }
       const uniqueWs: Workspace = {
         id: crypto.randomUUID(),
@@ -31,11 +39,15 @@ function getOrCreateLocalWorkspace(): Workspace {
         updated_at: new Date().toISOString(),
       };
       localStorage.setItem('rb_active_workspace', JSON.stringify(uniqueWs));
+      registerLocalWorkspaceId(uniqueWs.id);
       return uniqueWs;
     } catch {}
   }
   return DEFAULT_LOCAL_WORKSPACE;
 }
+
+// Module-level listener tracking to prevent duplicate onAuthStateChange registrations
+let authSubscription: { unsubscribe: () => void } | null = null;
 
 interface SessionState {
   user: User | null;
@@ -53,6 +65,7 @@ interface SessionState {
   isMembersModalOpen: boolean;
   showMigrationPrompt: boolean;
   localItemsCount: number;
+  migrationProgress: MigrationProgress | null;
   
   setUser: (user: User | null) => void;
   setUserRole: (role: WorkspaceRole | null) => void;
@@ -69,18 +82,25 @@ interface SessionState {
   setMembersModalOpen: (open: boolean) => void;
   setShowMigrationPrompt: (show: boolean) => void;
   setLocalItemsCount: (count: number) => void;
+  setMigrationProgress: (progress: MigrationProgress | null) => void;
 
   initAuth: () => Promise<void>;
+  cleanupAuth: () => void;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{
+    success: boolean;
+    requiresEmailConfirmation?: boolean;
+    email?: string;
+    error?: string;
+  }>;
   signOut: () => Promise<void>;
   refreshWorkspacesAndRole: (currentUser?: User | null) => Promise<void>;
-  migrateLocalDataToCloud: (targetWorkspaceId: string) => Promise<{ count: number; error?: string }>;
+  migrateLocalDataToCloud: (targetWorkspaceId: string) => Promise<MigrationResult>;
   resetSession: () => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
-  user: null, // Unauthenticated by default; authentic Supabase session populated by initAuth
+  user: null, // Strictly null when unauthenticated
   userRole: null,
   authLoading: true,
   workspaces: (() => {
@@ -91,7 +111,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const ws = getOrCreateLocalWorkspace();
     return ws.id;
   })(),
-  syncStatus: 'offline', // Strictly 'offline' in unauthenticated local-only mode
+  syncStatus: 'offline', // Strictly offline in local-only mode
   lastSyncTime: (() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('rb_last_sync_time') || null;
@@ -111,6 +131,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   isMembersModalOpen: false,
   showMigrationPrompt: false,
   localItemsCount: 0,
+  migrationProgress: null,
 
   setUser: (user) => {
     if (typeof window !== 'undefined') {
@@ -149,7 +170,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
   setSyncStatus: (syncStatus) => {
-    // Prevent unauthenticated state from ever masquerading as synced
+    // True local-only guarantee: unauthenticated mode can NEVER report synced
     const user = get().user;
     if (!user && syncStatus === 'synced') {
       set({ syncStatus: 'offline' });
@@ -183,6 +204,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setMembersModalOpen: (isMembersModalOpen) => set({ isMembersModalOpen }),
   setShowMigrationPrompt: (showMigrationPrompt) => set({ showMigrationPrompt }),
   setLocalItemsCount: (localItemsCount) => set({ localItemsCount }),
+  setMigrationProgress: (migrationProgress) => set({ migrationProgress }),
 
   initAuth: async () => {
     set({ authLoading: true });
@@ -217,8 +239,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({ authLoading: false });
     }
 
-    // Subscribe to auth state updates
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    // Deduplicate auth listeners: unsubscribe previous listener if active
+    if (authSubscription) {
+      authSubscription.unsubscribe();
+      authSubscription = null;
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (session?.user) {
           set({ user: session.user, authLoading: false });
@@ -228,6 +255,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         get().resetSession();
       }
     });
+
+    authSubscription = subscription;
+  },
+
+  cleanupAuth: () => {
+    if (authSubscription) {
+      authSubscription.unsubscribe();
+      authSubscription = null;
+    }
   },
 
   signIn: async (email, password) => {
@@ -238,7 +274,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         set({ authLoading: false });
         return { success: false, error: error.message };
       }
-      if (data.user) {
+      if (data.user && data.session) {
         get().setUser(data.user);
         await get().refreshWorkspacesAndRole(data.user);
         return { success: true };
@@ -264,11 +300,24 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         set({ authLoading: false });
         return { success: false, error: error.message };
       }
-      if (data.user) {
-        get().setUser(data.user);
-        await get().refreshWorkspacesAndRole(data.user);
-        return { success: true };
+
+      // Supabase Email Confirmation Mode: User created but session is null until email is confirmed
+      if (data.user && !data.session) {
+        set({ authLoading: false });
+        return {
+          success: true,
+          requiresEmailConfirmation: true,
+          email: data.user.email,
+        };
       }
+
+      // Auto-confirmed or existing session
+      if (data.session?.user) {
+        get().setUser(data.session.user);
+        await get().refreshWorkspacesAndRole(data.session.user);
+        return { success: true, requiresEmailConfirmation: false };
+      }
+
       return { success: false, error: 'Sign up failed' };
     } catch (err: any) {
       set({ authLoading: false });
@@ -311,20 +360,20 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         console.warn('[SessionStore] Error fetching workspaces:', wsErr.message);
       }
 
-      // 2. If no workspace exists for this newly authenticated user, create exactly one owned workspace
+      // 2. Concurrency-safe provisioning via database RPC
       if (!wsList || wsList.length === 0) {
-        // Try safe RPC helper first
         const { data: rpcWs, error: rpcErr } = await supabase.rpc('get_or_create_default_workspace');
         if (!rpcErr && rpcWs) {
           wsList = [rpcWs];
         } else {
-          // Direct insert with authenticated user ID
+          // Direct fallback insert with authenticated user ID
           const { data: newWs, error: insErr } = await supabase
             .from('workspaces')
             .insert({
               name: 'Personal Record Book',
               currency: 'INR',
-              owner_id: user.id, // Strictly auth.uid()
+              owner_id: user.id,
+              is_default: true,
             })
             .select()
             .single();
@@ -341,6 +390,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
             name: w.name,
             currency: w.currency || 'INR',
             owner_id: w.owner_id,
+            is_default: w.is_default,
             created_at: w.created_at,
             updated_at: w.updated_at,
           }))
@@ -376,18 +426,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           localStorage.setItem('rb_active_workspace', JSON.stringify(selectedWs));
         }
 
-        // Check if device has offline records that could be migrated
-        const storedLocal = localStorage.getItem('rb_active_workspace');
-        const defaultLocalId = '00000000-0000-0000-0000-000000000010';
-        let unmigratedCount = 0;
-        try {
-          const ledgerRaw = localStorage.getItem('rb_ledger_entries');
-          if (ledgerRaw) {
-            const entries = JSON.parse(ledgerRaw);
-            unmigratedCount += entries.filter((e: any) => e.workspace_id === defaultLocalId || !e.workspace_id).length;
-          }
-        } catch {}
-
+        // Check if device has offline records that could be migrated (using dynamic tracker, not fixed UUID)
+        const unmigratedCount = countUnmigratedLocalRecords(selectedWs.id);
         if (unmigratedCount > 0) {
           set({ showMigrationPrompt: true, localItemsCount: unmigratedCount });
         }
@@ -398,41 +438,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   migrateLocalDataToCloud: async (targetWorkspaceId: string) => {
-    let migratedCount = 0;
-    try {
-      const stores = [
-        'rb_cash_locations',
-        'rb_customers',
-        'rb_people_dues',
-        'rb_cards',
-        'rb_ledger_entries',
-        'rb_notes',
-        'rb_sheets',
-      ];
+    const result = await migrationEngine.executeMigration(targetWorkspaceId, (progress) => {
+      get().setMigrationProgress(progress);
+    });
 
-      for (const storeKey of stores) {
-        const raw = localStorage.getItem(storeKey);
-        if (!raw) continue;
-        try {
-          const items = JSON.parse(raw);
-          if (Array.isArray(items)) {
-            const updated = items.map((item: any) => {
-              if (!item.workspace_id || item.workspace_id === '00000000-0000-0000-0000-000000000010') {
-                migratedCount++;
-                return { ...item, workspace_id: targetWorkspaceId };
-              }
-              return item;
-            });
-            localStorage.setItem(storeKey, JSON.stringify(updated));
-          }
-        } catch {}
-      }
-
+    if (result.success) {
       set({ showMigrationPrompt: false, localItemsCount: 0 });
-      return { count: migratedCount };
-    } catch (err: any) {
-      return { count: migratedCount, error: err?.message || 'Migration failed' };
+    } else {
+      // Re-calculate remaining unmigrated items in case of partial failure
+      const remaining = countUnmigratedLocalRecords(targetWorkspaceId);
+      set({ localItemsCount: remaining });
     }
+
+    return result;
   },
 
   resetSession: () => {
@@ -449,6 +467,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       syncStatus: 'offline',
       pendingSyncCount: 0,
       showMigrationPrompt: false,
+      migrationProgress: null,
     });
   },
 }));

@@ -21,8 +21,35 @@ export interface Workspace {
   currency: string;
   owner_id: string;
   is_local?: boolean;
+  is_default?: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface MigrationFailure {
+  entity: string;
+  id: string;
+  error: string;
+}
+
+export interface MigrationProgress {
+  status: 'idle' | 'backing_up' | 'uploading' | 'verifying' | 'completed' | 'partial_failure' | 'error';
+  currentStep: string;
+  progressPercent: number;
+  totalRecords: number;
+  migratedRecords: number;
+  failedRecords: MigrationFailure[];
+  backupKey?: string;
+  errorMessage?: string;
+}
+
+export interface MigrationResult {
+  success: boolean;
+  total: number;
+  migrated: number;
+  failed: MigrationFailure[];
+  backupKey?: string;
+  error?: string;
 }
 
 export type AccountType = 'savings' | 'current' | 'cash_counter' | 'wallet' | 'od_cc';

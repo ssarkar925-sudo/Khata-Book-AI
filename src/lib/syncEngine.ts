@@ -41,7 +41,7 @@ const LEDGER_ENTRY_VALID_COLUMNS = new Set([
   'deleted_at',
 ]);
 
-function sanitizeLedgerPayload(obj: any): any {
+export function sanitizeLedgerPayload(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) {
     return obj.map(sanitizeLedgerPayload);
@@ -93,6 +93,11 @@ class SyncEngine {
   }
 
   private enqueue(table: string, action: 'upsert' | 'delete', payload: any) {
+    const user = useSessionStore.getState().user;
+    if (!user) {
+      // True Local-Only Mode: Zero cloud queuing or mutations while unauthenticated
+      return;
+    }
     const queue = this.getQueue();
     queue.push({
       id: crypto.randomUUID(),
@@ -521,7 +526,15 @@ class SyncEngine {
   }
 
   public async updateLedgerEntry(id: string, updates: Partial<LedgerEntry>) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useLedgerStore.getState().updateEntryOptimistic(id, updates);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     const cleanUpdates = sanitizeLedgerPayload(updates);
     if (Object.keys(cleanUpdates).length === 0) return;
     try {
@@ -541,6 +554,9 @@ class SyncEngine {
   }
 
   public async deleteLedgerEntry(id: string) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     // Reverse linked bank account balance if entry was linked
     const existing = useLedgerStore.getState().entries.find((e) => e.id === id);
     if (existing && existing.cash_location_id) {
@@ -561,6 +577,11 @@ class SyncEngine {
     }
 
     useLedgerStore.getState().removeEntryOptimistic(id);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('ledger_entries').delete().eq('id', id);
       if (error) throw error;
@@ -576,7 +597,15 @@ class SyncEngine {
 
   // Bank Accounts
   public async pushAccount(account: BankAccountItem) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useAccountStore.getState().addAccount(account);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     const payload = {
       id: account.id,
       workspace_id: account.workspace_id,
@@ -605,7 +634,15 @@ class SyncEngine {
   }
 
   public async updateAccount(id: string, updates: Partial<BankAccountItem>) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useAccountStore.getState().updateAccount(id, updates);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     const payload: Record<string, any> = {
       updated_at: new Date().toISOString(),
     };
@@ -637,7 +674,15 @@ class SyncEngine {
   }
 
   public async deleteAccount(id: string) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useAccountStore.getState().deleteAccount(id);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('cash_locations').delete().eq('id', id);
       if (error) throw error;
@@ -652,7 +697,15 @@ class SyncEngine {
   }
 
   public async updateAccountBalance(id: string, newBalance: number) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useAccountStore.getState().updateAccountBalance(id, newBalance);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('cash_locations')
@@ -671,11 +724,19 @@ class SyncEngine {
 
   // Customers & Dues
   public async pushCustomer(customer: Customer) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     const custWithScope: Customer = {
       ...customer,
       scope: customer.scope || 'business',
     };
     useCustomerStore.getState().addCustomerOptimistic(custWithScope);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('customers').upsert({
         id: custWithScope.id,
@@ -698,7 +759,15 @@ class SyncEngine {
   }
 
   public async updateCustomer(id: string, updates: Partial<Customer>) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useCustomerStore.getState().updateCustomerOptimistic(id, updates);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('customers')
@@ -716,7 +785,15 @@ class SyncEngine {
   }
 
   public async deleteCustomer(id: string) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useCustomerStore.getState().deleteCustomerOptimistic(id);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('customers').delete().eq('id', id);
       if (error) throw error;
@@ -731,11 +808,19 @@ class SyncEngine {
   }
 
   public async pushDue(due: PeopleDue) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     const dueWithScope: PeopleDue = {
       ...due,
       scope: due.scope || 'business',
     };
     useCustomerStore.getState().addDueOptimistic(dueWithScope);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('people_dues').upsert({
         id: dueWithScope.id,
@@ -760,7 +845,15 @@ class SyncEngine {
   }
 
   public async updateDue(id: string, updates: Partial<PeopleDue>) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useCustomerStore.getState().updateDueOptimistic(id, updates);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('people_dues')
@@ -778,7 +871,15 @@ class SyncEngine {
   }
 
   public async deleteDue(id: string) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useCustomerStore.getState().deleteDueOptimistic(id);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('people_dues').delete().eq('id', id);
       if (error) throw error;
@@ -793,7 +894,15 @@ class SyncEngine {
   }
 
   public async updateDueStatus(id: string, status: DueStatus) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useCustomerStore.getState().updateDueStatusOptimistic(id, status);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('people_dues')
@@ -858,12 +967,7 @@ class SyncEngine {
 
     if (perm.isOfflineMode) {
       useSessionStore.getState().setSyncStatus('offline');
-      this.enqueue('people_dues', 'upsert', {
-        id: dueId,
-        amount: isFullSettlement ? 0 : due.amount - paidAmountPaise,
-        status: isFullSettlement ? 'settled' : 'pending',
-      });
-      this.enqueue('ledger_entries', 'upsert', cleanLedger);
+      // True local-only mode: local store already updated, zero cloud queuing
       return;
     }
 
@@ -909,12 +1013,20 @@ class SyncEngine {
 
   // Cards
   public async pushCard(card: Card) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     const cardWithScope: Card = {
       ...card,
       scope: card.scope || 'business',
       due_day: card.due_day || 5,
     };
     useCardStore.getState().addCardOptimistic(cardWithScope);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('cards').upsert({
         id: cardWithScope.id,
@@ -940,7 +1052,15 @@ class SyncEngine {
   }
 
   public async updateCard(cardId: string, updates: Partial<Card>) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useCardStore.getState().updateCardOptimistic(cardId, updates);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('cards')
@@ -958,7 +1078,15 @@ class SyncEngine {
   }
 
   public async deleteCard(cardId: string) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useCardStore.getState().deleteCardOptimistic(cardId);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('cards').delete().eq('id', cardId);
       if (error) throw error;
@@ -974,7 +1102,15 @@ class SyncEngine {
 
   // Notes
   public async pushNote(note: NoteItem) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useNoteStore.getState().addNoteOptimistic(note);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('notes').upsert({
         id: note.id,
@@ -994,7 +1130,15 @@ class SyncEngine {
   }
 
   public async updateNote(id: string, updates: Partial<NoteItem>) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useNoteStore.getState().updateNoteOptimistic(id, updates);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('notes')
@@ -1008,7 +1152,15 @@ class SyncEngine {
   }
 
   public async deleteNote(id: string) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useNoteStore.getState().deleteNoteOptimistic(id);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('notes').delete().eq('id', id);
       if (error) throw error;
@@ -1020,6 +1172,14 @@ class SyncEngine {
 
   // Sheets
   public async pushSheet(sheet: RecordSheet) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     const payload = {
       id: sheet.id,
       workspace_id: sheet.workspace_id || this.currentWorkspaceId,
@@ -1048,7 +1208,15 @@ class SyncEngine {
   }
 
   public async deleteSheet(id: string) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
     useSheetStore.getState().deleteSheet(id);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('sheets').delete().eq('id', id);
       if (error) throw error;

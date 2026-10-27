@@ -12,6 +12,9 @@ import {
   AlertCircle,
   Loader2,
   HardDriveDownload,
+  RefreshCw,
+  Inbox,
+  AlertTriangle,
 } from 'lucide-react';
 import { useSessionStore } from '@/stores/useSessionStore';
 
@@ -28,6 +31,8 @@ export function AuthModal() {
     localItemsCount,
     activeWorkspaceId,
     migrateLocalDataToCloud,
+    migrationProgress,
+    setMigrationProgress,
   } = useSessionStore();
 
   const [tab, setTab] = useState<'signin' | 'signup'>('signin');
@@ -37,7 +42,8 @@ export function AuthModal() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [migrating, setMigrating] = useState(false);
+  const [emailConfirmationNeeded, setEmailConfirmationNeeded] = useState<string | null>(null);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   if (!isAuthModalOpen) return null;
 
@@ -68,6 +74,7 @@ export function AuthModal() {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
+    setEmailConfirmationNeeded(null);
 
     if (!email || !password || !fullName) {
       setErrorMsg('Please fill out all fields.');
@@ -87,6 +94,8 @@ export function AuthModal() {
     const res = await signUp(email.trim(), password, fullName.trim());
     if (!res.success) {
       setErrorMsg(res.error || 'Failed to create account.');
+    } else if (res.requiresEmailConfirmation) {
+      setEmailConfirmationNeeded(res.email || email.trim());
     } else {
       setSuccessMsg('Account created successfully! Welcome to Record Book.');
       setTimeout(() => {
@@ -96,17 +105,22 @@ export function AuthModal() {
   };
 
   const handleMigrate = async () => {
-    setMigrating(true);
+    setIsMigrating(true);
+    setErrorMsg(null);
     const result = await migrateLocalDataToCloud(activeWorkspaceId);
-    setMigrating(false);
-    if (result.error) {
-      setErrorMsg(result.error);
-    } else {
-      setSuccessMsg(`Migrated ${result.count} records to your cloud workspace.`);
+    setIsMigrating(false);
+
+    if (result.success) {
+      setSuccessMsg(`Successfully migrated all ${result.migrated} records to your cloud workspace.`);
       setTimeout(() => {
+        setMigrationProgress(null);
         setShowMigrationPrompt(false);
         setAuthModalOpen(false);
-      }, 1000);
+      }, 1500);
+    } else if (result.failed.length > 0) {
+      setErrorMsg(`Partial upload: ${result.migrated} succeeded, ${result.failed.length} failed. You can retry.`);
+    } else if (result.error) {
+      setErrorMsg(result.error);
     }
   };
 
@@ -120,7 +134,10 @@ export function AuthModal() {
         {/* Header */}
         <div className="relative p-6 pb-4 border-b border-inherit bg-gradient-to-br from-indigo-500/10 via-violet-500/5 to-transparent">
           <button
-            onClick={() => setAuthModalOpen(false)}
+            onClick={() => {
+              setAuthModalOpen(false);
+              setEmailConfirmationNeeded(null);
+            }}
             className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -136,8 +153,8 @@ export function AuthModal() {
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          {!showMigrationPrompt && (
+          {/* Navigation Tabs (Only when not showing email confirmation or migration prompt) */}
+          {!showMigrationPrompt && !emailConfirmationNeeded && (
             <div className="flex gap-1.5 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl mt-4">
               <button
                 type="button"
@@ -173,21 +190,84 @@ export function AuthModal() {
           )}
         </div>
 
-        {/* Migration Banner if user logged in with local records */}
-        {showMigrationPrompt ? (
-          <div className="p-6 space-y-4">
+        {/* 1. Email Confirmation State Screen */}
+        {emailConfirmationNeeded ? (
+          <div className="p-6 space-y-4 text-center animate-fade-in">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto shadow-inner">
+              <Inbox className="w-7 h-7 animate-bounce" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold">Check Your Email</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
+                We sent a confirmation link to <span className="font-semibold text-indigo-600 dark:text-indigo-400">{emailConfirmationNeeded}</span>.
+              </p>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Click the link in the email to activate your account. Once verified, sign in to access your cloud workspace.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailConfirmationNeeded(null);
+                  setTab('signin');
+                }}
+                className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md transition-all"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          </div>
+        ) : showMigrationPrompt ? (
+          /* 2. Reliable Migration Screen */
+          <div className="p-6 space-y-4 animate-fade-in">
             <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300">
               <div className="flex items-start gap-3">
                 <HardDriveDownload className="w-5 h-5 shrink-0 mt-0.5 text-indigo-500" />
                 <div>
                   <h4 className="text-sm font-bold">Offline Records Found</h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    We detected <span className="font-semibold text-indigo-500">{localItemsCount}</span> offline items
-                    saved on this device. Would you like to migrate them to your authenticated cloud workspace?
+                    We detected <span className="font-semibold text-indigo-500">{localItemsCount}</span> offline item(s)
+                    saved on this device. Would you like to upload them to your cloud account?
                   </p>
                 </div>
               </div>
             </div>
+
+            {/* Migration Progress Bar & Status */}
+            {migrationProgress && (
+              <div className="space-y-2 p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-inherit">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="truncate max-w-[220px]">{migrationProgress.currentStep}</span>
+                  <span className="text-indigo-600 dark:text-indigo-400">{migrationProgress.progressPercent}%</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-500 to-teal-400 transition-all duration-300"
+                    style={{ width: `${migrationProgress.progressPercent}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[11px] text-slate-400">
+                  <span>Migrated: {migrationProgress.migratedRecords} / {migrationProgress.totalRecords}</span>
+                  {migrationProgress.failedRecords.length > 0 && (
+                    <span className="text-rose-500 font-bold">{migrationProgress.failedRecords.length} Failed</span>
+                  )}
+                </div>
+
+                {/* List of failed records if partial failure */}
+                {migrationProgress.failedRecords.length > 0 && (
+                  <div className="mt-2 max-h-24 overflow-y-auto space-y-1 text-[11px] text-rose-500 bg-rose-500/10 p-2 rounded-xl">
+                    {migrationProgress.failedRecords.map((f, i) => (
+                      <div key={i} className="flex items-center gap-1.5 truncate">
+                        <AlertTriangle className="w-3 h-3 shrink-0" />
+                        <span>{f.entity}: {f.error}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {errorMsg && (
               <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs">
@@ -206,6 +286,7 @@ export function AuthModal() {
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
+                disabled={isMigrating}
                 onClick={() => {
                   setShowMigrationPrompt(false);
                   setAuthModalOpen(false);
@@ -220,17 +301,29 @@ export function AuthModal() {
               </button>
               <button
                 type="button"
-                disabled={migrating}
+                disabled={isMigrating}
                 onClick={handleMigrate}
                 className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
               >
-                {migrating ? <Loader2 className="w-4 h-4 animate-spin" /> : <HardDriveDownload className="w-4 h-4" />}
-                Migrate to Cloud
+                {isMigrating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : migrationProgress?.failedRecords && migrationProgress.failedRecords.length > 0 ? (
+                  <RefreshCw className="w-4 h-4" />
+                ) : (
+                  <HardDriveDownload className="w-4 h-4" />
+                )}
+                <span>
+                  {isMigrating
+                    ? 'Migrating...'
+                    : migrationProgress?.failedRecords && migrationProgress.failedRecords.length > 0
+                    ? 'Retry Failed Records'
+                    : 'Migrate to Cloud'}
+                </span>
               </button>
             </div>
           </div>
         ) : (
-          /* Sign In & Sign Up Form */
+          /* 3. Sign In & Sign Up Form */
           <form onSubmit={tab === 'signin' ? handleSignIn : handleSignUp} className="p-6 space-y-4">
             {errorMsg && (
               <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs">
