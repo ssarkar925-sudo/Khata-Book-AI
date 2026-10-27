@@ -1427,3 +1427,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp;
+
+-- Function Execution Grants
+GRANT EXECUTE ON FUNCTION public.record_ledger_entry_and_update_balance(jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.settle_due_atomically(UUID, BIGINT, jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.import_historical_ledger_entry(jsonb) TO authenticated, service_role;

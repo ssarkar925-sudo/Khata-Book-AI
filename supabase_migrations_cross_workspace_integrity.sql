@@ -3,6 +3,40 @@
 -- Idempotent script to enforce tenant boundaries across all relational write paths
 -- ============================================================================
 
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 0. Write-authorization helper function (ensures migration is 100% self-contained)
+CREATE OR REPLACE FUNCTION public.check_user_workspace_write(ws_id UUID)
+RETURNS BOOLEAN AS $
+BEGIN
+    IF auth.uid() IS NULL THEN
+        RETURN FALSE;
+    END IF;
+
+    -- 1. Direct owner check
+    IF EXISTS (
+        SELECT 1 FROM public.workspaces
+        WHERE id = ws_id AND owner_id = auth.uid()
+    ) THEN
+        RETURN TRUE;
+    END IF;
+
+    -- 2. Member check (exclude 'viewer')
+    IF EXISTS (
+        SELECT 1 FROM public.workspace_members
+        WHERE workspace_id = ws_id
+          AND user_id = auth.uid()
+          AND role IN ('owner', 'admin', 'member')
+    ) THEN
+        RETURN TRUE;
+    END IF;
+
+    RETURN FALSE;
+END;
+$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp;
+
+
 -- 1. Trigger function for public.ledger_entries cross-workspace boundary enforcement
 CREATE OR REPLACE FUNCTION public.check_ledger_entry_same_workspace()
 RETURNS TRIGGER AS $$
@@ -466,3 +500,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp;
+
+-- 6. Explicit Function Execution Grants
+GRANT EXECUTE ON FUNCTION public.record_ledger_entry_and_update_balance(jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.settle_due_atomically(UUID, BIGINT, jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.import_historical_ledger_entry(jsonb) TO authenticated, service_role;
