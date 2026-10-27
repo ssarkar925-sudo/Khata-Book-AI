@@ -1,0 +1,602 @@
+'use client';
+
+import React, { useState, useRef } from 'react';
+import {
+  X,
+  Download,
+  Upload,
+  Shield,
+  Lock,
+  CheckCircle2,
+  AlertTriangle,
+  Database,
+  FileJson,
+  Copy,
+  Check,
+  RefreshCw,
+  Fingerprint,
+  RotateCcw,
+} from 'lucide-react';
+import { useAccountStore } from '@/stores/useAccountStore';
+import { useLedgerStore } from '@/stores/useLedgerStore';
+import { useCustomerStore } from '@/stores/useCustomerStore';
+import { useCardStore } from '@/stores/useCardStore';
+import { useNoteStore } from '@/stores/useNoteStore';
+import { useSheetStore } from '@/stores/useSheetStore';
+import { useVaultStore } from '@/stores/useVaultStore';
+import { useSessionStore } from '@/stores/useSessionStore';
+import { useAppLockStore } from '@/stores/useAppLockStore';
+import { syncEngine } from '@/lib/syncEngine';
+
+interface BackupRestoreModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  defaultTab?: 'backup' | 'restore' | 'security';
+}
+
+export function BackupRestoreModal({
+  isOpen,
+  onClose,
+  defaultTab = 'backup',
+}: BackupRestoreModalProps) {
+  const [activeTab, setActiveTab] = useState<'backup' | 'restore' | 'security'>(defaultTab);
+
+  // Stores
+  const { accounts, setAccounts } = useAccountStore();
+  const { entries: ledger, setEntries } = useLedgerStore();
+  const { customers, dues, setCustomers, setDues } = useCustomerStore();
+  const { cards, setCards } = useCardStore();
+  const { notes, setNotes } = useNoteStore();
+  const { sheets, setSheets } = useSheetStore();
+  const { vaultItems, setVaultItems } = useVaultStore();
+  const { workspaces, activeWorkspaceId } = useSessionStore();
+
+  // App Lock Store
+  const {
+    isLockEnabled,
+    isLockConfigured,
+    setLockEnabled,
+    configurePin,
+    removeLock,
+    lockApp,
+    isBiometricSupported,
+  } = useAppLockStore();
+
+  // Restore State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [restoreFile, setRestoreFile] = useState<any | null>(null);
+  const [restoreError, setRestoreError] = useState('');
+  const [restoreSuccess, setRestoreSuccess] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
+
+  // App Lock Form State
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [removePinInput, setRemovePinInput] = useState('');
+  const [lockMsg, setLockMsg] = useState('');
+  const [lockError, setLockError] = useState('');
+
+  if (!isOpen) return null;
+
+  // 1-Click Backup Export
+  const generateBackupPayload = () => {
+    return {
+      version: '2.0.0',
+      exported_at: new Date().toISOString(),
+      workspace_id: activeWorkspaceId,
+      data: {
+        accounts,
+        ledger,
+        customers,
+        dues,
+        cards,
+        notes,
+        sheets,
+        vaultItems,
+        workspaces,
+      },
+      counts: {
+        accounts: accounts.length,
+        ledger: ledger.length,
+        customers: customers.length,
+        dues: dues.length,
+        cards: cards.length,
+        notes: notes.length,
+        sheets: sheets.length,
+        vaultItems: vaultItems.length,
+      },
+    };
+  };
+
+  const handleDownloadBackup = () => {
+    const payload = generateBackupPayload();
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const nowStr = new Date().toISOString().slice(0, 10);
+    link.download = `RecordBook_FullBackup_${nowStr}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleCopyBackupJSON = () => {
+    const payload = generateBackupPayload();
+    navigator.clipboard.writeText(JSON.stringify(payload));
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  // 1-Click Restore File Selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRestoreError('');
+    setRestoreSuccess('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const parsed = JSON.parse(evt.target?.result as string);
+        if (!parsed.data || typeof parsed.data !== 'object') {
+          throw new Error('Invalid Record Book backup format');
+        }
+        setRestoreFile(parsed);
+      } catch (err: any) {
+        setRestoreError('Failed to parse backup JSON. Please select a valid Record Book file.');
+        setRestoreFile(null);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Confirm Restore Action
+  const handleExecuteRestore = (mode: 'replace' | 'merge') => {
+    if (!restoreFile?.data) return;
+
+    try {
+      const data = restoreFile.data;
+
+      if (mode === 'replace') {
+        if (Array.isArray(data.accounts)) setAccounts(data.accounts);
+        if (Array.isArray(data.ledger)) setEntries(data.ledger);
+        if (Array.isArray(data.customers)) setCustomers(data.customers);
+        if (Array.isArray(data.dues)) setDues(data.dues);
+        if (Array.isArray(data.cards)) setCards(data.cards);
+        if (Array.isArray(data.notes)) setNotes(data.notes);
+        if (Array.isArray(data.sheets)) setSheets(data.sheets);
+        if (Array.isArray(data.vaultItems)) setVaultItems(data.vaultItems);
+      } else {
+        // Merge
+        if (Array.isArray(data.accounts)) {
+          const ids = new Set(accounts.map((a) => a.id));
+          setAccounts([...accounts, ...data.accounts.filter((a: any) => !ids.has(a.id))]);
+        }
+        if (Array.isArray(data.ledger)) {
+          const ids = new Set(ledger.map((l) => l.id));
+          setEntries([...ledger, ...data.ledger.filter((l: any) => !ids.has(l.id))]);
+        }
+        if (Array.isArray(data.customers)) {
+          const ids = new Set(customers.map((c) => c.id));
+          setCustomers([...customers, ...data.customers.filter((c: any) => !ids.has(c.id))]);
+        }
+        if (Array.isArray(data.dues)) {
+          const ids = new Set(dues.map((d) => d.id));
+          setDues([...dues, ...data.dues.filter((d: any) => !ids.has(d.id))]);
+        }
+        if (Array.isArray(data.cards)) {
+          const ids = new Set(cards.map((c) => c.id));
+          setCards([...cards, ...data.cards.filter((c: any) => !ids.has(c.id))]);
+        }
+        if (Array.isArray(data.notes)) {
+          const ids = new Set(notes.map((n) => n.id));
+          setNotes([...notes, ...data.notes.filter((n: any) => !ids.has(n.id))]);
+        }
+        if (Array.isArray(data.sheets)) {
+          const ids = new Set(sheets.map((s) => s.id));
+          setSheets([...sheets, ...data.sheets.filter((s: any) => !ids.has(s.id))]);
+        }
+        if (Array.isArray(data.vaultItems)) {
+          const ids = new Set(vaultItems.map((v) => v.id));
+          setVaultItems([...vaultItems, ...data.vaultItems.filter((v: any) => !ids.has(v.id))]);
+        }
+      }
+
+      setRestoreSuccess('Backup data restored successfully into all modules!');
+      setTimeout(() => {
+        setRestoreFile(null);
+        setRestoreSuccess('');
+      }, 2500);
+    } catch {
+      setRestoreError('An error occurred during restore.');
+    }
+  };
+
+  // App Lock Setup Handlers
+  const handleConfigurePin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLockError('');
+    setLockMsg('');
+
+    if (newPin.length !== 4 || isNaN(Number(newPin))) {
+      setLockError('PIN must be exactly 4 digits');
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setLockError('PINs do not match');
+      return;
+    }
+
+    configurePin(newPin);
+    setLockMsg('App Lock PIN configured & activated!');
+    setNewPin('');
+    setConfirmPin('');
+  };
+
+  const handleDisableLock = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLockError('');
+    setLockMsg('');
+
+    const ok = removeLock(removePinInput);
+    if (!ok) {
+      setLockError('Incorrect current PIN');
+    } else {
+      setLockMsg('App Lock has been disabled.');
+      setRemovePinInput('');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl flex flex-col overflow-hidden max-h-[92vh]">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-white/10 flex items-center justify-between bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner">
+              <Database className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-white">Backup, Restore & Security</h3>
+              <p className="text-[11px] text-white/80">
+                1-Click JSON export, database restore & App Lock
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-white/20 text-white transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tab Controls */}
+        <div className="flex border-b border-slate-100 dark:border-white/10 px-6 pt-3 gap-2 bg-slate-50 dark:bg-white/5">
+          <button
+            onClick={() => setActiveTab('backup')}
+            className={`flex items-center gap-1.5 px-3 py-2 border-b-2 text-xs font-bold transition-all ${
+              activeTab === 'backup'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'
+            }`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Full Backup</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('restore')}
+            className={`flex items-center gap-1.5 px-3 py-2 border-b-2 text-xs font-bold transition-all ${
+              activeTab === 'restore'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'
+            }`}
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Restore Data</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('security')}
+            className={`flex items-center gap-1.5 px-3 py-2 border-b-2 text-xs font-bold transition-all ${
+              activeTab === 'security'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'
+            }`}
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>App Lock on Launch</span>
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-6 overflow-y-auto space-y-5">
+          {/* TAB 1: 1-CLICK BACKUP */}
+          {activeTab === 'backup' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-800 dark:text-blue-300">
+                <span className="font-bold block mb-1">📦 Complete Database Snapshot</span>
+                Exports all your bank balances, ledger entries, customer dues, cards, notes, custom sheets, and encrypted vault records into a single portable `.json` file.
+              </div>
+
+              {/* Inventory Checklist of what is being backed up */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center text-xs">
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Bank Accounts</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white">{accounts.length}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Transactions</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white">{ledger.length}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Khata Dues</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white">{dues.length}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Credit Cards</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white">{cards.length}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Notes</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white">{notes.length}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Record Sheets</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white">{sheets.length}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Vault Items</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white">{vaultItems.length}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Format</span>
+                  <span className="text-xs font-mono font-bold text-indigo-500">JSON 2.0</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+                <button
+                  onClick={handleDownloadBackup}
+                  className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all hover-lift touch-press"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download Full Backup (.json)</span>
+                </button>
+
+                <button
+                  onClick={handleCopyBackupJSON}
+                  className="py-3 px-4 rounded-2xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+                >
+                  {isCopied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                  <span>{isCopied ? 'Copied JSON!' : 'Copy to Clipboard'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: 1-CLICK RESTORE */}
+          {activeTab === 'restore' && (
+            <div className="space-y-4">
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".json"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
+                <span className="font-bold block mb-1">⚠️ Restore Database from File</span>
+                Upload a valid `RecordBook_FullBackup_*.json` file to restore your entire financial data seamlessly.
+              </div>
+
+              {restoreError && (
+                <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+                  {restoreError}
+                </div>
+              )}
+
+              {restoreSuccess && (
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{restoreSuccess}</span>
+                </div>
+              )}
+
+              {!restoreFile ? (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-8 border-2 border-dashed border-slate-300 dark:border-white/20 hover:border-blue-500 dark:hover:border-blue-500 rounded-3xl flex flex-col items-center justify-center text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all space-y-2"
+                >
+                  <FileJson className="w-10 h-10 text-blue-500" />
+                  <span className="font-bold">Select RecordBook Backup File (.json)</span>
+                  <span className="text-[11px] text-slate-400">Click to browse your device</span>
+                </button>
+              ) : (
+                <div className="p-4 rounded-3xl border border-slate-200 dark:border-white/10 space-y-3 bg-slate-50 dark:bg-white/5">
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-2">
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white">Backup File Verified</h4>
+                      <p className="text-[10px] text-slate-400">
+                        Exported: {restoreFile.exported_at ? new Date(restoreFile.exported_at).toLocaleString('en-IN') : 'Unknown'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setRestoreFile(null)}
+                      className="text-xs text-rose-500 hover:underline font-bold"
+                    >
+                      Change File
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-800">
+                      <span className="text-slate-400 block text-[9px] uppercase">Ledger</span>
+                      <span className="font-black text-slate-800 dark:text-slate-200">
+                        {restoreFile.data?.ledger?.length || 0}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-800">
+                      <span className="text-slate-400 block text-[9px] uppercase">Contacts</span>
+                      <span className="font-black text-slate-800 dark:text-slate-200">
+                        {restoreFile.data?.customers?.length || 0}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-800">
+                      <span className="text-slate-400 block text-[9px] uppercase">Sheets</span>
+                      <span className="font-black text-slate-800 dark:text-slate-200">
+                        {restoreFile.data?.sheets?.length || 0}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex gap-2">
+                    <button
+                      onClick={() => handleExecuteRestore('merge')}
+                      className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                    >
+                      Merge with Existing
+                    </button>
+                    <button
+                      onClick={() => handleExecuteRestore('replace')}
+                      className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/25 transition-all"
+                    >
+                      Clean Replace
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: APP LOCK ON LAUNCH */}
+          {activeTab === 'security' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-indigo-500 text-white shadow-md shadow-indigo-500/30">
+                    <Shield className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-slate-900 dark:text-white">
+                      App Lock on Launch
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Require 4-digit PIN or fingerprint when opening Record Book
+                    </p>
+                  </div>
+                </div>
+
+                {isLockConfigured && (
+                  <button
+                    onClick={lockApp}
+                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-500/25"
+                  >
+                    Lock Now
+                  </button>
+                )}
+              </div>
+
+              {lockMsg && (
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{lockMsg}</span>
+                </div>
+              )}
+
+              {lockError && (
+                <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+                  {lockError}
+                </div>
+              )}
+
+              {!isLockConfigured ? (
+                /* Configure Form */
+                <form onSubmit={handleConfigurePin} className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Choose 4-Digit Security PIN
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      required
+                      placeholder="e.g. 1234"
+                      value={newPin}
+                      onChange={(e) => setNewPin(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-center font-mono font-bold text-slate-900 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Confirm PIN
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      required
+                      placeholder="Re-type 4 digits"
+                      value={confirmPin}
+                      onChange={(e) => setConfirmPin(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-sm text-center font-mono font-bold text-slate-900 dark:text-white"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-xs shadow-md shadow-indigo-500/25 transition-all hover-lift"
+                  >
+                    Activate App Lock
+                  </button>
+                </form>
+              ) : (
+                /* Already Configured - Option to disable or change */
+                <div className="space-y-4">
+                  <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-white/10 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 block">
+                        Status: Active & Protected
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        App will ask for PIN / Fingerprint every time it opens
+                      </span>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
+                      ENABLED
+                    </span>
+                  </div>
+
+                  <form onSubmit={handleDisableLock} className="space-y-2 pt-2 border-t border-slate-100 dark:border-white/5">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                      Disable App Lock
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        maxLength={4}
+                        required
+                        placeholder="Enter current PIN"
+                        value={removePinInput}
+                        onChange={(e) => setRemovePinInput(e.target.value)}
+                        className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                      />
+                      <button
+                        type="submit"
+                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors"
+                      >
+                        Turn Off Lock
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

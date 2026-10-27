@@ -20,8 +20,10 @@ import { SheetsScreen } from '@/components/screens/SheetsScreen';
 import { ReceiptScannerModal } from '@/components/modals/ReceiptScannerModal';
 import { VoiceExpenseModal } from '@/components/modals/VoiceExpenseModal';
 import { QuickTransactionModal } from '@/components/modals/QuickTransactionModal';
+import { BackupRestoreModal } from '@/components/modals/BackupRestoreModal';
+import { AppLockScreen } from '@/components/security/AppLockScreen';
 import { syncEngine } from '@/lib/syncEngine';
-import { X, Camera, Mic } from 'lucide-react';
+import { X, Camera, Mic, Shield } from 'lucide-react';
 
 export function AppShell() {
   const { user, authLoading, theme, activeWorkspaceId, setWorkspaces, setActiveWorkspaceId, setSyncStatus, setUser } = useSessionStore();
@@ -33,6 +35,7 @@ export function AppShell() {
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
 
   // Quick transaction modals
   const [showCashModal, setShowCashModal] = useState<'in' | 'out' | null>(null);
@@ -74,13 +77,21 @@ export function AppShell() {
         isLight ? 'bg-slate-50 modern-mesh-light text-slate-900' : 'bg-[#090d16] modern-mesh-dark text-slate-100'
       }`}
     >
+      {/* Biometric / PIN App Lock Overlay */}
+      <AppLockScreen />
+
       <Navbar
         onOpenAskAI={() => setIsAskAIOpen(true)}
         onRefresh={handleRefresh}
+        onOpenBackupRestore={() => setIsBackupModalOpen(true)}
       />
 
       <div className="flex-1 flex overflow-hidden">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onOpenBackupRestore={() => setIsBackupModalOpen(true)}
+        />
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 md:pb-8 max-w-7xl mx-auto w-full">
           {activeTab === 'dashboard' && (
@@ -203,10 +214,25 @@ export function AppShell() {
               >
                 📈 Reports
               </button>
+              <button
+                onClick={() => {
+                  setIsMobileMoreOpen(false);
+                  setIsBackupModalOpen(true);
+                }}
+                className="p-3 rounded-2xl border border-blue-500/20 bg-blue-500/10 text-center font-bold text-xs text-blue-600 dark:text-blue-400"
+              >
+                🛡️ Backup & Lock
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Full Backup, Restore & App Lock Modal */}
+      <BackupRestoreModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+      />
 
       {/* Quick Transaction Modal (Inflow / Outflow / Expense) */}
       <QuickTransactionModal

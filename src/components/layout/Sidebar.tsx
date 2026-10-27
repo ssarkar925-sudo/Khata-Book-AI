@@ -10,6 +10,7 @@ import {
   StickyNote,
   Lock,
   FileSpreadsheet,
+  Shield,
 } from 'lucide-react';
 import { TabType } from '@/types';
 import { useCustomerStore } from '@/stores/useCustomerStore';
@@ -19,9 +20,10 @@ import { useSessionStore } from '@/stores/useSessionStore';
 interface SidebarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
+  onOpenBackupRestore?: () => void;
 }
 
-export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, onOpenBackupRestore }: SidebarProps) {
   const { dues } = useCustomerStore();
   const { cards } = useCardStore();
   const { theme } = useSessionStore();
@@ -149,6 +151,18 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           </button>
         );
       })}
+
+      {onOpenBackupRestore && (
+        <div className="pt-4 mt-auto">
+          <button
+            onClick={onOpenBackupRestore}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-indigo-500/20 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold text-xs transition-colors"
+          >
+            <Shield className="w-4 h-4 text-indigo-500 shrink-0" />
+            <span>Backup & App Lock</span>
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

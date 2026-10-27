@@ -9,15 +9,18 @@ import {
   Building,
   ChevronDown,
   Check,
+  Shield,
+  Database,
 } from 'lucide-react';
 import { useSessionStore } from '@/stores/useSessionStore';
 
 interface NavbarProps {
   onOpenAskAI: () => void;
   onRefresh: () => void;
+  onOpenBackupRestore?: () => void;
 }
 
-export function Navbar({ onOpenAskAI, onRefresh }: NavbarProps) {
+export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarProps) {
   const { theme, setTheme, syncStatus, workspaces, activeWorkspaceId, setActiveWorkspaceId } = useSessionStore();
   const [showWsMenu, setShowWsMenu] = useState(false);
   const isLight = theme === 'light';
@@ -137,6 +140,21 @@ export function Navbar({ onOpenAskAI, onRefresh }: NavbarProps) {
           </span>
           <RefreshCw className="w-3 h-3 hover:rotate-180 transition-transform duration-500 hidden sm:inline" />
         </button>
+
+        {/* Backup & App Lock Security Button */}
+        {onOpenBackupRestore && (
+          <button
+            onClick={onOpenBackupRestore}
+            className={`p-2 rounded-xl border transition-all touch-press ${
+              isLight
+                ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300'
+            }`}
+            title="Backup, Restore & App Lock"
+          >
+            <Shield className="w-4 h-4 text-indigo-500" />
+          </button>
+        )}
 
         {/* Theme Toggle */}
         <button
