@@ -25,7 +25,7 @@ import {
   Briefcase,
   Check,
 } from 'lucide-react';
-import { PaymentMode, LedgerEntry } from '@/types';
+import { PaymentMode, LedgerEntry, EntityScope } from '@/types';
 import { parseToPaise, formatPaise } from '@/lib/money';
 import { useAccountStore } from '@/stores/useAccountStore';
 import { EXPENSE_CATEGORIES, ExpenseCategoryDef } from '@/lib/categories';
@@ -41,6 +41,7 @@ interface QuickTransactionModalProps {
     mode: PaymentMode;
     note: string;
     entryDate: string;
+    scope?: EntityScope;
   }) => void;
 }
 
@@ -56,6 +57,9 @@ export function QuickTransactionModal({
   const [selectedCategory, setSelectedCategory] = useState('general');
   const [selectedAccountId, setSelectedAccountId] = useState(
     accounts[0]?.id || ''
+  );
+  const [selectedScope, setSelectedScope] = useState<EntityScope>(
+    accounts[0]?.scope || 'business'
   );
   const [selectedMode, setSelectedMode] = useState<PaymentMode>('upi');
   const [note, setNote] = useState('');
@@ -74,8 +78,10 @@ export function QuickTransactionModal({
       } else {
         setSelectedCategory('food');
       }
-      if (accounts.length > 0 && !selectedAccountId) {
-        setSelectedAccountId(accounts[0].id);
+      if (accounts.length > 0) {
+        const defaultAcc = accounts[0];
+        setSelectedAccountId(defaultAcc.id);
+        setSelectedScope(defaultAcc.scope || 'business');
       }
     }
   }, [isOpen, type, accounts]);
@@ -106,6 +112,7 @@ export function QuickTransactionModal({
       mode: selectedMode,
       note: note.trim(),
       entryDate: new Date(entryDate).toISOString(),
+      scope: selectedScope,
     });
   };
 
@@ -250,6 +257,36 @@ export function QuickTransactionModal({
             </div>
           </div>
 
+          {/* Sphere Selector: Business / Personal / Family */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Entity Sphere (Financial Lens)
+            </label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { id: 'business', label: '🏢 Business' },
+                { id: 'personal', label: '👤 Personal' },
+                { id: 'family', label: '👨‍👩‍👧‍👦 Family' },
+              ].map((s) => {
+                const isSelected = selectedScope === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedScope(s.id as EntityScope)}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                      isSelected
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent shadow-xs'
+                        : 'border-slate-200 dark:border-white/10 text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Paid Through / Bank Account Dropdown */}
           <div className="space-y-1.5">
             <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -257,12 +294,19 @@ export function QuickTransactionModal({
             </label>
             <select
               value={selectedAccountId}
-              onChange={(e) => setSelectedAccountId(e.target.value)}
+              onChange={(e) => {
+                const newId = e.target.value;
+                setSelectedAccountId(newId);
+                const matched = accounts.find((a) => a.id === newId);
+                if (matched && matched.scope) {
+                  setSelectedScope(matched.scope);
+                }
+              }}
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
             >
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id} className="dark:bg-slate-900">
-                  {acc.name} — Balance: {formatPaise(acc.balance)}
+                  {acc.name} ({(acc.scope || 'business').toUpperCase()}) — Balance: {formatPaise(acc.balance)}
                 </option>
               ))}
             </select>

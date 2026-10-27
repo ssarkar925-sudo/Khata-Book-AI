@@ -19,8 +19,11 @@ import {
   ArrowRight,
   Edit3,
   Trash2,
+  Globe,
+  Building2,
+  Users2,
 } from 'lucide-react';
-import { Customer, PeopleDue, CustomerType } from '@/types';
+import { Customer, PeopleDue, CustomerType, EntityScope } from '@/types';
 import { formatPaise, parseToPaise, paiseToRupees } from '@/lib/money';
 import { useCustomerStore } from '@/stores/useCustomerStore';
 import { useSessionStore } from '@/stores/useSessionStore';
@@ -34,6 +37,7 @@ export function DuesScreen() {
   const isLight = theme === 'light';
 
   // Search & Filter
+  const [selectedScope, setSelectedScope] = useState<'all' | EntityScope>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'customer' | 'supplier' | 'overdue'>('all');
 
@@ -57,6 +61,7 @@ export function DuesScreen() {
   const [editCustType, setEditCustType] = useState<CustomerType>('customer');
 
   // Add Due State
+  const [dueScope, setDueScope] = useState<EntityScope>('business');
   const [selectedCustId, setSelectedCustId] = useState('');
   const [dueAmountRupees, setDueAmountRupees] = useState('');
   const [dueDirection, setDueDirection] = useState<'you_will_get' | 'you_will_give'>('you_will_get');
@@ -145,6 +150,7 @@ export function DuesScreen() {
       customer_id: selectedCustId,
       direction: dueDirection,
       amount: paise,
+      scope: dueScope,
       due_date: targetDate.toISOString(),
       status: 'pending',
       notes: dueNotes.trim() || null,
@@ -159,7 +165,9 @@ export function DuesScreen() {
     setDueDays(7);
   };
 
-  const pendingDues = dues.filter((d) => d.status === 'pending');
+  const pendingDues = dues.filter(
+    (d) => d.status === 'pending' && (selectedScope === 'all' || (d.scope || 'business') === selectedScope)
+  );
   const nowTime = new Date().getTime();
 
   // Metrics
@@ -334,6 +342,56 @@ export function DuesScreen() {
         </div>
       </div>
 
+      {/* 4-Pill Sphere Lens Switcher */}
+      <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
+        <div className="inline-flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
+          <button
+            onClick={() => setSelectedScope('all')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'all'
+                ? 'bg-white dark:bg-cyan-600 text-cyan-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>All Spheres</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('business')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'business'
+                ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300" />
+            <span>🏢 Business</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('personal')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'personal'
+                ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300" />
+            <span>👤 Personal</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('family')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'family'
+                ? 'bg-white dark:bg-amber-600 text-amber-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300" />
+            <span>👨‍👩‍👧‍👦 Family</span>
+          </button>
+        </div>
+      </div>
+
       {/* Dual Summary Banners (Receivables vs Payables) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Receivables Banner */}
@@ -497,6 +555,18 @@ export function DuesScreen() {
                           className={`font-bold px-2 py-0.2 rounded-md border text-[10px] ${deadline.color}`}
                         >
                           {deadline.label}
+                        </span>
+                        <span>•</span>
+                        <span
+                          className={`font-black px-1.5 py-0.2 rounded text-[9px] uppercase tracking-wider ${
+                            due.scope === 'personal'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                              : due.scope === 'family'
+                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                              : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                          }`}
+                        >
+                          {due.scope ? (due.scope === 'business' ? '🏢 Biz' : due.scope === 'personal' ? '👤 Pers' : '👨‍👩‍👧‍👦 Fam') : '🏢 Biz'}
                         </span>
                       </div>
                     </div>
@@ -807,6 +877,36 @@ export function DuesScreen() {
             </div>
 
             <form onSubmit={handleCreateDue} className="space-y-4 overflow-y-auto pr-1 flex-1">
+              {/* Sphere Selector: Business / Personal / Family */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Entity Sphere (Financial Lens)
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'business', label: '🏢 Business' },
+                    { id: 'personal', label: '👤 Personal' },
+                    { id: 'family', label: '👨‍👩‍👧‍👦 Family' },
+                  ].map((s) => {
+                    const isSelected = dueScope === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setDueScope(s.id as EntityScope)}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                          isSelected
+                            ? 'bg-cyan-600 text-white border-transparent shadow-xs'
+                            : 'border-slate-200 dark:border-white/10 text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Direction Tabs */}
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">

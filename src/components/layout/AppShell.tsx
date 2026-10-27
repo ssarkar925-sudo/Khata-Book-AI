@@ -285,7 +285,7 @@ export function AppShell() {
           isOpen={showCashModal !== null}
           type={showCashModal || 'out'}
           onClose={() => setShowCashModal(null)}
-          onSubmit={({ amountPaise, categoryId, accountId, mode, note, entryDate }) => {
+          onSubmit={({ amountPaise, categoryId, accountId, mode, note, entryDate, scope }) => {
             const newEntry: LedgerEntry = {
               id: crypto.randomUUID(),
               workspace_id: activeWorkspaceId || '00000000-0000-0000-0000-000000000010',
@@ -294,6 +294,7 @@ export function AppShell() {
               category_id: categoryId,
               cash_location_id: accountId,
               mode,
+              scope: scope || 'business',
               note: note.trim() || (showCashModal === 'in' ? 'Cash Received' : 'Expense Recorded'),
               entry_date: entryDate,
             };

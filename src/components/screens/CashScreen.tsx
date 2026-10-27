@@ -18,8 +18,12 @@ import {
   Coins,
   ShieldAlert,
   Calculator,
+  Globe,
+  User,
+  Users2,
+  Building2,
 } from 'lucide-react';
-import { CashLocation, AccountType } from '@/types';
+import { CashLocation, AccountType, EntityScope } from '@/types';
 import { formatPaise, parseToPaise, paiseToRupees } from '@/lib/money';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { useAccountStore, BankAccountItem } from '@/stores/useAccountStore';
@@ -94,6 +98,7 @@ export function CashScreen() {
   const isLight = theme === 'light';
 
   // Filter state: 'all' | 'bank' | 'cash' | 'wallet'
+  const [selectedScope, setSelectedScope] = useState<'all' | EntityScope>('all');
   const [accountFilter, setAccountFilter] = useState<'all' | 'bank' | 'cash' | 'wallet'>('all');
 
   // Modals state
@@ -106,6 +111,7 @@ export function CashScreen() {
   const [accountToDelete, setAccountToDelete] = useState<BankAccountItem | null>(null);
 
   // Form state for Add Account
+  const [newAccScope, setNewAccScope] = useState<EntityScope>('business');
   const [newAccName, setNewAccName] = useState('');
   const [newAccBank, setNewAccBank] = useState('State Bank of India');
   const [newAccType, setNewAccType] = useState<AccountType>('savings');
@@ -114,6 +120,7 @@ export function CashScreen() {
   const [newAccColor, setNewAccColor] = useState('blue');
 
   // Form state for Edit Account
+  const [editScope, setEditScope] = useState<EntityScope>('business');
   const [editName, setEditName] = useState('');
   const [editBank, setEditBank] = useState('');
   const [editType, setEditType] = useState<AccountType>('savings');
@@ -127,10 +134,11 @@ export function CashScreen() {
   const [transferAmountRupees, setTransferAmountRupees] = useState('');
   const [transferNote, setTransferNote] = useState('');
 
-  const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
-
-  // Filtered accounts list
+  // Filtered accounts list respecting selected Scope
   const filteredAccounts = accounts.filter((acc) => {
+    if (selectedScope !== 'all' && (acc.scope || 'business') !== selectedScope) {
+      return false;
+    }
     if (accountFilter === 'bank') {
       return acc.account_type === 'savings' || acc.account_type === 'current' || acc.account_type === 'od_cc';
     }
@@ -143,11 +151,13 @@ export function CashScreen() {
     return true;
   });
 
-  const bankCount = accounts.filter(
+  const totalBalance = filteredAccounts.reduce((sum, a) => sum + a.balance, 0);
+
+  const bankCount = filteredAccounts.filter(
     (a) => a.account_type === 'savings' || a.account_type === 'current' || a.account_type === 'od_cc'
   ).length;
-  const cashCount = accounts.filter((a) => a.account_type === 'cash_counter').length;
-  const walletCount = accounts.filter((a) => a.account_type === 'wallet').length;
+  const cashCount = filteredAccounts.filter((a) => a.account_type === 'cash_counter').length;
+  const walletCount = filteredAccounts.filter((a) => a.account_type === 'wallet').length;
 
   // Handle Add Account
   const handleAddAccount = (e: React.FormEvent) => {
@@ -161,6 +171,7 @@ export function CashScreen() {
       workspace_id: activeWorkspaceId,
       name: newAccName.trim(),
       balance: balancePaise,
+      scope: newAccScope,
       is_default: accounts.length === 0,
       account_type: newAccType,
       bank_name: newAccType === 'cash_counter' ? 'Cash Counter' : newAccBank,
@@ -184,6 +195,7 @@ export function CashScreen() {
   const handleOpenEdit = (acc: BankAccountItem) => {
     setAccountToEdit(acc);
     setEditName(acc.name);
+    setEditScope(acc.scope || 'business');
     setEditBank(acc.bank_name || 'State Bank of India');
     setEditType(acc.account_type || 'savings');
     setEditLast4(acc.account_number_last4 || '');
@@ -203,6 +215,7 @@ export function CashScreen() {
       name: editName.trim(),
       bank_name: editType === 'cash_counter' ? 'Cash Counter' : editBank,
       account_type: editType,
+      scope: editScope,
       account_number_last4: editLast4.trim() || undefined,
       balance: newBalance,
       color_theme: editColor,
@@ -348,6 +361,56 @@ export function CashScreen() {
         </div>
       </div>
 
+      {/* 4-Pill Sphere Lens Switcher */}
+      <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
+        <div className="inline-flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
+          <button
+            onClick={() => setSelectedScope('all')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'all'
+                ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>All Spheres</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('business')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'business'
+                ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300" />
+            <span>🏢 Business</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('personal')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'personal'
+                ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300" />
+            <span>👤 Personal</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('family')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'family'
+                ? 'bg-white dark:bg-amber-600 text-amber-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300" />
+            <span>👨‍👩‍👧‍👦 Family</span>
+          </button>
+        </div>
+      </div>
+
       {/* Hero Summary Card */}
       <div className="rounded-3xl p-6 sm:p-7 bg-gradient-to-br from-emerald-950 via-teal-950 to-slate-950 text-white border border-emerald-500/25 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-teal-400/10 blur-2xl pointer-events-none" />
@@ -457,6 +520,18 @@ export function CashScreen() {
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <span
+                    className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
+                      acc.scope === 'personal'
+                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                        : acc.scope === 'family'
+                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                        : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                    }`}
+                  >
+                    {acc.scope ? (acc.scope === 'business' ? '🏢 Biz' : acc.scope === 'personal' ? '👤 Pers' : '👨‍👩‍👧‍👦 Fam') : '🏢 Biz'}
+                  </span>
+
                   {acc.is_default ? (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
                       Primary
@@ -576,6 +651,36 @@ export function CashScreen() {
             </div>
 
             <form onSubmit={handleAddAccount} className="space-y-4 overflow-y-auto pr-1 flex-1">
+              {/* Sphere Selector: Business / Personal / Family */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Entity Sphere (Financial Lens)
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'business', label: '🏢 Business' },
+                    { id: 'personal', label: '👤 Personal' },
+                    { id: 'family', label: '👨‍👩‍👧‍👦 Family' },
+                  ].map((s) => {
+                    const isSelected = newAccScope === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setNewAccScope(s.id as EntityScope)}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white border-transparent shadow-xs'
+                            : 'border-slate-200 dark:border-white/10 text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Account Type */}
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
@@ -720,6 +825,36 @@ export function CashScreen() {
             </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-4 overflow-y-auto pr-1 flex-1">
+              {/* Sphere Selector: Business / Personal / Family */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Entity Sphere (Financial Lens)
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'business', label: '🏢 Business' },
+                    { id: 'personal', label: '👤 Personal' },
+                    { id: 'family', label: '👨‍👩‍👧‍👦 Family' },
+                  ].map((s) => {
+                    const isSelected = editScope === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setEditScope(s.id as EntityScope)}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-transparent shadow-xs'
+                            : 'border-slate-200 dark:border-white/10 text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Account Type

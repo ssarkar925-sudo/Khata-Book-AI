@@ -32,8 +32,11 @@ import {
   Megaphone,
   Truck,
   HelpCircle,
+  Globe,
+  User,
+  Users2,
 } from 'lucide-react';
-import { TabType, LedgerEntry, PaymentMode } from '@/types';
+import { TabType, LedgerEntry, PaymentMode, EntityScope } from '@/types';
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useAccountStore } from '@/stores/useAccountStore';
 import { useCardStore } from '@/stores/useCardStore';
@@ -66,6 +69,7 @@ export function ExpensesScreen({
   const isLight = theme === 'light';
 
   // Filters
+  const [selectedScope, setSelectedScope] = useState<'all' | EntityScope>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedMode, setSelectedMode] = useState<string>('all');
@@ -74,6 +78,7 @@ export function ExpensesScreen({
 
   // New Expense Modal State
   const [showAddModal, setShowAddModal] = useState(false);
+  const [expenseScope, setExpenseScope] = useState<EntityScope>('business');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseNote, setExpenseNote] = useState('');
   const [expenseCategory, setExpenseCategory] = useState('food');
@@ -86,12 +91,13 @@ export function ExpensesScreen({
   const allExpenses = useMemo(() => {
     return ledger.filter(
       (e) =>
-        e.type === 'cash_out' ||
-        e.type === 'expense' ||
-        e.type === 'card_spend' ||
-        e.type === 'bill_payment'
+        (e.type === 'cash_out' ||
+          e.type === 'expense' ||
+          e.type === 'card_spend' ||
+          e.type === 'bill_payment') &&
+        (selectedScope === 'all' || (e.scope || 'business') === selectedScope)
     );
-  }, [ledger]);
+  }, [ledger, selectedScope]);
 
   // Date Filtering helper
   const dateFilteredExpenses = useMemo(() => {
@@ -214,6 +220,7 @@ export function ExpensesScreen({
       workspace_id: activeWorkspaceId || '00000000-0000-0000-0000-000000000010',
       type: expenseMode === 'card' ? 'card_spend' : 'expense',
       amount: paise,
+      scope: expenseScope,
       category_id: expenseCategory,
       cash_location_id: expenseMode !== 'card' ? expenseAccountId : undefined,
       card_id: expenseMode === 'card' ? expenseCardId : undefined,
@@ -238,14 +245,16 @@ export function ExpensesScreen({
 
   // Export CSV
   const handleExportCSV = () => {
-    const headers = ['Date', 'Amount (INR)', 'Category', 'Payment Mode', 'Source / Account', 'Note'];
+    const headers = ['Date', 'Sphere', 'Amount (INR)', 'Category', 'Payment Mode', 'Source / Account', 'Note'];
     const rows = filteredExpenses.map((e) => {
       const cat = getCategoryById(e.category_id || '');
       const acc = accounts.find((a) => a.id === e.cash_location_id);
       const card = cards.find((c) => c.id === e.card_id);
       const source = card ? `Card: ${card.name}` : acc ? `Bank: ${acc.name}` : e.mode;
+      const sphere = (e.scope || 'business').toUpperCase();
       return [
         e.entry_date.slice(0, 10),
+        sphere,
         (Number(e.amount) / 100).toFixed(2),
         cat.name,
         e.mode.toUpperCase(),
@@ -311,6 +320,56 @@ export function ExpensesScreen({
           >
             <Plus className="w-4 h-4" />
             <span>+ Add Expense</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 4-Pill Sphere Lens Switcher */}
+      <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
+        <div className="inline-flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
+          <button
+            onClick={() => setSelectedScope('all')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'all'
+                ? 'bg-white dark:bg-rose-600 text-rose-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>All Spheres</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('business')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'business'
+                ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300" />
+            <span>🏢 Business</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('personal')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'personal'
+                ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300" />
+            <span>👤 Personal</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('family')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'family'
+                ? 'bg-white dark:bg-amber-600 text-amber-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300" />
+            <span>👨‍👩‍👧‍👦 Family</span>
           </button>
         </div>
       </div>
@@ -666,6 +725,19 @@ export function ExpensesScreen({
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-slate-500 uppercase font-mono font-bold">
                           {expense.mode}
                         </span>
+
+                        {/* Sphere Badge */}
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider ${
+                            expense.scope === 'personal'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                              : expense.scope === 'family'
+                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                              : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                          }`}
+                        >
+                          {expense.scope ? (expense.scope === 'business' ? '🏢 Biz' : expense.scope === 'personal' ? '👤 Pers' : '👨‍👩‍👧‍👦 Fam') : '🏢 Biz'}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -711,6 +783,36 @@ export function ExpensesScreen({
             </div>
 
             <form onSubmit={handleCreateExpense} className="space-y-4">
+              {/* Sphere Selector: Business / Personal / Family */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Entity Sphere (Financial Lens)
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'business', label: '🏢 Business' },
+                    { id: 'personal', label: '👤 Personal' },
+                    { id: 'family', label: '👨‍👩‍👧‍👦 Family' },
+                  ].map((s) => {
+                    const isSelected = expenseScope === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setExpenseScope(s.id as EntityScope)}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                          isSelected
+                            ? 'bg-rose-600 text-white border-transparent shadow-xs'
+                            : 'border-slate-200 dark:border-white/10 text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Amount */}
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">

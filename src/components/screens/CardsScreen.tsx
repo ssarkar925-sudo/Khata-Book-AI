@@ -28,8 +28,12 @@ import {
   Edit3,
   Share2,
   Check,
+  Globe,
+  User,
+  Users2,
+  Building2,
 } from 'lucide-react';
-import { Card, LedgerEntry } from '@/types';
+import { Card, LedgerEntry, EntityScope } from '@/types';
 import { formatPaise, parseToPaise, paiseToRupees } from '@/lib/money';
 import { useCardStore } from '@/stores/useCardStore';
 import { useLedgerStore } from '@/stores/useLedgerStore';
@@ -54,6 +58,7 @@ export function CardsScreen() {
   const isLight = theme === 'light';
 
   // Active view: 'cards' or 'report'
+  const [selectedScope, setSelectedScope] = useState<'all' | EntityScope>('all');
   const [activeTab, setActiveTab] = useState<'cards' | 'report'>('cards');
   const [selectedCardForDetail, setSelectedCardForDetail] = useState<Card | null>(null);
 
@@ -65,6 +70,7 @@ export function CardsScreen() {
 
   // Edit Card State
   const [cardToEdit, setCardToEdit] = useState<Card | null>(null);
+  const [editCardScope, setEditCardScope] = useState<EntityScope>('business');
   const [editCardName, setEditCardName] = useState('');
   const [editCardBank, setEditCardBank] = useState('');
   const [editLast4, setEditLast4] = useState('');
@@ -73,11 +79,17 @@ export function CardsScreen() {
   const [editDueDay, setEditDueDay] = useState('5');
   const [copiedReminderId, setCopiedReminderId] = useState<string | null>(null);
 
-  // Billing Report calculation across all deduplicated cards
-  const billingReport = calculateAllCardsBillingReport(cards, ledger);
+  // Scoped Cards
+  const scopedCards = cards.filter(
+    (c) => selectedScope === 'all' || (c.scope || 'business') === selectedScope
+  );
+
+  // Billing Report calculation across all deduplicated scoped cards
+  const billingReport = calculateAllCardsBillingReport(scopedCards, ledger);
 
   // New Card State
   const [showAddModal, setShowAddModal] = useState(false);
+  const [cardScope, setCardScope] = useState<EntityScope>('business');
   const [cardName, setCardName] = useState('');
   const [cardBank, setCardBank] = useState('');
   const [last4, setLast4] = useState('');
@@ -160,6 +172,7 @@ export function CardsScreen() {
   const handleOpenEditCard = (card: Card) => {
     setCardToEdit(card);
     setEditCardName(card.name);
+    setEditCardScope(card.scope || 'business');
     setEditCardBank(card.bank);
     setEditLast4(card.last4);
     setEditLimitRupees(paiseToRupees(card.credit_limit).toString());
@@ -175,6 +188,7 @@ export function CardsScreen() {
       name: editCardName.trim(),
       bank: editCardBank.trim() || 'Bank',
       last4: editLast4.trim(),
+      scope: editCardScope,
       credit_limit: parseToPaise(editLimitRupees),
       statement_day: parseInt(editStatementDay, 10) || 15,
       due_day: parseInt(editDueDay, 10) || 5,
@@ -209,6 +223,7 @@ export function CardsScreen() {
       name: cardName.trim(),
       bank: cardBank.trim() || 'Bank',
       last4: last4.trim(),
+      scope: cardScope,
       credit_limit: parseToPaise(limitRupees),
       statement_day: parseInt(statementDay, 10) || 15,
       due_day: parseInt(dueDay, 10) || 5,
@@ -372,6 +387,56 @@ export function CardsScreen() {
           >
             <Plus className="w-4 h-4" />
             <span>Add Card</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 4-Pill Sphere Lens Switcher */}
+      <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
+        <div className="inline-flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
+          <button
+            onClick={() => setSelectedScope('all')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'all'
+                ? 'bg-white dark:bg-purple-600 text-purple-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>All Spheres</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('business')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'business'
+                ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300" />
+            <span>🏢 Business</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('personal')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'personal'
+                ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300" />
+            <span>👤 Personal</span>
+          </button>
+          <button
+            onClick={() => setSelectedScope('family')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedScope === 'family'
+                ? 'bg-white dark:bg-amber-600 text-amber-700 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300" />
+            <span>👨‍👩‍👧‍👦 Family</span>
           </button>
         </div>
       </div>
@@ -659,8 +724,19 @@ export function CardsScreen() {
 
                     {/* Embossed Card Number & Reminder Badge */}
                     <div className="flex items-center justify-between mt-4">
-                      <div className="font-mono text-sm tracking-widest font-semibold text-white/90 drop-shadow-sm">
-                        ••••  ••••  ••••  {card.last4}
+                      <div className="font-mono text-sm tracking-widest font-semibold text-white/90 drop-shadow-sm flex items-center gap-2">
+                        <span>•••• {card.last4}</span>
+                        <span
+                          className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
+                            card.scope === 'personal'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : card.scope === 'family'
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                          }`}
+                        >
+                          {card.scope ? (card.scope === 'business' ? '🏢 Biz' : card.scope === 'personal' ? '👤 Pers' : '👨‍👩‍👧‍👦 Fam') : '🏢 Biz'}
+                        </span>
                       </div>
                       <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${badgeColor}`}>
                         {badgeText}
@@ -1062,6 +1138,36 @@ export function CardsScreen() {
             </div>
 
             <form onSubmit={handleAddCard} className="space-y-4 overflow-y-auto pr-1 flex-1">
+              {/* Sphere Selector: Business / Personal / Family */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Entity Sphere (Financial Lens)
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'business', label: '🏢 Business' },
+                    { id: 'personal', label: '👤 Personal' },
+                    { id: 'family', label: '👨‍👩‍👧‍👦 Family' },
+                  ].map((s) => {
+                    const isSelected = cardScope === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setCardScope(s.id as EntityScope)}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                          isSelected
+                            ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                            : 'border-slate-200 dark:border-white/10 text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Card Name
@@ -1204,6 +1310,36 @@ export function CardsScreen() {
             </div>
 
             <form onSubmit={handleSaveEditCard} className="space-y-4 overflow-y-auto pr-1 flex-1">
+              {/* Sphere Selector: Business / Personal / Family */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Entity Sphere (Financial Lens)
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'business', label: '🏢 Business' },
+                    { id: 'personal', label: '👤 Personal' },
+                    { id: 'family', label: '👨‍👩‍👧‍👦 Family' },
+                  ].map((s) => {
+                    const isSelected = editCardScope === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setEditCardScope(s.id as EntityScope)}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                          isSelected
+                            ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                            : 'border-slate-200 dark:border-white/10 text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Card Nickname
