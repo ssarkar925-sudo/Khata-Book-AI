@@ -298,16 +298,39 @@ SET search_path = public, pg_temp;
 -- ============================================================================
 ALTER TABLE public.workspaces ENABLE ROW LEVEL SECURITY;
 
+-- 1. Helper with row_security = off to check membership without triggering workspace_members RLS
+CREATE OR REPLACE FUNCTION public.check_user_is_member(p_workspace_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.workspace_members
+        WHERE workspace_id = p_workspace_id AND user_id = auth.uid()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+SET row_security = off;
+
+-- 2. Helper with row_security = off to check ownership without triggering workspaces RLS
+CREATE OR REPLACE FUNCTION public.is_workspace_owner(p_workspace_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.workspaces
+        WHERE id = p_workspace_id AND owner_id = auth.uid()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+SET row_security = off;
+
 DROP POLICY IF EXISTS "Workspaces access policy" ON public.workspaces;
 DROP POLICY IF EXISTS "Workspaces select policy" ON public.workspaces;
 CREATE POLICY "Workspaces select policy" ON public.workspaces FOR SELECT
     USING (
         auth.uid() IS NOT NULL AND (
             owner_id = auth.uid() OR
-            EXISTS (
-                SELECT 1 FROM public.workspace_members
-                WHERE workspace_id = workspaces.id AND user_id = auth.uid()
-            )
+            public.check_user_is_member(id)
         )
     );
 
@@ -332,10 +355,7 @@ CREATE POLICY "Workspace members select policy" ON public.workspace_members FOR 
     USING (
         auth.uid() IS NOT NULL AND (
             user_id = auth.uid() OR
-            EXISTS (
-                SELECT 1 FROM public.workspaces
-                WHERE id = workspace_members.workspace_id AND owner_id = auth.uid()
-            )
+            public.is_workspace_owner(workspace_id)
         )
     );
 
@@ -1436,6 +1456,7 @@ GRANT EXECUTE ON FUNCTION public.get_or_create_default_workspace() TO authentica
 GRANT EXECUTE ON FUNCTION public.check_user_workspace_read(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.check_user_workspace_write(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.check_user_workspace_admin(UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.check_user_is_member(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.is_workspace_owner(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.record_ledger_entry_and_update_balance(jsonb) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.settle_due_atomically(UUID, BIGINT, jsonb) TO authenticated, service_role;
