@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   Table,
   Plus,
@@ -29,6 +29,8 @@ import {
   ListFilter,
   Maximize2,
   Sliders,
+  ArrowUp,
+  SlidersHorizontal,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useSheetStore } from '@/stores/useSheetStore';
@@ -56,7 +58,7 @@ const CELL_HIGHLIGHT_COLORS = [
   { id: '#fed7aa', label: 'Orange', bg: '#fed7aa' }, // orange-200
 ];
 
-// Helper to convert Excel date serials to clean YYYY-MM-DD or DD/MM/YYYY
+// Helper to convert Excel date serials to clean YYYY-MM-DD
 function convertExcelSerialToDate(val: any): string {
   if (val === null || val === undefined || val === '') return '';
   if (val instanceof Date) {
@@ -108,12 +110,15 @@ export function SheetsScreen() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Search & Filter
+  // Search & Display Controls
   const [searchQuery, setSearchQuery] = useState('');
   const [wrapText, setWrapText] = useState(false);
   const [density, setDensity] = useState<'compact' | 'normal' | 'spacious'>('normal');
 
-  // Currently selected cell for box coloring: { rowId, colId }
+  // Currently Selected Column (for the Excel Bar controls)
+  const [selectedColId, setSelectedColId] = useState<string | null>(null);
+
+  // Currently Selected Cell (for box coloring): { rowId, colId }
   const [selectedCell, setSelectedCell] = useState<{ rowId: string; colId: string } | null>(null);
 
   // Modals
@@ -137,7 +142,7 @@ export function SheetsScreen() {
   const [editingColId, setEditingColId] = useState<string | null>(null);
   const [colName, setColName] = useState('');
   const [colType, setColType] = useState<SheetColumnType>('text');
-  const [colWidth, setColWidth] = useState<number>(160);
+  const [colWidth, setColWidth] = useState<number>(180);
   const [colOptionsInput, setColOptionsInput] = useState('');
   const [colIsPinned, setColIsPinned] = useState(false);
 
@@ -152,6 +157,34 @@ export function SheetsScreen() {
   } | null>(null);
 
   const activeSheet = sheets.find((s) => s.id === activeSheetId) || sheets[0];
+
+  // Auto-select first column on load if none selected
+  useEffect(() => {
+    if (activeSheet && activeSheet.columns.length > 0 && !selectedColId) {
+      setSelectedColId(activeSheet.columns[0].id);
+    }
+  }, [activeSheet, selectedColId]);
+
+  // Ensure scroll position resets to top (Row 1) on sheet change
+  useEffect(() => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTop = 0;
+      tableContainerRef.current.scrollLeft = 0;
+    }
+  }, [activeSheetId]);
+
+  // 1-Click Scroll to Row 1
+  const scrollToRow1 = () => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Selected column object
+  const activeCol = useMemo(() => {
+    if (!activeSheet || !selectedColId) return null;
+    return activeSheet.columns.find((c) => c.id === selectedColId) || activeSheet.columns[0] || null;
+  }, [activeSheet, selectedColId]);
 
   // Open Edit Sheet Modal
   const openEditSheet = () => {
@@ -181,7 +214,7 @@ export function SheetsScreen() {
     setNewSheetTitle('');
   };
 
-  // Handle File Upload (.xlsx, .xls, .csv) with full Date of Birth conversion
+  // Intelligent Excel Import Parser (Finds real header row & doesn't skip data)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -190,7 +223,6 @@ export function SheetsScreen() {
     reader.onload = (evt) => {
       try {
         const data = evt.target?.result;
-        // Parse with cellDates to automatically convert Excel date serials
         const workbook = XLSX.read(data, {
           type: 'array',
           cellDates: true,
@@ -205,12 +237,23 @@ export function SheetsScreen() {
           return;
         }
 
-        const headerRow = rawJson[0] as string[];
+        // Find the actual header row (row with the most columns / non-empty values)
+        let headerRowIndex = 0;
+        let maxCols = 0;
+        for (let r = 0; r < Math.min(rawJson.length, 12); r++) {
+          const row = rawJson[r] || [];
+          const count = row.filter((c: any) => c !== undefined && c !== null && String(c).trim() !== '').length;
+          if (count > maxCols) {
+            maxCols = count;
+            headerRowIndex = r;
+          }
+        }
+
+        const headerRow = (rawJson[headerRowIndex] || []) as string[];
         const detectedColumns: SheetColumn[] = headerRow.map((h, idx) => {
           const name = String(h || `Column ${idx + 1}`).trim();
           const lower = name.toLowerCase();
 
-          // Smarter type detection
           let detectedType: SheetColumnType = 'text';
           if (
             lower.includes('birth') ||
@@ -236,17 +279,20 @@ export function SheetsScreen() {
             lower.includes('status') ||
             lower.includes('gender') ||
             lower.includes('mode') ||
-            lower.includes('verified')
+            lower.includes('type')
           ) {
             detectedType = 'select';
           }
+
+          // Dynamic column width based on column title length
+          const estimatedWidth = Math.max(140, Math.min(320, name.length * 11 + 40));
 
           return {
             id: `col_${idx}_${Date.now()}`,
             name,
             type: detectedType,
-            width: detectedType === 'date' ? 140 : 160,
-            isPinned: idx === 0, // Freeze first column by default!
+            width: estimatedWidth,
+            isPinned: idx === 0, // Freeze first column by default
           };
         });
 
@@ -258,9 +304,9 @@ export function SheetsScreen() {
           }
         });
 
-        // Data rows
+        // Parse ALL Data Rows starting immediately from headerRowIndex + 1
         const parsedRows: SheetRow[] = [];
-        for (let r = 1; r < rawJson.length; r++) {
+        for (let r = headerRowIndex + 1; r < rawJson.length; r++) {
           const rowVals = rawJson[r];
           if (!rowVals || rowVals.length === 0) continue;
           const rowData: Record<string, any> = {};
@@ -270,7 +316,7 @@ export function SheetsScreen() {
             let v = rowVals[idx];
             if (v !== undefined && v !== null && v !== '') {
               hasContent = true;
-              // If column is date or has birth/dob in name, convert serial numbers
+              // Date serial conversion
               if (col.type === 'date' || /birth|dob|date/i.test(col.name)) {
                 v = convertExcelSerialToDate(v);
               }
@@ -332,14 +378,15 @@ export function SheetsScreen() {
     );
     setShowImportModal(false);
     setPendingImport(null);
+    scrollToRow1();
   };
 
-  // Open Column Settings / Edit Column Modal
-  const openEditColumn = (col: SheetColumn) => {
+  // Open Column Settings Modal
+  const openEditColumnModal = (col: SheetColumn) => {
     setEditingColId(col.id);
     setColName(col.name);
     setColType(col.type);
-    setColWidth(col.width || 160);
+    setColWidth(col.width || 180);
     setColOptionsInput(col.options ? col.options.join(', ') : '');
     setColIsPinned(Boolean(col.isPinned));
     setShowEditColModal(true);
@@ -357,7 +404,7 @@ export function SheetsScreen() {
     updateColumn(activeSheet.id, editingColId, {
       name: colName.trim(),
       type: colType,
-      width: Math.max(80, colWidth || 160),
+      width: Math.max(90, colWidth || 180),
       options: options.length > 0 ? options : undefined,
       isPinned: colIsPinned,
     });
@@ -377,7 +424,7 @@ export function SheetsScreen() {
       id: `col_${Date.now()}`,
       name: colName.trim(),
       type: colType,
-      width: Math.max(80, colWidth || 160),
+      width: Math.max(90, colWidth || 180),
       options: options.length > 0 ? options : undefined,
       isPinned: colIsPinned,
     };
@@ -385,9 +432,10 @@ export function SheetsScreen() {
     setShowNewColModal(false);
     setColName('');
     setColOptionsInput('');
+    setSelectedColId(newCol.id);
   };
 
-  // 1-Click Quick Add Row for effortless continuation
+  // Quick 1-Click Continuation Row
   const handleQuickAddRow = () => {
     if (!activeSheet) return;
     const blankData: Record<string, any> = {};
@@ -410,12 +458,12 @@ export function SheetsScreen() {
     if (!activeSheet) return;
     const col = activeSheet.columns.find((c) => c.id === colId);
     if (!col) return;
-    const currentW = col.width || 160;
-    const newW = Math.max(90, Math.min(500, currentW + delta));
+    const currentW = col.width || 180;
+    const newW = Math.max(90, Math.min(600, currentW + delta));
     updateColumn(activeSheet.id, colId, { width: newW });
   };
 
-  // Cell Background Color (Selected Box Color)
+  // Cell Background Color (Color in Selected Box)
   const handleApplyCellColor = (colorHex: string) => {
     if (!activeSheet || !selectedCell) return;
     setCellColor(
@@ -429,7 +477,7 @@ export function SheetsScreen() {
   // Scroll Helpers
   const scrollTable = (direction: 'left' | 'right') => {
     if (tableContainerRef.current) {
-      const offset = direction === 'left' ? -300 : 300;
+      const offset = direction === 'left' ? -350 : 350;
       tableContainerRef.current.scrollBy({ left: offset, behavior: 'smooth' });
     }
   };
@@ -448,25 +496,6 @@ export function SheetsScreen() {
       wb,
       `${activeSheet.title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`
     );
-  };
-
-  // Export to CSV
-  const handleExportCSV = () => {
-    if (!activeSheet) return;
-    const headers = activeSheet.columns.map((c) => c.name);
-    const rows = activeSheet.rows.map((r) =>
-      activeSheet.columns.map((c) => `"${(r.data[c.id] || '').toString().replace(/"/g, '""')}"`)
-    );
-
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${activeSheet.title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   // Filtered rows
@@ -498,10 +527,10 @@ export function SheetsScreen() {
   });
 
   const densityPadding =
-    density === 'compact' ? 'py-1 px-2' : density === 'spacious' ? 'py-3 px-3.5' : 'py-2 px-2.5';
+    density === 'compact' ? 'py-1 px-2.5' : density === 'spacious' ? 'py-3.5 px-3.5' : 'py-2 px-3';
 
   return (
-    <div className="space-y-5 animate-fade-in pb-16">
+    <div className="space-y-4 animate-fade-in pb-16">
       <input
         type="file"
         ref={fileInputRef}
@@ -519,8 +548,8 @@ export function SheetsScreen() {
             </div>
             <span>Record Sheets & Excel Grid</span>
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Excel-grade table with freeze columns, dropdown options, cell highlighting & auto-sums.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Full-featured spreadsheet. Dropdown menus, DOB date formatting, column freeze & Excel ribbon bar.
           </p>
         </div>
 
@@ -544,7 +573,7 @@ export function SheetsScreen() {
       </div>
 
       {/* Sheet Tabs Strip with Distinct Colors */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200 dark:border-white/10 scrollbar-none">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200 dark:border-white/10 scrollbar-none">
         {sheets.map((sheet) => {
           const isActive = sheet.id === activeSheet?.id;
           const sheetColor = sheet.color || '#6366F1';
@@ -552,8 +581,11 @@ export function SheetsScreen() {
           return (
             <button
               key={sheet.id}
-              onClick={() => setActiveSheetId(sheet.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all touch-press ${
+              onClick={() => {
+                setActiveSheetId(sheet.id);
+                scrollToRow1();
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all touch-press ${
                 isActive
                   ? 'text-white shadow-md'
                   : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
@@ -582,280 +614,318 @@ export function SheetsScreen() {
 
       {activeSheet && (
         <div
-          className={`rounded-3xl border p-4 sm:p-5 transition-all ${
-            isLight ? 'bg-white border-slate-200/90 shadow-sm' : 'bg-slate-900/80 border-white/10 shadow-lg'
+          className={`rounded-3xl border shadow-sm transition-all overflow-hidden ${
+            isLight ? 'bg-white border-slate-200/90' : 'bg-slate-900/90 border-white/10'
           }`}
         >
-          {/* Main Action & Formatting Toolbar */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-3 pb-3 border-b border-slate-100 dark:border-white/5">
-            {/* Search Bar */}
-            <div className="relative w-full lg:w-72">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder={`Search ${activeSheet.rows.length} records...`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+          {/* ========================================================
+              TOP EXCEL RIBBON BAR (ALL SETTINGS MOVED HERE)
+             ======================================================== */}
+          <div className="p-3.5 space-y-3 border-b border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-slate-800/40">
+            {/* Ribbon Row 1: Global Actions & Search */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Search */}
+                <div className="relative w-56 sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder={`Search ${activeSheet.rows.length} records...`}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-            {/* Quick Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Add Continuation Row */}
-              <button
-                onClick={handleQuickAddRow}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition-all hover-lift touch-press"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Add Row</span>
-              </button>
-
-              {/* Add Column */}
-              <button
-                onClick={() => {
-                  setColName('');
-                  setColType('text');
-                  setColWidth(160);
-                  setColOptionsInput('');
-                  setColIsPinned(false);
-                  setShowNewColModal(true);
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
-              >
-                <Columns className="w-3.5 h-3.5" />
-                <span>+ Column</span>
-              </button>
-
-              {/* Wrap Text Toggle */}
-              <button
-                onClick={() => setWrapText(!wrapText)}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
-                  wrapText
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
-                }`}
-                title="Toggle Text Wrap / Single-line scroll"
-              >
-                <WrapText className="w-3.5 h-3.5" />
-                <span>{wrapText ? 'Wrap: On' : 'Wrap: Off'}</span>
-              </button>
-
-              {/* Density Selector */}
-              <div className="flex rounded-xl border border-slate-200 dark:border-white/10 p-0.5 text-[11px] font-bold">
+                {/* 1-Click Jump to Row 1 (Top) */}
                 <button
-                  onClick={() => setDensity('compact')}
-                  className={`px-2 py-0.5 rounded-lg transition-all ${
-                    density === 'compact' ? 'bg-blue-600 text-white' : 'text-slate-500'
-                  }`}
-                  title="Compact Row Height"
+                  onClick={scrollToRow1}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold text-xs border border-blue-200 dark:border-blue-500/20 transition-colors"
+                  title="Scroll back to Row 1 (First line)"
                 >
-                  Compact
+                  <ArrowUp className="w-3.5 h-3.5" />
+                  <span>Go to Row 1</span>
                 </button>
+
+                {/* Quick Add Row */}
                 <button
-                  onClick={() => setDensity('normal')}
-                  className={`px-2 py-0.5 rounded-lg transition-all ${
-                    density === 'normal' ? 'bg-blue-600 text-white' : 'text-slate-500'
-                  }`}
-                  title="Normal Row Height"
+                  onClick={handleQuickAddRow}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-all hover-lift touch-press"
+                  title="Add continuation row"
                 >
-                  Normal
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Row</span>
                 </button>
-              </div>
 
-              {/* Horizontal Scroll Helper Arrows */}
-              <div className="flex items-center gap-1 border-l border-slate-200 dark:border-white/10 pl-2">
-                <button
-                  onClick={() => scrollTable('left')}
-                  className="p-1.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-600 dark:text-slate-300"
-                  title="Scroll Left"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => scrollTable('right')}
-                  className="p-1.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-600 dark:text-slate-300"
-                  title="Scroll Right"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Sheet Settings & Color */}
-              <button
-                onClick={openEditSheet}
-                className="p-1.5 rounded-xl border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
-                title="Sheet Color & Title"
-              >
-                <Palette className="w-3.5 h-3.5 text-blue-500" />
-              </button>
-
-              {/* Export XLSX */}
-              <button
-                onClick={handleExportXLSX}
-                className="px-2.5 py-1.5 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-500/10"
-                title="Export Excel .xlsx"
-              >
-                .XLSX
-              </button>
-
-              {/* Delete Sheet */}
-              {sheets.length > 1 && (
+                {/* Quick Add Column */}
                 <button
                   onClick={() => {
-                    if (confirm(`Delete sheet "${activeSheet.title}" and its ${activeSheet.rows.length} rows?`)) {
-                      deleteSheet(activeSheet.id);
-                    }
+                    setColName('');
+                    setColType('text');
+                    setColWidth(180);
+                    setColOptionsInput('');
+                    setColIsPinned(false);
+                    setShowNewColModal(true);
                   }}
-                  className="p-1.5 rounded-xl text-rose-500 hover:bg-rose-500/10"
-                  title="Delete Sheet"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                  title="Add new column"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Columns className="w-3.5 h-3.5" />
+                  <span>+ Column</span>
                 </button>
+              </div>
+
+              {/* View & Density Controls */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Wrap Text Toggle */}
+                <button
+                  onClick={() => setWrapText(!wrapText)}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
+                    wrapText
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                  title="Toggle text wrapping"
+                >
+                  <WrapText className="w-3.5 h-3.5" />
+                  <span>{wrapText ? 'Wrap: On' : 'Wrap: Off'}</span>
+                </button>
+
+                {/* Density: Compact / Normal */}
+                <div className="flex rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-0.5 text-[11px] font-bold">
+                  <button
+                    onClick={() => setDensity('compact')}
+                    className={`px-2 py-0.5 rounded-lg transition-all ${
+                      density === 'compact' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                    }`}
+                  >
+                    Compact
+                  </button>
+                  <button
+                    onClick={() => setDensity('normal')}
+                    className={`px-2 py-0.5 rounded-lg transition-all ${
+                      density === 'normal' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                    }`}
+                  >
+                    Normal
+                  </button>
+                </div>
+
+                {/* Horizontal Scroll Arrows */}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => scrollTable('left')}
+                    className="p-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                    title="Scroll Left"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => scrollTable('right')}
+                    className="p-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                    title="Scroll Right"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Sheet Title & Color */}
+                <button
+                  onClick={openEditSheet}
+                  className="p-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                  title="Sheet Color & Title"
+                >
+                  <Palette className="w-3.5 h-3.5 text-blue-500" />
+                </button>
+
+                {/* Export XLSX */}
+                <button
+                  onClick={handleExportXLSX}
+                  className="px-2.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-500/10"
+                  title="Download Excel .xlsx"
+                >
+                  .XLSX
+                </button>
+              </div>
+            </div>
+
+            {/* Ribbon Row 2: Selected Column Settings & Cell Box Color Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2 border-t border-slate-200/80 dark:border-white/5">
+              {/* Active Column Inspector */}
+              {activeCol ? (
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 font-bold">
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>Column:</span>
+                    <span className="text-slate-900 dark:text-white font-mono">{activeCol.name}</span>
+                  </div>
+
+                  {/* Freeze Column Button */}
+                  <button
+                    onClick={() => handleToggleFreezeColumn(activeCol.id)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border font-semibold transition-colors ${
+                      activeCol.isPinned
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                    }`}
+                    title={activeCol.isPinned ? 'Unfreeze Column' : 'Freeze Column on Left'}
+                  >
+                    {activeCol.isPinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+                    <span>{activeCol.isPinned ? 'Frozen (Left)' : 'Freeze Column'}</span>
+                  </button>
+
+                  {/* Width Adjusters */}
+                  <div className="flex items-center rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 px-1 py-0.5">
+                    <button
+                      onClick={() => handleAdjustColumnWidth(activeCol.id, -20)}
+                      className="px-1.5 py-0.5 text-slate-600 dark:text-slate-300 hover:text-blue-500 font-bold"
+                      title="Make Column Narrower"
+                    >
+                      −
+                    </button>
+                    <span className="px-1.5 text-[10px] font-mono text-slate-500">
+                      {activeCol.width || 180}px
+                    </span>
+                    <button
+                      onClick={() => handleAdjustColumnWidth(activeCol.id, 20)}
+                      className="px-1.5 py-0.5 text-slate-600 dark:text-slate-300 hover:text-blue-500 font-bold"
+                      title="Make Column Wider"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Edit Column Type / Dropdown Options */}
+                  <button
+                    onClick={() => openEditColumnModal(activeCol)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 font-semibold"
+                  >
+                    <Settings className="w-3 h-3 text-blue-500" />
+                    <span>Options / Type ({activeCol.type})</span>
+                  </button>
+
+                  {/* Delete Column */}
+                  {activeSheet.columns.length > 1 && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`Delete column "${activeCol.name}"?`)) {
+                          deleteColumn(activeSheet.id, activeCol.id);
+                        }
+                      }}
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10"
+                      title="Delete this column"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="text-xs text-slate-400 italic">
+                  Click any column header below to inspect its settings
+                </div>
               )}
+
+              {/* Color Selected Box / Cell Palette */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-bold text-slate-500 flex items-center gap-1 text-[11px]">
+                  <Paintbrush className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Color Box:</span>
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {CELL_HIGHLIGHT_COLORS.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleApplyCellColor(c.id)}
+                      className="w-5 h-5 rounded-md border border-black/20 dark:border-white/20 transition-transform hover:scale-125 shadow-xs"
+                      style={{ backgroundColor: c.bg }}
+                      title={`Highlight Box: ${c.label}`}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Cell Highlight Color Palette (Color Selected Box) */}
-          <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs">
-            <span className="font-bold text-slate-500 flex items-center gap-1.5 text-[11px]">
-              <Paintbrush className="w-3.5 h-3.5 text-amber-500" />
-              <span>Color in Selected Box:</span>
-            </span>
-
-            {selectedCell ? (
-              <div className="flex items-center gap-1.5">
-                {CELL_HIGHLIGHT_COLORS.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => handleApplyCellColor(c.id)}
-                    className="w-5 h-5 rounded-md border border-black/20 dark:border-white/20 transition-transform hover:scale-125 shadow-xs"
-                    style={{ backgroundColor: c.bg }}
-                    title={`Highlight ${c.label}`}
-                  />
-                ))}
-              </div>
-            ) : (
-              <span className="text-[11px] text-slate-400 italic">
-                (Click any cell below to highlight it)
-              </span>
-            )}
-          </div>
-
-          {/* SPREADSHEET GRID TABLE CONTAINER */}
+          {/* ========================================================
+              SPREADSHEET GRID TABLE (CLEAN HEADERS WITH NO CLUTTER)
+             ======================================================== */}
           <div
             ref={tableContainerRef}
-            className="overflow-x-auto overflow-y-auto max-h-[70vh] rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-xs relative"
+            className="overflow-x-auto overflow-y-auto max-h-[72vh] relative"
           >
             <table className="w-full text-left text-xs border-collapse">
               {/* Sticky Table Header */}
-              <thead className="sticky top-0 z-30 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold uppercase tracking-wider text-[11px] select-none border-b border-slate-300 dark:border-slate-700">
+              <thead className="sticky top-0 z-30 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold uppercase tracking-wider text-[11px] select-none border-b-2 border-slate-300 dark:border-slate-700 shadow-xs">
                 <tr>
                   {/* Sticky Index Column Header */}
-                  <th className="sticky left-0 z-40 bg-slate-200 dark:bg-slate-800 py-2.5 px-2 w-12 text-center text-slate-500 border-r border-slate-300 dark:border-slate-700">
+                  <th className="sticky left-0 z-40 bg-slate-200 dark:bg-slate-800 py-3 px-3 w-12 text-center text-slate-500 border-r border-slate-300 dark:border-slate-700">
                     #
                   </th>
 
                   {activeSheet.columns.map((col, idx) => {
                     const isPinned = Boolean(col.isPinned);
-                    const colW = col.width || 160;
+                    const isSelectedCol = selectedColId === col.id;
+                    const colW = col.width || 180;
 
                     return (
                       <th
                         key={col.id}
+                        onClick={() => setSelectedColId(col.id)}
                         style={{
                           width: `${colW}px`,
                           minWidth: `${colW}px`,
                           maxWidth: `${colW}px`,
-                          left: isPinned ? `${48 + idx * 160}px` : undefined,
+                          left: isPinned ? `${48 + idx * 180}px` : undefined,
                         }}
-                        className={`py-2.5 px-3 border-r border-slate-300 dark:border-slate-700 transition-colors ${
+                        className={`py-3 px-3.5 border-r border-slate-300 dark:border-slate-700 cursor-pointer transition-colors ${
                           isPinned
-                            ? 'sticky z-40 bg-blue-50 dark:bg-slate-800 border-r-2 border-r-blue-500'
-                            : 'bg-slate-100 dark:bg-slate-800'
+                            ? 'sticky z-40 bg-blue-50/90 dark:bg-slate-800 border-r-2 border-r-blue-500'
+                            : isSelectedCol
+                            ? 'bg-blue-100/70 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200'
+                            : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700'
                         }`}
+                        title="Click to select this column and adjust settings in Excel Bar"
                       >
-                        <div className="flex items-center justify-between gap-1">
-                          <div className="flex items-center gap-1 truncate">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-1.5 truncate">
                             {isPinned && <Pin className="w-3 h-3 text-blue-500 shrink-0" />}
-                            <span className="truncate font-black">{col.name}</span>
+                            <span className="truncate font-extrabold text-slate-900 dark:text-white">
+                              {col.name}
+                            </span>
                           </div>
 
-                          {/* Column Controls Header Menu */}
-                          <div className="flex items-center gap-0.5 shrink-0 opacity-70 hover:opacity-100">
-                            {/* Width Adjusters */}
-                            <button
-                              onClick={() => handleAdjustColumnWidth(col.id, -20)}
-                              className="px-1 text-[10px] text-slate-500 hover:text-slate-900 dark:hover:text-white"
-                              title="Narrow Column"
-                            >
-                              −
-                            </button>
-                            <button
-                              onClick={() => handleAdjustColumnWidth(col.id, 20)}
-                              className="px-1 text-[10px] text-slate-500 hover:text-slate-900 dark:hover:text-white"
-                              title="Widen Column"
-                            >
-                              +
-                            </button>
-
-                            {/* Pin / Freeze Toggle */}
-                            <button
-                              onClick={() => handleToggleFreezeColumn(col.id)}
-                              className={`p-1 hover:text-blue-500 ${
-                                isPinned ? 'text-blue-500' : 'text-slate-400'
-                              }`}
-                              title={isPinned ? 'Unfreeze Column' : 'Freeze Column (Stay on left)'}
-                            >
-                              {isPinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
-                            </button>
-
-                            {/* Column Settings Modal */}
-                            <button
-                              onClick={() => openEditColumn(col)}
-                              className="p-1 text-slate-400 hover:text-blue-500"
-                              title="Column Type & Dropdown Options"
-                            >
-                              <Settings className="w-3 h-3" />
-                            </button>
-
-                            {activeSheet.columns.length > 1 && (
-                              <button
-                                onClick={() => deleteColumn(activeSheet.id, col.id)}
-                                className="p-1 text-slate-400 hover:text-rose-500"
-                                title="Delete Column"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            )}
-                          </div>
+                          <span className="text-[9px] lowercase font-normal opacity-50 shrink-0">
+                            {col.type}
+                          </span>
                         </div>
                       </th>
                     );
                   })}
-                  <th className="py-2.5 px-3 w-14 text-center border-slate-300 dark:border-slate-700">Del</th>
+                  <th className="py-3 px-2 w-12 text-center text-slate-400 border-slate-300 dark:border-slate-700">
+                    Del
+                  </th>
                 </tr>
               </thead>
 
-              {/* Table Body with Cells */}
+              {/* Table Body */}
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700/80">
                 {filteredRows.length === 0 ? (
                   <tr>
                     <td
                       colSpan={activeSheet.columns.length + 2}
-                      className="py-12 text-center text-slate-400 text-xs"
+                      className="py-16 text-center text-slate-400 text-xs"
                     >
-                      No records found. Click &quot;+ Add Row&quot; to begin.
+                      No records found. Click &quot;+ Row&quot; or upload an Excel file.
                     </td>
                   </tr>
                 ) : (
                   filteredRows.map((row, rowIdx) => (
                     <tr
                       key={row.id}
-                      className="hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors group"
+                      className="hover:bg-slate-50/70 dark:hover:bg-white/5 transition-colors group"
                     >
-                      {/* Sticky Row Index Cell */}
-                      <td className="sticky left-0 z-20 bg-slate-100 dark:bg-slate-800 text-center text-slate-400 font-mono text-[11px] py-2 px-2 border-r border-slate-300 dark:border-slate-700">
+                      {/* Row Index Number (1, 2, 3...) */}
+                      <td className="sticky left-0 z-20 bg-slate-100 dark:bg-slate-800 text-center text-slate-500 font-mono text-[11px] py-2 px-2.5 border-r border-slate-300 dark:border-slate-700">
                         {rowIdx + 1}
                       </td>
 
@@ -863,33 +933,39 @@ export function SheetsScreen() {
                         const cellVal = row.data[col.id] ?? '';
                         const cellColor = row.data[`_color_${col.id}`];
                         const isPinned = Boolean(col.isPinned);
-                        const colW = col.width || 160;
-                        const isSelected =
+                        const isSelectedCol = selectedColId === col.id;
+                        const colW = col.width || 180;
+                        const isSelectedCell =
                           selectedCell?.rowId === row.id && selectedCell?.colId === col.id;
 
-                        // Clean display value for date
+                        // Date serial formatting
                         const displayVal =
                           col.type === 'date' ? convertExcelSerialToDate(cellVal) : cellVal;
 
                         return (
                           <td
                             key={col.id}
-                            onClick={() => setSelectedCell({ rowId: row.id, colId: col.id })}
+                            onClick={() => {
+                              setSelectedCell({ rowId: row.id, colId: col.id });
+                              setSelectedColId(col.id);
+                            }}
                             style={{
                               width: `${colW}px`,
                               minWidth: `${colW}px`,
                               maxWidth: `${colW}px`,
                               backgroundColor: cellColor || undefined,
-                              left: isPinned ? `${48 + colIdx * 160}px` : undefined,
+                              left: isPinned ? `${48 + colIdx * 180}px` : undefined,
                             }}
                             className={`${densityPadding} border-r border-slate-200 dark:border-slate-700/80 relative transition-colors ${
                               isPinned
                                 ? 'sticky z-20 border-r-2 border-r-blue-500 ' +
                                   (cellColor ? '' : isLight ? 'bg-white' : 'bg-slate-900')
+                                : isSelectedCol && !cellColor
+                                ? 'bg-blue-50/20 dark:bg-blue-950/10'
                                 : ''
-                            } ${isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
+                            } ${isSelectedCell ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
                           >
-                            {/* CASE 1: DROPDOWN MENU (select or status with options) */}
+                            {/* CASE 1: DROPDOWN MENU */}
                             {col.type === 'select' || (col.options && col.options.length > 0) ? (
                               <div className="relative">
                                 <select
@@ -942,7 +1018,7 @@ export function SheetsScreen() {
                                   updateCell(activeSheet.id, row.id, col.id, e.target.value)
                                 }
                                 onKeyDown={(e) => {
-                                  // Press Enter on the last row to automatically append a new continuation row
+                                  // Press Enter in last row to add continuation row
                                   if (e.key === 'Enter' && rowIdx === filteredRows.length - 1) {
                                     handleQuickAddRow();
                                   }
@@ -962,11 +1038,11 @@ export function SheetsScreen() {
                         );
                       })}
 
-                      {/* Delete Row Button */}
-                      <td className="py-1.5 px-3 text-center border-slate-200 dark:border-slate-700">
+                      {/* Row Delete Button */}
+                      <td className="py-1 px-2 text-center border-slate-200 dark:border-slate-700">
                         <button
                           onClick={() => deleteRow(activeSheet.id, row.id)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-rose-500 transition-colors"
+                          className="p-1 rounded-lg text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
                           title="Delete Row"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -976,7 +1052,7 @@ export function SheetsScreen() {
                   ))
                 )}
 
-                {/* PERMANENT CONTINUATION ROW: Click to effortlessly add another row */}
+                {/* PERMANENT CONTINUATION ROW: 1-Click add row */}
                 <tr
                   onClick={handleQuickAddRow}
                   className="cursor-pointer bg-slate-50/70 dark:bg-white/5 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors border-t border-dashed border-slate-300 dark:border-slate-700"
@@ -993,7 +1069,7 @@ export function SheetsScreen() {
                 </tr>
               </tbody>
 
-              {/* Summary / Calculation Row */}
+              {/* Bottom Auto-Sum Row */}
               {activeSheet.rows.length > 0 && (
                 <tfoot className="sticky bottom-0 z-20 bg-slate-100 dark:bg-slate-800 font-bold border-t-2 border-slate-300 dark:border-slate-700 text-xs select-none">
                   <tr>
@@ -1003,7 +1079,7 @@ export function SheetsScreen() {
                     {activeSheet.columns.map((col, idx) => {
                       const summary = columnSummaries?.find((s) => s.id === col.id);
                       const isPinned = Boolean(col.isPinned);
-                      const colW = col.width || 160;
+                      const colW = col.width || 180;
 
                       return (
                         <td
@@ -1012,7 +1088,7 @@ export function SheetsScreen() {
                             width: `${colW}px`,
                             minWidth: `${colW}px`,
                             maxWidth: `${colW}px`,
-                            left: isPinned ? `${48 + idx * 160}px` : undefined,
+                            left: isPinned ? `${48 + idx * 180}px` : undefined,
                           }}
                           className={`py-2 px-3 border-r border-slate-300 dark:border-slate-700 ${
                             isPinned ? 'sticky z-30 bg-slate-200 dark:bg-slate-800 border-r-2 border-r-blue-500' : ''
@@ -1035,7 +1111,7 @@ export function SheetsScreen() {
                         </td>
                       );
                     })}
-                    <td className="py-2 px-3" />
+                    <td className="py-2 px-2" />
                   </tr>
                 </tfoot>
               )}
@@ -1055,7 +1131,7 @@ export function SheetsScreen() {
                 </div>
                 <div>
                   <h3 className="font-bold text-base text-slate-900 dark:text-white">Import Excel Sheet</h3>
-                  <p className="text-[11px] text-slate-400">Dates of birth & columns converted accurately</p>
+                  <p className="text-[11px] text-slate-400">Headers and all data rows verified</p>
                 </div>
               </div>
               <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white">
@@ -1126,13 +1202,13 @@ export function SheetsScreen() {
         </div>
       )}
 
-      {/* MODAL 2: Column Settings & Dropdown Options */}
+      {/* MODAL 2: Column Settings (from Excel Bar) */}
       {(showNewColModal || showEditColModal) && activeSheet && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
               <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                {showEditColModal ? 'Edit Column Settings' : 'Add Column to Sheet'}
+                {showEditColModal ? 'Column Settings & Options' : 'Add Column to Sheet'}
               </h3>
               <button
                 onClick={() => {
@@ -1170,7 +1246,7 @@ export function SheetsScreen() {
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
                 >
                   <option value="text">Text (General Free-form)</option>
-                  <option value="date">📅 Date (Date of Birth / Deadline)</option>
+                  <option value="date">📅 Date (Date of Birth / Calendar)</option>
                   <option value="select">📋 Dropdown Menu (Choose from Options)</option>
                   <option value="amount">💰 Amount (₹ Auto-sum)</option>
                   <option value="number">🔢 Number (Auto-calculated)</option>
@@ -1187,13 +1263,13 @@ export function SheetsScreen() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Active, Pending, Completed, Cancelled"
+                    placeholder="e.g. Active, Pending, Completed, Male, Female"
                     value={colOptionsInput}
                     onChange={(e) => setColOptionsInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
                   />
                   <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    Users will select from this dropdown list instead of typing
+                    Cells in this column will show a clickable dropdown select menu
                   </span>
                 </div>
               )}
@@ -1207,7 +1283,7 @@ export function SheetsScreen() {
                   <input
                     type="number"
                     min={90}
-                    max={500}
+                    max={600}
                     value={colWidth}
                     onChange={(e) => setColWidth(Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs font-mono font-bold"
@@ -1244,7 +1320,7 @@ export function SheetsScreen() {
                   type="submit"
                   className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/25"
                 >
-                  {showEditColModal ? 'Save Column' : 'Add Column'}
+                  {showEditColModal ? 'Save Settings' : 'Add Column'}
                 </button>
               </div>
             </form>
