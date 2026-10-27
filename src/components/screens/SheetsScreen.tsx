@@ -22,6 +22,8 @@ import {
   ChevronRight,
   WrapText,
   AlignLeft,
+  AlignCenter,
+  AlignRight,
   ChevronDown,
   Paintbrush,
   Calendar,
@@ -30,7 +32,17 @@ import {
   Maximize2,
   Sliders,
   ArrowUp,
+  ArrowDown,
   SlidersHorizontal,
+  Bold,
+  Italic,
+  Copy,
+  Grid,
+  ArrowUpDown,
+  CornerDownLeft,
+  Type,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useSheetStore } from '@/stores/useSheetStore';
@@ -49,13 +61,23 @@ const SHEET_COLORS = [
 ];
 
 const CELL_HIGHLIGHT_COLORS = [
-  { id: 'none', label: 'Clear', bg: 'transparent', border: 'border-slate-300 dark:border-white/20' },
+  { id: 'none', label: 'Clear Fill', bg: 'transparent', border: 'border-slate-300 dark:border-white/20' },
   { id: '#fef08a', label: 'Yellow', bg: '#fef08a' }, // yellow-200
   { id: '#bbf7d0', label: 'Green', bg: '#bbf7d0' }, // green-200
   { id: '#fecdd3', label: 'Red', bg: '#fecdd3' }, // rose-200
   { id: '#bfdbfe', label: 'Blue', bg: '#bfdbfe' }, // blue-200
   { id: '#e9d5ff', label: 'Purple', bg: '#e9d5ff' }, // purple-200
   { id: '#fed7aa', label: 'Orange', bg: '#fed7aa' }, // orange-200
+];
+
+const TEXT_COLORS = [
+  { id: 'default', label: 'Default Text', color: 'inherit' },
+  { id: '#0f172a', label: 'Black', color: '#0f172a' },
+  { id: '#2563eb', label: 'Blue', color: '#2563eb' },
+  { id: '#16a34a', label: 'Green', color: '#16a34a' },
+  { id: '#dc2626', label: 'Red', color: '#dc2626' },
+  { id: '#d97706', label: 'Amber', color: '#d97706' },
+  { id: '#9333ea', label: 'Purple', color: '#9333ea' },
 ];
 
 // Helper to convert Excel date serials to clean YYYY-MM-DD
@@ -68,11 +90,9 @@ function convertExcelSerialToDate(val: any): string {
     return `${y}-${m}-${d}`;
   }
   const str = String(val).trim();
-  // If already in YYYY-MM-DD or DD/MM/YYYY format, keep it
   if (/^\d{4}-\d{2}-\d{2}$/.test(str) || /^\d{2}[-/]\d{2}[-/]\d{4}$/.test(str)) {
     return str;
   }
-  // Check if it's an Excel serial number (between 1000 and 65000)
   const num = parseFloat(str);
   if (!isNaN(num) && num > 1000 && num < 65000 && !str.includes('-') && !str.includes('/')) {
     const date = new Date(Math.round((num - 25569) * 86400 * 1000));
@@ -84,6 +104,18 @@ function convertExcelSerialToDate(val: any): string {
     }
   }
   return str;
+}
+
+// Convert 0-based column index to Excel column letter (0 -> A, 1 -> B, 26 -> AA)
+function getColumnLetter(colIndex: number): string {
+  if (colIndex < 0) return 'A';
+  let letter = '';
+  let temp = colIndex;
+  while (temp >= 0) {
+    letter = String.fromCharCode((temp % 26) + 65) + letter;
+    temp = Math.floor(temp / 26) - 1;
+  }
+  return letter;
 }
 
 export function SheetsScreen() {
@@ -102,6 +134,14 @@ export function SheetsScreen() {
     updateColumn,
     deleteColumn,
     setCellColor,
+    setFrozenRowCount,
+    insertRowAbove,
+    insertRowBelow,
+    duplicateRow,
+    setRowHeight,
+    sortSheetByColumn,
+    setCellFormat,
+    insertColumnAt,
   } = useSheetStore();
 
   const { theme } = useSessionStore();
@@ -113,13 +153,15 @@ export function SheetsScreen() {
   // Search & Display Controls
   const [searchQuery, setSearchQuery] = useState('');
   const [wrapText, setWrapText] = useState(false);
-  const [density, setDensity] = useState<'compact' | 'normal' | 'spacious'>('normal');
+  const [showGridlines, setShowGridlines] = useState(true);
 
-  // Currently Selected Column (for the Excel Bar controls)
+  // Selection states
   const [selectedColId, setSelectedColId] = useState<string | null>(null);
-
-  // Currently Selected Cell (for box coloring): { rowId, colId }
   const [selectedCell, setSelectedCell] = useState<{ rowId: string; colId: string } | null>(null);
+
+  // Formula Bar (fx) State
+  const [formulaInput, setFormulaInput] = useState('');
+  const [isFormulaEditing, setIsFormulaEditing] = useState(false);
 
   // Modals
   const [showNewSheetModal, setShowNewSheetModal] = useState(false);
@@ -145,6 +187,7 @@ export function SheetsScreen() {
   const [colWidth, setColWidth] = useState<number>(180);
   const [colOptionsInput, setColOptionsInput] = useState('');
   const [colIsPinned, setColIsPinned] = useState(false);
+  const [colInsertTarget, setColInsertTarget] = useState<'end' | 'left' | 'right'>('end');
 
   // Excel Import Pending State
   const [pendingImport, setPendingImport] = useState<{
@@ -180,11 +223,323 @@ export function SheetsScreen() {
     }
   };
 
+  // 1-Click Scroll to Bottom
+  const scrollToBottom = () => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTo({
+        top: tableContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  };
+
   // Selected column object
   const activeCol = useMemo(() => {
     if (!activeSheet || !selectedColId) return null;
     return activeSheet.columns.find((c) => c.id === selectedColId) || activeSheet.columns[0] || null;
   }, [activeSheet, selectedColId]);
+
+  // Filtered rows
+  const filteredRows = useMemo(() => {
+    return (activeSheet?.rows || []).filter((r) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return Object.values(r.data).some((val) => String(val).toLowerCase().includes(q));
+    });
+  }, [activeSheet?.rows, searchQuery]);
+
+  // Selected row object
+  const activeRow = useMemo(() => {
+    if (!activeSheet || !selectedCell) return null;
+    return activeSheet.rows.find((r) => r.id === selectedCell.rowId) || null;
+  }, [activeSheet, selectedCell]);
+
+  // Selected cell coordinate info (e.g. A1, B4)
+  const cellCoordinate = useMemo(() => {
+    if (!activeSheet || !selectedCell) return null;
+    const colIdx = activeSheet.columns.findIndex((c) => c.id === selectedCell.colId);
+    const rowIdx = filteredRows.findIndex((r) => r.id === selectedCell.rowId);
+    if (colIdx === -1 || rowIdx === -1) return null;
+    const letter = getColumnLetter(colIdx);
+    const num = rowIdx + 1;
+    const colObj = activeSheet.columns[colIdx];
+    return {
+      coordinate: `${letter}${num}`,
+      colLetter: letter,
+      rowNum: num,
+      colName: colObj.name,
+      colType: colObj.type,
+      colIndex: colIdx,
+      rowIndex: rowIdx,
+    };
+  }, [activeSheet, selectedCell, filteredRows]);
+
+  // Keep formulaInput synced when selectedCell changes
+  useEffect(() => {
+    if (selectedCell && activeRow) {
+      const val = activeRow.data[selectedCell.colId] ?? '';
+      setFormulaInput(String(val));
+      setIsFormulaEditing(false);
+    } else {
+      setFormulaInput('');
+    }
+  }, [selectedCell, activeRow]);
+
+  // Commit Formula Input to Selected Cell
+  const handleCommitFormula = () => {
+    if (!activeSheet || !selectedCell) return;
+    updateCell(activeSheet.id, selectedCell.rowId, selectedCell.colId, formulaInput);
+    setIsFormulaEditing(false);
+  };
+
+  // Revert Formula Input
+  const handleCancelFormula = () => {
+    if (!activeSheet || !selectedCell || !activeRow) return;
+    const original = activeRow.data[selectedCell.colId] ?? '';
+    setFormulaInput(String(original));
+    setIsFormulaEditing(false);
+  };
+
+  // Precompute cumulative left offsets for pinned columns
+  const pinnedColOffsets = useMemo(() => {
+    const offsets: Record<string, number> = {};
+    let currentLeft = 48; // width of '#' index column
+    activeSheet?.columns.forEach((col) => {
+      if (col.isPinned) {
+        offsets[col.id] = currentLeft;
+        currentLeft += col.width || 180;
+      }
+    });
+    return offsets;
+  }, [activeSheet?.columns]);
+
+  // Density / Row Height Configuration
+  const rowHeightMode = activeSheet?.rowHeight || 'normal';
+  const rowHeightPx = rowHeightMode === 'compact' ? 30 : rowHeightMode === 'relaxed' ? 50 : 38;
+  const densityPadding =
+    rowHeightMode === 'compact'
+      ? 'py-1 px-2.5 text-xs'
+      : rowHeightMode === 'relaxed'
+      ? 'py-3.5 px-3.5 text-sm'
+      : 'py-2 px-3 text-xs';
+
+  const frozenRowCount = activeSheet?.frozenRowCount || 0;
+
+  // Freeze Panes Operations
+  const handleToggleFreezeTopRow = () => {
+    if (!activeSheet) return;
+    const nextCount = frozenRowCount === 1 ? 0 : 1;
+    setFrozenRowCount(activeSheet.id, nextCount);
+  };
+
+  const handleFreezeUpToSelectedRow = () => {
+    if (!activeSheet || !cellCoordinate) return;
+    setFrozenRowCount(activeSheet.id, cellCoordinate.rowNum);
+  };
+
+  const handleToggleFreezeFirstColumn = () => {
+    if (!activeSheet || activeSheet.columns.length === 0) return;
+    const firstCol = activeSheet.columns[0];
+    updateColumn(activeSheet.id, firstCol.id, { isPinned: !firstCol.isPinned });
+  };
+
+  const handleUnfreezeAll = () => {
+    if (!activeSheet) return;
+    setFrozenRowCount(activeSheet.id, 0);
+    activeSheet.columns.forEach((col) => {
+      if (col.isPinned) {
+        updateColumn(activeSheet.id, col.id, { isPinned: false });
+      }
+    });
+  };
+
+  // Toggle Column Freeze / Pin
+  const handleToggleFreezeColumn = (colId: string) => {
+    if (!activeSheet) return;
+    const col = activeSheet.columns.find((c) => c.id === colId);
+    if (!col) return;
+    updateColumn(activeSheet.id, colId, { isPinned: !col.isPinned });
+  };
+
+  // Column Width +/- Adjuster
+  const handleAdjustColumnWidth = (colId: string, delta: number) => {
+    if (!activeSheet) return;
+    const col = activeSheet.columns.find((c) => c.id === colId);
+    if (!col) return;
+    const currentW = col.width || 180;
+    const newW = Math.max(90, Math.min(600, currentW + delta));
+    updateColumn(activeSheet.id, colId, { width: newW });
+  };
+
+  // Quick 1-Click Continuation Row
+  const handleQuickAddRow = () => {
+    if (!activeSheet) return;
+    const blankData: Record<string, any> = {};
+    activeSheet.columns.forEach((col) => {
+      blankData[col.id] = '';
+    });
+    addRow(activeSheet.id, blankData);
+  };
+
+  // Insert Row Above Selected
+  const handleInsertRowAbove = () => {
+    if (!activeSheet) return;
+    const blankData: Record<string, any> = {};
+    activeSheet.columns.forEach((col) => {
+      blankData[col.id] = '';
+    });
+    const refId = selectedCell?.rowId || activeSheet.rows[0]?.id || '';
+    insertRowAbove(activeSheet.id, refId, blankData);
+  };
+
+  // Insert Row Below Selected
+  const handleInsertRowBelow = () => {
+    if (!activeSheet) return;
+    const blankData: Record<string, any> = {};
+    activeSheet.columns.forEach((col) => {
+      blankData[col.id] = '';
+    });
+    const refId = selectedCell?.rowId || activeSheet.rows[activeSheet.rows.length - 1]?.id || '';
+    insertRowBelow(activeSheet.id, refId, blankData);
+  };
+
+  // Duplicate Selected Row
+  const handleDuplicateRow = () => {
+    if (!activeSheet || !selectedCell) return;
+    duplicateRow(activeSheet.id, selectedCell.rowId);
+  };
+
+  // Delete Selected Row
+  const handleDeleteSelectedRow = () => {
+    if (!activeSheet || !selectedCell) return;
+    if (confirm(`Delete Row #${(cellCoordinate?.rowNum || '')}?`)) {
+      deleteRow(activeSheet.id, selectedCell.rowId);
+      setSelectedCell(null);
+    }
+  };
+
+  // Cell Formatting Helpers
+  const currentCellData = activeRow?.data;
+  const isCellBold = selectedCell && currentCellData ? Boolean(currentCellData[`_bold_${selectedCell.colId}`]) : false;
+  const isCellItalic = selectedCell && currentCellData ? Boolean(currentCellData[`_italic_${selectedCell.colId}`]) : false;
+  const cellAlignment = selectedCell && currentCellData ? currentCellData[`_align_${selectedCell.colId}`] || 'left' : 'left';
+
+  const handleToggleBold = () => {
+    if (!activeSheet || !selectedCell) return;
+    setCellFormat(activeSheet.id, selectedCell.rowId, selectedCell.colId, { bold: !isCellBold });
+  };
+
+  const handleToggleItalic = () => {
+    if (!activeSheet || !selectedCell) return;
+    setCellFormat(activeSheet.id, selectedCell.rowId, selectedCell.colId, { italic: !isCellItalic });
+  };
+
+  const handleSetAlignment = (align: 'left' | 'center' | 'right') => {
+    if (!activeSheet || !selectedCell) return;
+    setCellFormat(activeSheet.id, selectedCell.rowId, selectedCell.colId, { align });
+  };
+
+  const handleSetTextColor = (color: string) => {
+    if (!activeSheet || !selectedCell) return;
+    setCellFormat(activeSheet.id, selectedCell.rowId, selectedCell.colId, {
+      textColor: color === 'default' ? null : color,
+    });
+  };
+
+  const handleApplyCellColor = (colorHex: string) => {
+    if (!activeSheet || !selectedCell) return;
+    setCellColor(
+      activeSheet.id,
+      selectedCell.rowId,
+      selectedCell.colId,
+      colorHex === 'none' ? null : colorHex
+    );
+  };
+
+  // Column Sort
+  const handleSortColumn = (direction: 'asc' | 'desc') => {
+    if (!activeSheet || !activeCol) return;
+    sortSheetByColumn(activeSheet.id, activeCol.id, direction);
+  };
+
+  // Column Insert (Left / Right)
+  const openAddColumnModal = (target: 'end' | 'left' | 'right') => {
+    setColInsertTarget(target);
+    setColName('');
+    setColType('text');
+    setColWidth(180);
+    setColOptionsInput('');
+    setColIsPinned(false);
+    setShowNewColModal(true);
+  };
+
+  const handleAddColumnSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSheet || !colName.trim()) return;
+    const options = colOptionsInput
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const newCol: SheetColumn = {
+      id: `col_${Date.now()}`,
+      name: colName.trim(),
+      type: colType,
+      width: Math.max(90, colWidth || 180),
+      options: options.length > 0 ? options : undefined,
+      isPinned: colIsPinned,
+    };
+
+    if (colInsertTarget === 'end' || !activeCol) {
+      addColumn(activeSheet.id, newCol);
+    } else {
+      const idx = activeSheet.columns.findIndex((c) => c.id === activeCol.id);
+      const targetIndex = colInsertTarget === 'left' ? Math.max(0, idx) : idx + 1;
+      insertColumnAt(activeSheet.id, newCol, targetIndex);
+    }
+
+    setShowNewColModal(false);
+    setSelectedColId(newCol.id);
+  };
+
+  // Column Edit Modal
+  const openEditColumnModal = (col: SheetColumn) => {
+    setEditingColId(col.id);
+    setColName(col.name);
+    setColType(col.type);
+    setColWidth(col.width || 180);
+    setColOptionsInput(col.options ? col.options.join(', ') : '');
+    setColIsPinned(Boolean(col.isPinned));
+    setShowEditColModal(true);
+  };
+
+  const handleSaveColumnEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSheet || !editingColId || !colName.trim()) return;
+
+    const options = colOptionsInput
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    updateColumn(activeSheet.id, editingColId, {
+      name: colName.trim(),
+      type: colType,
+      width: Math.max(90, colWidth || 180),
+      options: options.length > 0 ? options : undefined,
+      isPinned: colIsPinned,
+    });
+
+    setShowEditColModal(false);
+  };
+
+  // Horizontal pan
+  const scrollTable = (direction: 'left' | 'right') => {
+    if (tableContainerRef.current) {
+      const offset = direction === 'left' ? -350 : 350;
+      tableContainerRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
 
   // Open Edit Sheet Modal
   const openEditSheet = () => {
@@ -214,7 +569,7 @@ export function SheetsScreen() {
     setNewSheetTitle('');
   };
 
-  // Intelligent Excel Import Parser (Finds real header row & doesn't skip data)
+  // Excel File Upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -237,7 +592,6 @@ export function SheetsScreen() {
           return;
         }
 
-        // Find the actual header row (row with the most columns / non-empty values)
         let headerRowIndex = 0;
         let maxCols = 0;
         for (let r = 0; r < Math.min(rawJson.length, 12); r++) {
@@ -284,7 +638,6 @@ export function SheetsScreen() {
             detectedType = 'select';
           }
 
-          // Dynamic column width based on column title length
           const estimatedWidth = Math.max(140, Math.min(320, name.length * 11 + 40));
 
           return {
@@ -292,11 +645,10 @@ export function SheetsScreen() {
             name,
             type: detectedType,
             width: estimatedWidth,
-            isPinned: idx === 0, // Freeze first column by default
+            isPinned: idx === 0,
           };
         });
 
-        // Collect unique values for select columns to build dropdown options
         const optionsMap: Record<string, Set<string>> = {};
         detectedColumns.forEach((c) => {
           if (c.type === 'select' || c.type === 'status') {
@@ -304,7 +656,6 @@ export function SheetsScreen() {
           }
         });
 
-        // Parse ALL Data Rows starting immediately from headerRowIndex + 1
         const parsedRows: SheetRow[] = [];
         for (let r = headerRowIndex + 1; r < rawJson.length; r++) {
           const rowVals = rawJson[r];
@@ -316,7 +667,6 @@ export function SheetsScreen() {
             let v = rowVals[idx];
             if (v !== undefined && v !== null && v !== '') {
               hasContent = true;
-              // Date serial conversion
               if (col.type === 'date' || /birth|dob|date/i.test(col.name)) {
                 v = convertExcelSerialToDate(v);
               }
@@ -340,7 +690,6 @@ export function SheetsScreen() {
           }
         }
 
-        // Attach detected options to columns
         detectedColumns.forEach((c) => {
           if (optionsMap[c.id] && optionsMap[c.id].size > 0 && optionsMap[c.id].size <= 15) {
             c.options = Array.from(optionsMap[c.id]);
@@ -381,107 +730,6 @@ export function SheetsScreen() {
     scrollToRow1();
   };
 
-  // Open Column Settings Modal
-  const openEditColumnModal = (col: SheetColumn) => {
-    setEditingColId(col.id);
-    setColName(col.name);
-    setColType(col.type);
-    setColWidth(col.width || 180);
-    setColOptionsInput(col.options ? col.options.join(', ') : '');
-    setColIsPinned(Boolean(col.isPinned));
-    setShowEditColModal(true);
-  };
-
-  const handleSaveColumnEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeSheet || !editingColId || !colName.trim()) return;
-
-    const options = colOptionsInput
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    updateColumn(activeSheet.id, editingColId, {
-      name: colName.trim(),
-      type: colType,
-      width: Math.max(90, colWidth || 180),
-      options: options.length > 0 ? options : undefined,
-      isPinned: colIsPinned,
-    });
-
-    setShowEditColModal(false);
-  };
-
-  const handleAddColumn = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeSheet || !colName.trim()) return;
-    const options = colOptionsInput
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    const newCol: SheetColumn = {
-      id: `col_${Date.now()}`,
-      name: colName.trim(),
-      type: colType,
-      width: Math.max(90, colWidth || 180),
-      options: options.length > 0 ? options : undefined,
-      isPinned: colIsPinned,
-    };
-    addColumn(activeSheet.id, newCol);
-    setShowNewColModal(false);
-    setColName('');
-    setColOptionsInput('');
-    setSelectedColId(newCol.id);
-  };
-
-  // Quick 1-Click Continuation Row
-  const handleQuickAddRow = () => {
-    if (!activeSheet) return;
-    const blankData: Record<string, any> = {};
-    activeSheet.columns.forEach((col) => {
-      blankData[col.id] = '';
-    });
-    addRow(activeSheet.id, blankData);
-  };
-
-  // Toggle Column Freeze / Pin
-  const handleToggleFreezeColumn = (colId: string) => {
-    if (!activeSheet) return;
-    const col = activeSheet.columns.find((c) => c.id === colId);
-    if (!col) return;
-    updateColumn(activeSheet.id, colId, { isPinned: !col.isPinned });
-  };
-
-  // Column Width +/- Adjuster
-  const handleAdjustColumnWidth = (colId: string, delta: number) => {
-    if (!activeSheet) return;
-    const col = activeSheet.columns.find((c) => c.id === colId);
-    if (!col) return;
-    const currentW = col.width || 180;
-    const newW = Math.max(90, Math.min(600, currentW + delta));
-    updateColumn(activeSheet.id, colId, { width: newW });
-  };
-
-  // Cell Background Color (Color in Selected Box)
-  const handleApplyCellColor = (colorHex: string) => {
-    if (!activeSheet || !selectedCell) return;
-    setCellColor(
-      activeSheet.id,
-      selectedCell.rowId,
-      selectedCell.colId,
-      colorHex === 'none' ? null : colorHex
-    );
-  };
-
-  // Scroll Helpers
-  const scrollTable = (direction: 'left' | 'right') => {
-    if (tableContainerRef.current) {
-      const offset = direction === 'left' ? -350 : 350;
-      tableContainerRef.current.scrollBy({ left: offset, behavior: 'smooth' });
-    }
-  };
-
   // Export to Excel (.xlsx)
   const handleExportXLSX = () => {
     if (!activeSheet) return;
@@ -498,39 +746,58 @@ export function SheetsScreen() {
     );
   };
 
-  // Filtered rows
-  const filteredRows = useMemo(() => {
-    return (activeSheet?.rows || []).filter((r) => {
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase();
-      return Object.values(r.data).some((val) => String(val).toLowerCase().includes(q));
+  // Live Calculations for Active Column / Selection
+  const activeColStats = useMemo(() => {
+    if (!activeSheet || !activeCol) return null;
+    let numericCount = 0;
+    let totalSum = 0;
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+    let nonEmptyCount = 0;
+
+    activeSheet.rows.forEach((r) => {
+      const raw = r.data[activeCol.id];
+      if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
+        nonEmptyCount++;
+        const num = parseFloat(String(raw).replace(/[₹,\s]/g, ''));
+        if (!isNaN(num)) {
+          numericCount++;
+          totalSum += num;
+          if (num < minVal) minVal = num;
+          if (num > maxVal) maxVal = num;
+        }
+      }
     });
-  }, [activeSheet?.rows, searchQuery]);
 
-  // Column summaries
-  const columnSummaries = activeSheet?.columns.map((col) => {
-    if (col.type === 'amount' || col.type === 'number') {
-      const sum = (activeSheet.rows || []).reduce((acc, r) => {
-        const val = parseFloat(String(r.data[col.id] || '0').replace(/[₹,\s]/g, ''));
-        return acc + (isNaN(val) ? 0 : val);
-      }, 0);
-      return {
-        id: col.id,
-        type: col.type,
-        sum:
-          col.type === 'amount'
-            ? `₹${sum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-            : sum.toLocaleString('en-IN'),
-      };
-    }
-    return { id: col.id, type: col.type, sum: null };
-  });
+    const isAmount = activeCol.type === 'amount';
+    const hasNumbers = numericCount > 0;
+    const avg = hasNumbers ? totalSum / numericCount : 0;
 
-  const densityPadding =
-    density === 'compact' ? 'py-1 px-2.5' : density === 'spacious' ? 'py-3.5 px-3.5' : 'py-2 px-3';
+    return {
+      hasNumbers,
+      count: nonEmptyCount,
+      numericCount,
+      sum: isAmount
+        ? `₹${totalSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+        : totalSum.toLocaleString('en-IN'),
+      avg: isAmount
+        ? `₹${avg.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+        : avg.toFixed(2),
+      min: hasNumbers
+        ? isAmount
+          ? `₹${minVal.toLocaleString('en-IN')}`
+          : String(minVal)
+        : null,
+      max: hasNumbers
+        ? isAmount
+          ? `₹${maxVal.toLocaleString('en-IN')}`
+          : String(maxVal)
+        : null,
+    };
+  }, [activeSheet, activeCol]);
 
   return (
-    <div className="space-y-4 animate-fade-in pb-16">
+    <div className="space-y-3 animate-fade-in pb-16">
       <input
         type="file"
         ref={fileInputRef}
@@ -539,8 +806,8 @@ export function SheetsScreen() {
         className="hidden"
       />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
             <div className="p-2 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/25">
@@ -549,30 +816,30 @@ export function SheetsScreen() {
             <span>Record Sheets & Excel Grid</span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Full-featured spreadsheet. Dropdown menus, DOB date formatting, column freeze & Excel ribbon bar.
+            Excel-grade spreadsheet: Freeze Panes (fixed rows & columns), Formula bar (fx), full Row/Col operations & formatting.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 font-bold text-white text-xs shadow-md shadow-emerald-500/25 transition-all hover-lift touch-press"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-white text-xs shadow-md shadow-emerald-500/25 transition-all hover-lift touch-press"
           >
-            <Upload className="w-4 h-4" />
-            <span>Upload Excel (.xlsx)</span>
+            <Upload className="w-3.5 h-3.5" />
+            <span>Upload Excel</span>
           </button>
 
           <button
             onClick={() => setShowNewSheetModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-bold text-white text-xs shadow-lg shadow-blue-500/25 transition-all hover-lift touch-press"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-bold text-white text-xs shadow-lg shadow-blue-500/25 transition-all hover-lift touch-press"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             <span>New Sheet</span>
           </button>
         </div>
       </div>
 
-      {/* Sheet Tabs Strip with Distinct Colors */}
+      {/* Sheet Tabs Strip */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200 dark:border-white/10 scrollbar-none">
         {sheets.map((sheet) => {
           const isActive = sheet.id === activeSheet?.id;
@@ -585,7 +852,7 @@ export function SheetsScreen() {
                 setActiveSheetId(sheet.id);
                 scrollToRow1();
               }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all touch-press ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all touch-press ${
                 isActive
                   ? 'text-white shadow-md'
                   : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
@@ -601,7 +868,7 @@ export function SheetsScreen() {
               />
               <span>{sheet.title}</span>
               <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
                   isActive ? 'bg-black/20 text-white' : 'bg-slate-100 dark:bg-white/10 text-slate-500'
                 }`}
               >
@@ -619,15 +886,15 @@ export function SheetsScreen() {
           }`}
         >
           {/* ========================================================
-              TOP EXCEL RIBBON BAR (ALL SETTINGS MOVED HERE)
+              EXCEL TOP TOOLBARS & FORMULA BAR (FX)
              ======================================================== */}
-          <div className="p-3.5 space-y-3 border-b border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-slate-800/40">
-            {/* Ribbon Row 1: Global Actions & Search */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="border-b border-slate-200 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/50 p-3 space-y-2.5">
+            {/* ROW 1: SEARCH & GLOBAL VIEW CONTROLS */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+              {/* Left Group: Search, Row 1 Jump, Quick continuation */}
               <div className="flex items-center gap-2 flex-wrap">
-                {/* Search */}
-                <div className="relative w-56 sm:w-64">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <div className="relative w-48 sm:w-56">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                   <input
                     type="text"
                     placeholder={`Search ${activeSheet.rows.length} records...`}
@@ -637,37 +904,39 @@ export function SheetsScreen() {
                   />
                 </div>
 
-                {/* 1-Click Jump to Row 1 (Top) */}
+                {/* 1-Click Jump to Row 1 */}
                 <button
                   onClick={scrollToRow1}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold text-xs border border-blue-200 dark:border-blue-500/20 transition-colors"
-                  title="Scroll back to Row 1 (First line)"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold text-xs border border-blue-200 dark:border-blue-500/20 transition-colors"
+                  title="Jump to Row 1 (Top)"
                 >
                   <ArrowUp className="w-3.5 h-3.5" />
-                  <span>Go to Row 1</span>
+                  <span>Row 1</span>
                 </button>
 
-                {/* Quick Add Row */}
+                {/* Jump to Bottom */}
+                <button
+                  onClick={scrollToBottom}
+                  className="flex items-center gap-1 px-2 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-white/5"
+                  title="Jump to Bottom of Sheet"
+                >
+                  <ArrowDown className="w-3.5 h-3.5" />
+                </button>
+
+                {/* 1-Click + Row */}
                 <button
                   onClick={handleQuickAddRow}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-all hover-lift touch-press"
-                  title="Add continuation row"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-all hover-lift touch-press"
+                  title="Add continuation row at bottom"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Row</span>
                 </button>
 
-                {/* Quick Add Column */}
+                {/* Add Column */}
                 <button
-                  onClick={() => {
-                    setColName('');
-                    setColType('text');
-                    setColWidth(180);
-                    setColOptionsInput('');
-                    setColIsPinned(false);
-                    setShowNewColModal(true);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                  onClick={() => openAddColumnModal('end')}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
                   title="Add new column"
                 >
                   <Columns className="w-3.5 h-3.5" />
@@ -675,12 +944,12 @@ export function SheetsScreen() {
                 </button>
               </div>
 
-              {/* View & Density Controls */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Wrap Text Toggle */}
+              {/* Right Group: Display, Gridlines, Wrap, Pan, Export */}
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                {/* Wrap Text */}
                 <button
                   onClick={() => setWrapText(!wrapText)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
+                  className={`flex items-center gap-1 px-2 py-1 rounded-xl border text-[11px] font-bold transition-colors ${
                     wrapText
                       ? 'bg-blue-600 text-white border-blue-600'
                       : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
@@ -691,39 +960,64 @@ export function SheetsScreen() {
                   <span>{wrapText ? 'Wrap: On' : 'Wrap: Off'}</span>
                 </button>
 
-                {/* Density: Compact / Normal */}
+                {/* Gridlines */}
+                <button
+                  onClick={() => setShowGridlines(!showGridlines)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-xl border text-[11px] font-bold transition-colors ${
+                    showGridlines
+                      ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white border-slate-300'
+                      : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-400'
+                  }`}
+                  title="Toggle Gridlines"
+                >
+                  <Grid className="w-3.5 h-3.5" />
+                  <span>Grid</span>
+                </button>
+
+                {/* Row Height Mode */}
                 <div className="flex rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-0.5 text-[11px] font-bold">
                   <button
-                    onClick={() => setDensity('compact')}
-                    className={`px-2 py-0.5 rounded-lg transition-all ${
-                      density === 'compact' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                    onClick={() => setRowHeight(activeSheet.id, 'compact')}
+                    className={`px-1.5 py-0.5 rounded-lg transition-all ${
+                      rowHeightMode === 'compact' ? 'bg-blue-600 text-white' : 'text-slate-500'
                     }`}
+                    title="Compact Row Height (28px)"
                   >
-                    Compact
+                    S
                   </button>
                   <button
-                    onClick={() => setDensity('normal')}
-                    className={`px-2 py-0.5 rounded-lg transition-all ${
-                      density === 'normal' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                    onClick={() => setRowHeight(activeSheet.id, 'normal')}
+                    className={`px-1.5 py-0.5 rounded-lg transition-all ${
+                      rowHeightMode === 'normal' ? 'bg-blue-600 text-white' : 'text-slate-500'
                     }`}
+                    title="Default Row Height (38px)"
                   >
-                    Normal
+                    M
+                  </button>
+                  <button
+                    onClick={() => setRowHeight(activeSheet.id, 'relaxed')}
+                    className={`px-1.5 py-0.5 rounded-lg transition-all ${
+                      rowHeightMode === 'relaxed' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                    }`}
+                    title="Relaxed Row Height (48px)"
+                  >
+                    L
                   </button>
                 </div>
 
-                {/* Horizontal Scroll Arrows */}
-                <div className="flex items-center gap-1">
+                {/* Horizontal pan buttons */}
+                <div className="flex items-center gap-0.5">
                   <button
                     onClick={() => scrollTable('left')}
-                    className="p-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
-                    title="Scroll Left"
+                    className="p-1 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                    title="Pan Left"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => scrollTable('right')}
-                    className="p-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
-                    title="Scroll Right"
+                    className="p-1 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                    title="Pan Right"
                   >
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
@@ -732,113 +1026,333 @@ export function SheetsScreen() {
                 {/* Sheet Title & Color */}
                 <button
                   onClick={openEditSheet}
-                  className="p-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
-                  title="Sheet Color & Title"
+                  className="p-1 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                  title="Edit Sheet Title & Color"
                 >
                   <Palette className="w-3.5 h-3.5 text-blue-500" />
                 </button>
 
-                {/* Export XLSX */}
+                {/* Export .xlsx */}
                 <button
                   onClick={handleExportXLSX}
-                  className="px-2.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-500/10"
-                  title="Download Excel .xlsx"
+                  className="px-2 py-1 rounded-xl border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] hover:bg-emerald-500/10"
+                  title="Export Excel .xlsx"
                 >
                   .XLSX
                 </button>
               </div>
             </div>
 
-            {/* Ribbon Row 2: Selected Column Settings & Cell Box Color Bar */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2 border-t border-slate-200/80 dark:border-white/5">
-              {/* Active Column Inspector */}
-              {activeCol ? (
-                <div className="flex items-center gap-2 flex-wrap text-xs">
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 font-bold">
-                    <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>Column:</span>
-                    <span className="text-slate-900 dark:text-white font-mono">{activeCol.name}</span>
-                  </div>
+            {/* ROW 2: EXCEL FORMULA & CELL ADDRESS BAR (FX) */}
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-200/70 dark:border-white/5">
+              {/* Name Box (Address: e.g. A1, B4) */}
+              <div
+                className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 min-w-[70px] justify-center text-xs font-mono font-black text-blue-600 dark:text-blue-400 shadow-xs"
+                title={
+                  cellCoordinate
+                    ? `Cell ${cellCoordinate.coordinate} (${cellCoordinate.colName})`
+                    : 'Select a cell in the grid below'
+                }
+              >
+                <span>{cellCoordinate ? cellCoordinate.coordinate : '--'}</span>
+              </div>
 
-                  {/* Freeze Column Button */}
-                  <button
-                    onClick={() => handleToggleFreezeColumn(activeCol.id)}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border font-semibold transition-colors ${
-                      activeCol.isPinned
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
-                    }`}
-                    title={activeCol.isPinned ? 'Unfreeze Column' : 'Freeze Column on Left'}
-                  >
-                    {activeCol.isPinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
-                    <span>{activeCol.isPinned ? 'Frozen (Left)' : 'Freeze Column'}</span>
-                  </button>
+              {/* fx Icon */}
+              <div className="font-serif italic font-bold text-slate-400 dark:text-slate-500 text-sm select-none px-1">
+                fx
+              </div>
 
-                  {/* Width Adjusters */}
-                  <div className="flex items-center rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 px-1 py-0.5">
+              {/* Formula Bar Input */}
+              <div className="flex-1 relative flex items-center">
+                <input
+                  type="text"
+                  placeholder={
+                    selectedCell
+                      ? `Edit ${cellCoordinate?.coordinate} (${cellCoordinate?.colName})... Press Enter to commit`
+                      : 'Click any cell below to view or edit in this Formula Bar'
+                  }
+                  value={formulaInput}
+                  disabled={!selectedCell}
+                  onChange={(e) => {
+                    setFormulaInput(e.target.value);
+                    setIsFormulaEditing(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleCommitFormula();
+                    } else if (e.key === 'Escape') {
+                      handleCancelFormula();
+                    }
+                  }}
+                  className="w-full px-3 py-1 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+
+                {/* Commit / Cancel Buttons when editing formula */}
+                {isFormulaEditing && (
+                  <div className="absolute right-1.5 flex items-center gap-1">
                     <button
-                      onClick={() => handleAdjustColumnWidth(activeCol.id, -20)}
-                      className="px-1.5 py-0.5 text-slate-600 dark:text-slate-300 hover:text-blue-500 font-bold"
-                      title="Make Column Narrower"
+                      onClick={handleCommitFormula}
+                      className="p-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white"
+                      title="Commit changes (Enter)"
                     >
-                      −
+                      <Check className="w-3 h-3" />
                     </button>
-                    <span className="px-1.5 text-[10px] font-mono text-slate-500">
-                      {activeCol.width || 180}px
-                    </span>
                     <button
-                      onClick={() => handleAdjustColumnWidth(activeCol.id, 20)}
-                      className="px-1.5 py-0.5 text-slate-600 dark:text-slate-300 hover:text-blue-500 font-bold"
-                      title="Make Column Wider"
+                      onClick={handleCancelFormula}
+                      className="p-1 rounded-md bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-700 dark:text-slate-200"
+                      title="Cancel (Esc)"
                     >
-                      +
+                      <X className="w-3 h-3" />
                     </button>
                   </div>
+                )}
+              </div>
+            </div>
 
-                  {/* Edit Column Type / Dropdown Options */}
+            {/* ROW 3: EXCEL TOOLBAR (FREEZE PANES, ROW TOOLS, COL TOOLS, FORMATTING) */}
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-2 pt-2 border-t border-slate-200/70 dark:border-white/5">
+              {/* GROUP 1: FREEZE PANES (FIXED ROWS & COLUMNS) */}
+              <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-white/5 flex-wrap">
+                <div className="flex items-center gap-1 text-[11px] font-black text-slate-400 uppercase tracking-wider px-1">
+                  <Lock className="w-3 h-3 text-blue-500" />
+                  <span>Freeze:</span>
+                </div>
+
+                {/* Freeze Top Row */}
+                <button
+                  onClick={handleToggleFreezeTopRow}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[11px] font-bold transition-all ${
+                    frozenRowCount > 0
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                      : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                  title="Freeze Top Row (Row 1 sticks when scrolling vertically)"
+                >
+                  <Pin className="w-3 h-3" />
+                  <span>{frozenRowCount > 0 ? `Row 1-${frozenRowCount} Fixed` : 'Top Row'}</span>
+                </button>
+
+                {/* Freeze up to Selected Row */}
+                {cellCoordinate && cellCoordinate.rowNum > 1 && (
                   <button
-                    onClick={() => openEditColumnModal(activeCol)}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 font-semibold"
+                    onClick={handleFreezeUpToSelectedRow}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-white/10 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                    title={`Freeze up to current Row #${cellCoordinate.rowNum}`}
                   >
-                    <Settings className="w-3 h-3 text-blue-500" />
-                    <span>Options / Type ({activeCol.type})</span>
+                    <span>To Row {cellCoordinate.rowNum}</span>
                   </button>
+                )}
 
-                  {/* Delete Column */}
-                  {activeSheet.columns.length > 1 && (
+                {/* Freeze First Column */}
+                <button
+                  onClick={handleToggleFreezeFirstColumn}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[11px] font-bold transition-all ${
+                    activeSheet.columns[0]?.isPinned
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                      : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                  title="Freeze First Column on the left"
+                >
+                  <span>Col 1</span>
+                </button>
+
+                {/* Unfreeze All */}
+                {(frozenRowCount > 0 || activeSheet.columns.some((c) => c.isPinned)) && (
+                  <button
+                    onClick={handleUnfreezeAll}
+                    className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10"
+                    title="Unfreeze All Rows & Columns"
+                  >
+                    <Unlock className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* GROUP 2: ROW OPERATIONS */}
+              <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-white/5 flex-wrap">
+                <div className="flex items-center gap-1 text-[11px] font-black text-slate-400 uppercase tracking-wider px-1">
+                  <Table className="w-3 h-3 text-emerald-500" />
+                  <span>Row {cellCoordinate ? `#${cellCoordinate.rowNum}` : ''}:</span>
+                </div>
+
+                <button
+                  onClick={handleInsertRowAbove}
+                  className="px-2 py-0.5 rounded-lg border border-slate-200 dark:border-white/10 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
+                  title="Insert Blank Row Above Current Selection"
+                >
+                  + Above
+                </button>
+
+                <button
+                  onClick={handleInsertRowBelow}
+                  className="px-2 py-0.5 rounded-lg border border-slate-200 dark:border-white/10 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
+                  title="Insert Blank Row Below Current Selection"
+                >
+                  + Below
+                </button>
+
+                {selectedCell && (
+                  <>
                     <button
-                      onClick={() => {
-                        if (confirm(`Delete column "${activeCol.name}"?`)) {
-                          deleteColumn(activeSheet.id, activeCol.id);
-                        }
-                      }}
+                      onClick={handleDuplicateRow}
+                      className="p-1 rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                      title="Duplicate this row"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+
+                    <button
+                      onClick={handleDeleteSelectedRow}
                       className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10"
-                      title="Delete this column"
+                      title="Delete this row"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3 h-3" />
                     </button>
-                  )}
-                </div>
-              ) : (
-                <div className="text-xs text-slate-400 italic">
-                  Click any column header below to inspect its settings
-                </div>
-              )}
+                  </>
+                )}
+              </div>
 
-              {/* Color Selected Box / Cell Palette */}
-              <div className="flex items-center gap-2 text-xs">
-                <span className="font-bold text-slate-500 flex items-center gap-1 text-[11px]">
-                  <Paintbrush className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Color Box:</span>
-                </span>
-                <div className="flex items-center gap-1.5">
+              {/* GROUP 3: COLUMN OPERATIONS */}
+              <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-white/5 flex-wrap">
+                <div className="flex items-center gap-1 text-[11px] font-black text-slate-400 uppercase tracking-wider px-1">
+                  <Columns className="w-3 h-3 text-indigo-500" />
+                  <span className="truncate max-w-[80px]">
+                    {activeCol ? activeCol.name : 'Col'}
+                  </span>
+                </div>
+
+                {activeCol && (
+                  <>
+                    {/* Width − / + */}
+                    <div className="flex items-center rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 px-1 py-0.5">
+                      <button
+                        onClick={() => handleAdjustColumnWidth(activeCol.id, -20)}
+                        className="px-1 text-slate-600 dark:text-slate-300 hover:text-blue-500 font-bold text-xs"
+                        title="Make column narrower"
+                      >
+                        −
+                      </button>
+                      <span className="px-1 text-[10px] font-mono text-slate-500">
+                        {activeCol.width || 180}
+                      </span>
+                      <button
+                        onClick={() => handleAdjustColumnWidth(activeCol.id, 20)}
+                        className="px-1 text-slate-600 dark:text-slate-300 hover:text-blue-500 font-bold text-xs"
+                        title="Make column wider"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    {/* Freeze Column Toggle */}
+                    <button
+                      onClick={() => handleToggleFreezeColumn(activeCol.id)}
+                      className={`p-1 rounded-lg border text-[11px] ${
+                        activeCol.isPinned
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                      }`}
+                      title={activeCol.isPinned ? 'Unfreeze this column' : 'Freeze this column (Left)'}
+                    >
+                      {activeCol.isPinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+                    </button>
+
+                    {/* Sort A-Z / Z-A */}
+                    <button
+                      onClick={() => handleSortColumn('asc')}
+                      className="px-1.5 py-0.5 rounded-lg border border-slate-200 dark:border-white/10 text-[10px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
+                      title="Sort Ascending (A → Z or 0 → 9)"
+                    >
+                      A-Z
+                    </button>
+                    <button
+                      onClick={() => handleSortColumn('desc')}
+                      className="px-1.5 py-0.5 rounded-lg border border-slate-200 dark:border-white/10 text-[10px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
+                      title="Sort Descending (Z → A or 9 → 0)"
+                    >
+                      Z-A
+                    </button>
+
+                    {/* Column Settings Modal */}
+                    <button
+                      onClick={() => openEditColumnModal(activeCol)}
+                      className="p-1 rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                      title="Edit Column Type & Dropdown Options"
+                    >
+                      <Settings className="w-3 h-3 text-blue-500" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* GROUP 4: CELL FORMATTING (BOLD, ITALIC, ALIGN, COLOR) */}
+              <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-white/5 flex-wrap">
+                {/* Bold */}
+                <button
+                  onClick={handleToggleBold}
+                  className={`p-1 rounded-lg border text-xs font-black ${
+                    isCellBold
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                  title="Bold (Selected cell)"
+                >
+                  <Bold className="w-3 h-3" />
+                </button>
+
+                {/* Italic */}
+                <button
+                  onClick={handleToggleItalic}
+                  className={`p-1 rounded-lg border text-xs font-serif italic ${
+                    isCellItalic
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                  title="Italic (Selected cell)"
+                >
+                  <Italic className="w-3 h-3" />
+                </button>
+
+                {/* Alignment */}
+                <div className="flex items-center rounded-lg border border-slate-200 dark:border-white/10 p-0.5">
+                  <button
+                    onClick={() => handleSetAlignment('left')}
+                    className={`p-0.5 rounded ${
+                      cellAlignment === 'left' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                    }`}
+                    title="Align Left"
+                  >
+                    <AlignLeft className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => handleSetAlignment('center')}
+                    className={`p-0.5 rounded ${
+                      cellAlignment === 'center' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                    }`}
+                    title="Align Center"
+                  >
+                    <AlignCenter className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => handleSetAlignment('right')}
+                    className={`p-0.5 rounded ${
+                      cellAlignment === 'right' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                    }`}
+                    title="Align Right"
+                  >
+                    <AlignRight className="w-3 h-3" />
+                  </button>
+                </div>
+
+                {/* Fill Color Palette */}
+                <div className="flex items-center gap-1">
                   {CELL_HIGHLIGHT_COLORS.map((c) => (
                     <button
                       key={c.id}
                       onClick={() => handleApplyCellColor(c.id)}
-                      className="w-5 h-5 rounded-md border border-black/20 dark:border-white/20 transition-transform hover:scale-125 shadow-xs"
+                      className="w-4 h-4 rounded-md border border-black/20 dark:border-white/20 transition-transform hover:scale-125 shadow-xs"
                       style={{ backgroundColor: c.bg }}
-                      title={`Highlight Box: ${c.label}`}
+                      title={`Fill Color: ${c.label}`}
                     />
                   ))}
                 </div>
@@ -847,18 +1361,18 @@ export function SheetsScreen() {
           </div>
 
           {/* ========================================================
-              SPREADSHEET GRID TABLE (CLEAN HEADERS WITH NO CLUTTER)
+              EXCEL GRID TABLE (FIXED ROWS & FIXED COLUMNS MATRIX)
              ======================================================== */}
           <div
             ref={tableContainerRef}
-            className="overflow-x-auto overflow-y-auto max-h-[72vh] relative"
+            className="overflow-x-auto overflow-y-auto max-h-[70vh] relative scrollbar-thin"
           >
             <table className="w-full text-left text-xs border-collapse">
-              {/* Sticky Table Header */}
-              <thead className="sticky top-0 z-30 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold uppercase tracking-wider text-[11px] select-none border-b-2 border-slate-300 dark:border-slate-700 shadow-xs">
+              {/* STICKY TABLE HEADER (Always at top: 0, z-40) */}
+              <thead className="sticky top-0 z-40 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold uppercase tracking-wider text-[11px] select-none border-b-2 border-slate-300 dark:border-slate-700 shadow-xs h-10">
                 <tr>
-                  {/* Sticky Index Column Header */}
-                  <th className="sticky left-0 z-40 bg-slate-200 dark:bg-slate-800 py-3 px-3 w-12 text-center text-slate-500 border-r border-slate-300 dark:border-slate-700">
+                  {/* Top-Left Corner Index '#' (Sticky both top: 0 and left: 0, z-50) */}
+                  <th className="sticky top-0 left-0 z-50 bg-slate-200 dark:bg-slate-800 py-2.5 px-3 w-12 text-center text-slate-500 border-r border-b-2 border-slate-300 dark:border-slate-700">
                     #
                   </th>
 
@@ -866,6 +1380,7 @@ export function SheetsScreen() {
                     const isPinned = Boolean(col.isPinned);
                     const isSelectedCol = selectedColId === col.id;
                     const colW = col.width || 180;
+                    const leftOffset = pinnedColOffsets[col.id];
 
                     return (
                       <th
@@ -875,20 +1390,23 @@ export function SheetsScreen() {
                           width: `${colW}px`,
                           minWidth: `${colW}px`,
                           maxWidth: `${colW}px`,
-                          left: isPinned ? `${48 + idx * 180}px` : undefined,
+                          left: isPinned ? `${leftOffset}px` : undefined,
                         }}
-                        className={`py-3 px-3.5 border-r border-slate-300 dark:border-slate-700 cursor-pointer transition-colors ${
+                        className={`py-2.5 px-3 border-r border-slate-300 dark:border-slate-700 cursor-pointer transition-colors ${
                           isPinned
-                            ? 'sticky z-40 bg-blue-50/90 dark:bg-slate-800 border-r-2 border-r-blue-500'
+                            ? 'sticky top-0 z-45 bg-blue-50/95 dark:bg-slate-800 border-r-2 border-r-blue-500'
                             : isSelectedCol
                             ? 'bg-blue-100/70 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200'
                             : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700'
                         }`}
-                        title="Click to select this column and adjust settings in Excel Bar"
+                        title="Click to select column"
                       >
                         <div className="flex items-center justify-between gap-1.5">
                           <div className="flex items-center gap-1.5 truncate">
                             {isPinned && <Pin className="w-3 h-3 text-blue-500 shrink-0" />}
+                            <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">
+                              {getColumnLetter(idx)}
+                            </span>
                             <span className="truncate font-extrabold text-slate-900 dark:text-white">
                               {col.name}
                             </span>
@@ -901,14 +1419,20 @@ export function SheetsScreen() {
                       </th>
                     );
                   })}
-                  <th className="py-3 px-2 w-12 text-center text-slate-400 border-slate-300 dark:border-slate-700">
+                  <th className="py-2.5 px-2 w-12 text-center text-slate-400 border-slate-300 dark:border-slate-700">
                     Del
                   </th>
                 </tr>
               </thead>
 
-              {/* Table Body */}
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700/80">
+              {/* TABLE BODY */}
+              <tbody
+                className={`divide-y ${
+                  showGridlines
+                    ? 'divide-slate-200 dark:divide-slate-700/80'
+                    : 'divide-transparent'
+                }`}
+              >
                 {filteredRows.length === 0 ? (
                   <tr>
                     <td
@@ -919,140 +1443,217 @@ export function SheetsScreen() {
                     </td>
                   </tr>
                 ) : (
-                  filteredRows.map((row, rowIdx) => (
-                    <tr
-                      key={row.id}
-                      className="hover:bg-slate-50/70 dark:hover:bg-white/5 transition-colors group"
-                    >
-                      {/* Row Index Number (1, 2, 3...) */}
-                      <td className="sticky left-0 z-20 bg-slate-100 dark:bg-slate-800 text-center text-slate-500 font-mono text-[11px] py-2 px-2.5 border-r border-slate-300 dark:border-slate-700">
-                        {rowIdx + 1}
-                      </td>
+                  filteredRows.map((row, rowIdx) => {
+                    // Check if this row is frozen at top
+                    const isRowFrozen = rowIdx < frozenRowCount;
+                    // Sticky top offset for frozen row: 40px (header height) + rowIdx * rowHeightPx
+                    const frozenRowTop = 40 + rowIdx * rowHeightPx;
+                    const isLastFrozenRow = rowIdx === frozenRowCount - 1;
 
-                      {activeSheet.columns.map((col, colIdx) => {
-                        const cellVal = row.data[col.id] ?? '';
-                        const cellColor = row.data[`_color_${col.id}`];
-                        const isPinned = Boolean(col.isPinned);
-                        const isSelectedCol = selectedColId === col.id;
-                        const colW = col.width || 180;
-                        const isSelectedCell =
-                          selectedCell?.rowId === row.id && selectedCell?.colId === col.id;
+                    return (
+                      <tr
+                        key={row.id}
+                        style={{ height: `${rowHeightPx}px` }}
+                        className={`hover:bg-slate-50/70 dark:hover:bg-white/5 transition-colors group ${
+                          isRowFrozen
+                            ? isLight
+                              ? 'bg-blue-50/20'
+                              : 'bg-blue-950/20'
+                            : ''
+                        } ${isLastFrozenRow ? 'border-b-2 border-b-blue-500 shadow-sm' : ''}`}
+                      >
+                        {/* Index Column Cell */}
+                        <td
+                          onClick={() => {
+                            setSelectedCell({ rowId: row.id, colId: activeSheet.columns[0]?.id || '' });
+                            if (activeSheet.columns[0]) setSelectedColId(activeSheet.columns[0].id);
+                          }}
+                          style={{
+                            top: isRowFrozen ? `${frozenRowTop}px` : undefined,
+                          }}
+                          className={`sticky left-0 ${
+                            isRowFrozen ? 'z-35' : 'z-20'
+                          } bg-slate-100 dark:bg-slate-800 text-center text-slate-500 font-mono text-[11px] py-2 px-2.5 ${
+                            showGridlines
+                              ? 'border-r border-slate-300 dark:border-slate-700'
+                              : ''
+                          } ${isLastFrozenRow ? 'border-b-2 border-b-blue-500' : ''}`}
+                        >
+                          <div className="flex items-center justify-center gap-1">
+                            {isRowFrozen && <Pin className="w-2.5 h-2.5 text-blue-500" />}
+                            <span>{rowIdx + 1}</span>
+                          </div>
+                        </td>
 
-                        // Date serial formatting
-                        const displayVal =
-                          col.type === 'date' ? convertExcelSerialToDate(cellVal) : cellVal;
+                        {/* Data Cells */}
+                        {activeSheet.columns.map((col, colIdx) => {
+                          const cellVal = row.data[col.id] ?? '';
+                          const cellColor = row.data[`_color_${col.id}`];
+                          const isBold = Boolean(row.data[`_bold_${col.id}`]);
+                          const isItalic = Boolean(row.data[`_italic_${col.id}`]);
+                          const align = row.data[`_align_${col.id}`] || 'left';
+                          const textColor = row.data[`_textColor_${col.id}`];
 
-                        return (
-                          <td
-                            key={col.id}
-                            onClick={() => {
-                              setSelectedCell({ rowId: row.id, colId: col.id });
-                              setSelectedColId(col.id);
-                            }}
-                            style={{
-                              width: `${colW}px`,
-                              minWidth: `${colW}px`,
-                              maxWidth: `${colW}px`,
-                              backgroundColor: cellColor || undefined,
-                              left: isPinned ? `${48 + colIdx * 180}px` : undefined,
-                            }}
-                            className={`${densityPadding} border-r border-slate-200 dark:border-slate-700/80 relative transition-colors ${
-                              isPinned
-                                ? 'sticky z-20 border-r-2 border-r-blue-500 ' +
-                                  (cellColor ? '' : isLight ? 'bg-white' : 'bg-slate-900')
-                                : isSelectedCol && !cellColor
-                                ? 'bg-blue-50/20 dark:bg-blue-950/10'
-                                : ''
-                            } ${isSelectedCell ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
-                          >
-                            {/* CASE 1: DROPDOWN MENU */}
-                            {col.type === 'select' || (col.options && col.options.length > 0) ? (
-                              <div className="relative">
-                                <select
+                          const isPinned = Boolean(col.isPinned);
+                          const isSelectedCol = selectedColId === col.id;
+                          const colW = col.width || 180;
+                          const leftOffset = pinnedColOffsets[col.id];
+                          const isSelectedCell =
+                            selectedCell?.rowId === row.id && selectedCell?.colId === col.id;
+
+                          const displayVal =
+                            col.type === 'date' ? convertExcelSerialToDate(cellVal) : cellVal;
+
+                          // Cell Sticky Coordinates:
+                          // If both row and column are frozen: sticky on both top and left (z-35)
+                          // If row frozen only: sticky on top (z-25)
+                          // If col pinned only: sticky on left (z-20)
+                          const isStickyCell = isRowFrozen || isPinned;
+                          const cellZIndex = isRowFrozen && isPinned ? 35 : isRowFrozen ? 25 : isPinned ? 20 : undefined;
+
+                          return (
+                            <td
+                              key={col.id}
+                              onClick={() => {
+                                setSelectedCell({ rowId: row.id, colId: col.id });
+                                setSelectedColId(col.id);
+                              }}
+                              style={{
+                                width: `${colW}px`,
+                                minWidth: `${colW}px`,
+                                maxWidth: `${colW}px`,
+                                backgroundColor: cellColor || undefined,
+                                top: isRowFrozen ? `${frozenRowTop}px` : undefined,
+                                left: isPinned ? `${leftOffset}px` : undefined,
+                                zIndex: cellZIndex,
+                              }}
+                              className={`${densityPadding} ${
+                                showGridlines
+                                  ? 'border-r border-slate-200 dark:border-slate-700/80'
+                                  : ''
+                              } relative transition-colors ${
+                                isStickyCell ? 'sticky ' : ''
+                              } ${
+                                isPinned
+                                  ? 'border-r-2 border-r-blue-500 ' +
+                                    (cellColor ? '' : isLight ? 'bg-white' : 'bg-slate-900')
+                                  : isRowFrozen && !cellColor
+                                  ? isLight
+                                    ? 'bg-slate-50'
+                                    : 'bg-slate-900'
+                                  : isSelectedCol && !cellColor
+                                  ? 'bg-blue-50/20 dark:bg-blue-950/10'
+                                  : ''
+                              } ${isLastFrozenRow ? 'border-b-2 border-b-blue-500' : ''} ${
+                                isSelectedCell ? 'ring-2 ring-blue-500 ring-inset' : ''
+                              }`}
+                            >
+                              {/* CASE 1: DROPDOWN MENU */}
+                              {col.type === 'select' || (col.options && col.options.length > 0) ? (
+                                <div className="relative">
+                                  <select
+                                    value={displayVal}
+                                    onChange={(e) =>
+                                      updateCell(activeSheet.id, row.id, col.id, e.target.value)
+                                    }
+                                    style={{
+                                      fontWeight: isBold ? 'bold' : 'normal',
+                                      fontStyle: isItalic ? 'italic' : 'normal',
+                                      textAlign: align,
+                                      color: textColor || undefined,
+                                    }}
+                                    className={`w-full bg-transparent focus:outline-none cursor-pointer ${
+                                      wrapText ? '' : 'truncate'
+                                    } ${
+                                      displayVal === 'Active' || displayVal === 'Verified' || displayVal === 'Paid'
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : displayVal === 'Pending' || displayVal === 'Inactive'
+                                        ? 'text-amber-600 dark:text-amber-400'
+                                        : 'text-slate-800 dark:text-slate-200'
+                                    }`}
+                                  >
+                                    <option value="">-- Select --</option>
+                                    {(col.options || [
+                                      'Active',
+                                      'Pending',
+                                      'Completed',
+                                      'Male',
+                                      'Female',
+                                    ]).map((opt) => (
+                                      <option key={opt} value={opt} className="text-slate-900 bg-white">
+                                        {opt}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ) : col.type === 'date' ? (
+                                /* CASE 2: DATE PICKER */
+                                <div className="relative flex items-center">
+                                  <input
+                                    type="date"
+                                    value={displayVal}
+                                    onChange={(e) =>
+                                      updateCell(activeSheet.id, row.id, col.id, e.target.value)
+                                    }
+                                    style={{
+                                      fontWeight: isBold ? 'bold' : 'normal',
+                                      fontStyle: isItalic ? 'italic' : 'normal',
+                                      textAlign: align,
+                                      color: textColor || undefined,
+                                    }}
+                                    className="w-full bg-transparent px-1 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 font-mono text-slate-800 dark:text-slate-200"
+                                  />
+                                </div>
+                              ) : (
+                                /* CASE 3: TEXT / AMOUNT / NUMBER FREE EDIT */
+                                <input
+                                  type="text"
                                   value={displayVal}
                                   onChange={(e) =>
                                     updateCell(activeSheet.id, row.id, col.id, e.target.value)
                                   }
-                                  className={`w-full bg-transparent text-xs font-semibold focus:outline-none cursor-pointer ${
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && rowIdx === filteredRows.length - 1) {
+                                      handleQuickAddRow();
+                                    }
+                                  }}
+                                  style={{
+                                    fontWeight: isBold ? 'bold' : undefined,
+                                    fontStyle: isItalic ? 'italic' : undefined,
+                                    textAlign: align,
+                                    color: textColor || undefined,
+                                  }}
+                                  className={`w-full bg-transparent px-1.5 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 transition-colors ${
                                     wrapText ? '' : 'truncate'
                                   } ${
-                                    displayVal === 'Active' || displayVal === 'Verified' || displayVal === 'Paid'
-                                      ? 'text-emerald-600 dark:text-emerald-400'
-                                      : displayVal === 'Pending' || displayVal === 'Inactive'
-                                      ? 'text-amber-600 dark:text-amber-400'
+                                    col.type === 'amount'
+                                      ? 'font-bold font-mono text-emerald-600 dark:text-emerald-400'
+                                      : col.type === 'status'
+                                      ? 'font-bold text-blue-600 dark:text-blue-400'
                                       : 'text-slate-800 dark:text-slate-200'
                                   }`}
-                                >
-                                  <option value="">-- Select --</option>
-                                  {(col.options || [
-                                    'Active',
-                                    'Pending',
-                                    'Completed',
-                                    'Male',
-                                    'Female',
-                                  ]).map((opt) => (
-                                    <option key={opt} value={opt} className="text-slate-900 bg-white">
-                                      {opt}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            ) : col.type === 'date' ? (
-                              /* CASE 2: DATE PICKER / FORMATTED DATE */
-                              <div className="relative flex items-center">
-                                <input
-                                  type="date"
-                                  value={displayVal}
-                                  onChange={(e) =>
-                                    updateCell(activeSheet.id, row.id, col.id, e.target.value)
-                                  }
-                                  className="w-full bg-transparent px-1 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 font-mono text-xs text-slate-800 dark:text-slate-200"
                                 />
-                              </div>
-                            ) : (
-                              /* CASE 3: TEXT / AMOUNT / NUMBER FREE EDIT */
-                              <input
-                                type="text"
-                                value={displayVal}
-                                onChange={(e) =>
-                                  updateCell(activeSheet.id, row.id, col.id, e.target.value)
-                                }
-                                onKeyDown={(e) => {
-                                  // Press Enter in last row to add continuation row
-                                  if (e.key === 'Enter' && rowIdx === filteredRows.length - 1) {
-                                    handleQuickAddRow();
-                                  }
-                                }}
-                                className={`w-full bg-transparent px-1.5 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 transition-colors ${
-                                  wrapText ? '' : 'truncate'
-                                } ${
-                                  col.type === 'amount'
-                                    ? 'font-bold font-mono text-emerald-600 dark:text-emerald-400'
-                                    : col.type === 'status'
-                                    ? 'font-bold text-blue-600 dark:text-blue-400'
-                                    : 'text-slate-800 dark:text-slate-200'
-                                }`}
-                              />
-                            )}
-                          </td>
-                        );
-                      })}
+                              )}
+                            </td>
+                          );
+                        })}
 
-                      {/* Row Delete Button */}
-                      <td className="py-1 px-2 text-center border-slate-200 dark:border-slate-700">
-                        <button
-                          onClick={() => deleteRow(activeSheet.id, row.id)}
-                          className="p-1 rounded-lg text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-                          title="Delete Row"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        {/* Delete Row Button */}
+                        <td className="py-1 px-2 text-center border-slate-200 dark:border-slate-700">
+                          <button
+                            onClick={() => deleteRow(activeSheet.id, row.id)}
+                            className="p-1 rounded-lg text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Delete Row"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
 
-                {/* PERMANENT CONTINUATION ROW: 1-Click add row */}
+                {/* CONTINUATION ROW */}
                 <tr
                   onClick={handleQuickAddRow}
                   className="cursor-pointer bg-slate-50/70 dark:bg-white/5 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors border-t border-dashed border-slate-300 dark:border-slate-700"
@@ -1064,58 +1665,77 @@ export function SheetsScreen() {
                     colSpan={activeSheet.columns.length + 1}
                     className="py-2.5 px-3 text-xs font-bold text-blue-600 dark:text-blue-400"
                   >
-                    + Click here to add next row for continuation (or press Enter in last cell)
+                    + Click here to add continuation row (or press Enter in last cell)
                   </td>
                 </tr>
               </tbody>
-
-              {/* Bottom Auto-Sum Row */}
-              {activeSheet.rows.length > 0 && (
-                <tfoot className="sticky bottom-0 z-20 bg-slate-100 dark:bg-slate-800 font-bold border-t-2 border-slate-300 dark:border-slate-700 text-xs select-none">
-                  <tr>
-                    <td className="sticky left-0 z-30 bg-slate-200 dark:bg-slate-800 py-2.5 px-2 text-center text-slate-400 font-mono border-r border-slate-300 dark:border-slate-700">
-                      <Calculator className="w-3.5 h-3.5 mx-auto text-blue-500" />
-                    </td>
-                    {activeSheet.columns.map((col, idx) => {
-                      const summary = columnSummaries?.find((s) => s.id === col.id);
-                      const isPinned = Boolean(col.isPinned);
-                      const colW = col.width || 180;
-
-                      return (
-                        <td
-                          key={col.id}
-                          style={{
-                            width: `${colW}px`,
-                            minWidth: `${colW}px`,
-                            maxWidth: `${colW}px`,
-                            left: isPinned ? `${48 + idx * 180}px` : undefined,
-                          }}
-                          className={`py-2 px-3 border-r border-slate-300 dark:border-slate-700 ${
-                            isPinned ? 'sticky z-30 bg-slate-200 dark:bg-slate-800 border-r-2 border-r-blue-500' : ''
-                          }`}
-                        >
-                          {summary?.sum ? (
-                            <div>
-                              <span className="text-[9px] text-slate-400 uppercase font-mono block">
-                                Total:
-                              </span>
-                              <span className="font-black text-emerald-600 dark:text-emerald-400 font-mono text-xs">
-                                {summary.sum}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {activeSheet.rows.length} rows
-                            </span>
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className="py-2 px-2" />
-                  </tr>
-                </tfoot>
-              )}
             </table>
+          </div>
+
+          {/* ========================================================
+              BOTTOM EXCEL STATUS BAR (CALCULATIONS & SHEET METRICS)
+             ======================================================== */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-slate-100/90 dark:bg-slate-800/90 border-t border-slate-300 dark:border-slate-700 text-xs select-none">
+            {/* Left: Active Selection Metric */}
+            <div className="flex items-center gap-2 flex-wrap text-slate-600 dark:text-slate-300 font-medium">
+              <span className="flex items-center gap-1 font-bold text-slate-800 dark:text-slate-200">
+                <FileSpreadsheet className="w-3.5 h-3.5 text-blue-500" />
+                <span>
+                  {cellCoordinate ? (
+                    <>
+                      Cell <strong className="font-mono text-blue-600 dark:text-blue-400">{cellCoordinate.coordinate}</strong> ({cellCoordinate.colName})
+                    </>
+                  ) : (
+                    'Ready'
+                  )}
+                </span>
+              </span>
+
+              <span className="text-slate-400">|</span>
+
+              <span className="text-[11px] font-mono">
+                {activeSheet.rows.length} rows, {activeSheet.columns.length} columns
+              </span>
+
+              {frozenRowCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 font-mono text-[10px] font-bold">
+                  📌 {frozenRowCount} Row{frozenRowCount > 1 ? 's' : ''} Frozen
+                </span>
+              )}
+            </div>
+
+            {/* Right: Quick Calculations on Active Column */}
+            {activeColStats && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-[11px] font-mono">
+                  COUNT: <strong>{activeColStats.count}</strong>
+                </span>
+
+                {activeColStats.hasNumbers && (
+                  <>
+                    <span className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-[11px] font-mono">
+                      SUM: <strong className="text-emerald-600 dark:text-emerald-400">{activeColStats.sum}</strong>
+                    </span>
+
+                    <span className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-[11px] font-mono">
+                      AVG: <strong>{activeColStats.avg}</strong>
+                    </span>
+
+                    {activeColStats.min && (
+                      <span className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-[11px] font-mono">
+                        MIN: <strong>{activeColStats.min}</strong>
+                      </span>
+                    )}
+
+                    {activeColStats.max && (
+                      <span className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-[11px] font-mono">
+                        MAX: <strong>{activeColStats.max}</strong>
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1202,7 +1822,7 @@ export function SheetsScreen() {
         </div>
       )}
 
-      {/* MODAL 2: Column Settings (from Excel Bar) */}
+      {/* MODAL 2: Column Settings & Options */}
       {(showNewColModal || showEditColModal) && activeSheet && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-4 shadow-2xl">
@@ -1221,7 +1841,7 @@ export function SheetsScreen() {
               </button>
             </div>
 
-            <form onSubmit={showEditColModal ? handleSaveColumnEdit : handleAddColumn} className="space-y-4">
+            <form onSubmit={showEditColModal ? handleSaveColumnEdit : handleAddColumnSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Column Name

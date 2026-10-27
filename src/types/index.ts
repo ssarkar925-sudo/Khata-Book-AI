@@ -190,6 +190,9 @@ export interface RecordSheet {
   color?: string;
   columns: SheetColumn[];
   rows: SheetRow[];
+  frozenRowCount?: number;
+  rowHeight?: 'compact' | 'normal' | 'relaxed';
+  showGridlines?: boolean;
   created_at?: string;
   updated_at?: string;
 }

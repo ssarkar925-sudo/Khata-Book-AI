@@ -46,6 +46,19 @@ interface SheetState {
   updateColumn: (sheetId: string, columnId: string, updates: Partial<SheetColumn>) => void;
   deleteColumn: (sheetId: string, columnId: string) => void;
   setCellColor: (sheetId: string, rowId: string, colId: string, color: string | null) => void;
+  setFrozenRowCount: (sheetId: string, count: number) => void;
+  insertRowAbove: (sheetId: string, referenceRowId: string, rowData?: Record<string, any>) => void;
+  insertRowBelow: (sheetId: string, referenceRowId: string, rowData?: Record<string, any>) => void;
+  duplicateRow: (sheetId: string, rowId: string) => void;
+  setRowHeight: (sheetId: string, height: 'compact' | 'normal' | 'relaxed') => void;
+  sortSheetByColumn: (sheetId: string, columnId: string, direction: 'asc' | 'desc') => void;
+  setCellFormat: (
+    sheetId: string,
+    rowId: string,
+    colId: string,
+    format: { bold?: boolean; italic?: boolean; align?: 'left' | 'center' | 'right'; textColor?: string | null }
+  ) => void;
+  insertColumnAt: (sheetId: string, column: SheetColumn, targetIndex: number) => void;
 }
 
 const DEFAULT_SHEETS: RecordSheet[] = [
@@ -336,6 +349,200 @@ export const useSheetStore = create<SheetState>((set) => ({
           return { ...r, data: updatedData };
         });
         targetSheet = { ...s, rows };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
+
+  setFrozenRowCount: (sheetId, count) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== sheetId) return s;
+        targetSheet = { ...s, frozenRowCount: Math.max(0, count) };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
+
+  insertRowAbove: (sheetId, referenceRowId, rowData = {}) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== sheetId) return s;
+        const index = s.rows.findIndex((r) => r.id === referenceRowId);
+        const newRow: SheetRow = {
+          id: crypto.randomUUID(),
+          data: rowData,
+          created_at: new Date().toISOString(),
+        };
+        const rows = [...s.rows];
+        if (index === -1) {
+          rows.unshift(newRow);
+        } else {
+          rows.splice(index, 0, newRow);
+        }
+        targetSheet = { ...s, rows };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
+
+  insertRowBelow: (sheetId, referenceRowId, rowData = {}) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== sheetId) return s;
+        const index = s.rows.findIndex((r) => r.id === referenceRowId);
+        const newRow: SheetRow = {
+          id: crypto.randomUUID(),
+          data: rowData,
+          created_at: new Date().toISOString(),
+        };
+        const rows = [...s.rows];
+        if (index === -1) {
+          rows.push(newRow);
+        } else {
+          rows.splice(index + 1, 0, newRow);
+        }
+        targetSheet = { ...s, rows };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
+
+  duplicateRow: (sheetId, rowId) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== sheetId) return s;
+        const index = s.rows.findIndex((r) => r.id === rowId);
+        if (index === -1) return s;
+        const original = s.rows[index];
+        const newRow: SheetRow = {
+          id: crypto.randomUUID(),
+          data: { ...original.data },
+          created_at: new Date().toISOString(),
+        };
+        const rows = [...s.rows];
+        rows.splice(index + 1, 0, newRow);
+        targetSheet = { ...s, rows };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
+
+  setRowHeight: (sheetId, height) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== sheetId) return s;
+        targetSheet = { ...s, rowHeight: height };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
+
+  sortSheetByColumn: (sheetId, columnId, direction) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== sheetId) return s;
+        const sorted = [...s.rows].sort((a, b) => {
+          const valA = a.data[columnId] ?? '';
+          const valB = b.data[columnId] ?? '';
+          const numA = parseFloat(String(valA).replace(/[₹,\s]/g, ''));
+          const numB = parseFloat(String(valB).replace(/[₹,\s]/g, ''));
+          const isNum = !isNaN(numA) && !isNaN(numB);
+
+          if (isNum) {
+            return direction === 'asc' ? numA - numB : numB - numA;
+          }
+          const strA = String(valA).toLowerCase();
+          const strB = String(valB).toLowerCase();
+          return direction === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
+        });
+        targetSheet = { ...s, rows: sorted };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
+
+  setCellFormat: (sheetId, rowId, colId, format) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== sheetId) return s;
+        const rows = s.rows.map((r) => {
+          if (r.id !== rowId) return r;
+          const updatedData = { ...r.data };
+          if (format.bold !== undefined) {
+            if (format.bold) updatedData[`_bold_${colId}`] = true;
+            else delete updatedData[`_bold_${colId}`];
+          }
+          if (format.italic !== undefined) {
+            if (format.italic) updatedData[`_italic_${colId}`] = true;
+            else delete updatedData[`_italic_${colId}`];
+          }
+          if (format.align !== undefined) {
+            updatedData[`_align_${colId}`] = format.align;
+          }
+          if (format.textColor !== undefined) {
+            if (format.textColor) updatedData[`_textColor_${colId}`] = format.textColor;
+            else delete updatedData[`_textColor_${colId}`];
+          }
+          return { ...r, data: updatedData };
+        });
+        targetSheet = { ...s, rows };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
+
+  insertColumnAt: (sheetId, column, targetIndex) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== sheetId) return s;
+        const cols = [...s.columns];
+        if (targetIndex < 0 || targetIndex >= cols.length) {
+          cols.push(column);
+        } else {
+          cols.splice(targetIndex, 0, column);
+        }
+        targetSheet = { ...s, columns: cols };
         return targetSheet;
       });
       if (typeof window !== 'undefined') {
