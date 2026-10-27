@@ -26,14 +26,38 @@ export interface Workspace {
   updated_at?: string;
 }
 
+export type MigrationErrorCategory =
+  | 'rpc_unavailable'
+  | 'authorization'
+  | 'validation'
+  | 'network_connectivity'
+  | 'server_error'
+  | 'reconciliation_mismatch';
+
 export interface MigrationFailure {
   entity: string;
   id: string;
   error: string;
+  errorCategory?: MigrationErrorCategory;
+  isRetryable?: boolean;
+}
+
+export interface AccountReconciliationFailure {
+  accountId: string;
+  accountName: string;
+  expectedBalance: number;
+  actualBalance: number | null;
+  error: string;
+}
+
+export interface ReconciliationReport {
+  passed: boolean;
+  failures: AccountReconciliationFailure[];
+  timestamp?: string;
 }
 
 export interface MigrationProgress {
-  status: 'idle' | 'backing_up' | 'uploading' | 'verifying' | 'completed' | 'partial_failure' | 'error';
+  status: 'idle' | 'backing_up' | 'uploading' | 'reconciling' | 'verifying' | 'completed' | 'partial_failure' | 'error';
   currentStep: string;
   progressPercent: number;
   totalRecords: number;
@@ -41,6 +65,7 @@ export interface MigrationProgress {
   failedRecords: MigrationFailure[];
   backupKey?: string;
   errorMessage?: string;
+  reconciliation?: ReconciliationReport;
 }
 
 export interface MigrationResult {
@@ -50,6 +75,7 @@ export interface MigrationResult {
   failed: MigrationFailure[];
   backupKey?: string;
   error?: string;
+  reconciliation?: ReconciliationReport;
 }
 
 export type AccountType = 'savings' | 'current' | 'cash_counter' | 'wallet' | 'od_cc';
@@ -172,10 +198,13 @@ export interface NoteItem {
   workspace_id: string;
   title: string;
   body?: string | null;
+  content?: string | null; // Legacy alias for body
   color?: string | null;
   tags: string[];
   is_pinned: boolean;
+  pinned?: boolean; // Legacy alias for is_pinned
   checklist_items: NoteChecklistItem[];
+  scope?: EntityScope;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;

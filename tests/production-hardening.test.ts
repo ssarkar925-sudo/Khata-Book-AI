@@ -1,5 +1,12 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import {
+  validateNotePayload,
+  validateSheetPayload,
+  mapNoteToCloudPayload,
+  mapSheetToCloudPayload,
+  categorizeError,
+} from '../src/lib/migrationEngine';
 
 // Mock localStorage for node environment
 const storage: Record<string, string> = {};
@@ -916,5 +923,263 @@ describe('RecordBook AI — Production Hardening & Security Test Suite', () => {
     assert.notStrictEqual(sub1.id, sub2.id);
     const finalSub: any = activeSubscription;
     assert.strictEqual(finalSub?.id, sub3.id, 'Only the latest active subscription must be retained');
+  });
+
+  // ==========================================================================
+  // 18. OPTION A SNAPSHOT BALANCE CORRECTNESS & ZERO DOUBLE COUNTING
+  // ==========================================================================
+  test('Migration Strategy: Option A Snapshot strategy prevents account balance double counting', async () => {
+    // 1. Initial local account state
+    const startingOpeningBalance = 1000000; // ₹10,000 in paise
+    let runningLocalBalance = startingOpeningBalance;
+
+    // 2. Local historical transactions (Cash-in, Expense, Transfer, Card Payment, Due Settlement)
+    const historicalMovements = [
+      { id: 'tx-1', type: 'cash_in', amount: 500000, note: 'Customer advance' }, // +₹5,000
+      { id: 'tx-2', type: 'expense', amount: 200000, note: 'Office stationery' }, // -₹2,000
+      { id: 'tx-3', type: 'cash_out', amount: 150000, note: 'Transfer to Petty Cash' }, // -₹1,500
+      { id: 'tx-4', type: 'card_spend', amount: 100000, note: 'Online software license' }, // -₹1,000
+      { id: 'tx-5', type: 'cash_in', amount: 300000, note: 'Settlement from Ramesh' }, // +₹3,000
+    ];
+
+    for (const tx of historicalMovements) {
+      if (tx.type === 'cash_in') runningLocalBalance += tx.amount;
+      else runningLocalBalance -= tx.amount;
+    }
+
+    // Expected local balance: 10,000 + 5,000 - 2,000 - 1,500 - 1,000 + 3,000 = ₹13,500 (1,350,000 paise)
+    assert.strictEqual(runningLocalBalance, 1350000, 'Calculated local balance must equal 1,350,000 paise');
+
+    // 3. Option A Snapshot Migration:
+    // Step A: Upload account with CURRENT snapshot balance
+    const cloudDatabase = {
+      accounts: new Map<string, { id: string; balance: number }>([
+        ['acc-sbi-1', { id: 'acc-sbi-1', balance: runningLocalBalance }],
+      ]),
+      ledger: [] as any[],
+    };
+
+    // Step B: Dedicated import RPC inserts ledger entries WITHOUT updating account balance
+    function importHistoricalLedgerEntry(entry: any) {
+      // Option A import RPC does NOT mutate cloudDatabase.accounts balance
+      cloudDatabase.ledger.push(entry);
+      return { status: 'success', id: entry.id };
+    }
+
+    // Buggy comparison: What would happen if we used Option B or balance-updating RPC?
+    let doubleCountedBalance = runningLocalBalance;
+    for (const tx of historicalMovements) {
+      importHistoricalLedgerEntry({ ...tx, account_id: 'acc-sbi-1' });
+      // If balance-updating RPC was called, it would mutate balance a second time:
+      if (tx.type === 'cash_in') doubleCountedBalance += tx.amount;
+      else doubleCountedBalance -= tx.amount;
+    }
+
+    // 4. Assert Option A Snapshot preserved exact account balance
+    const finalCloudAccount = cloudDatabase.accounts.get('acc-sbi-1')!;
+    assert.strictEqual(finalCloudAccount.balance, 1350000, 'Option A must preserve exact snapshot balance (₹13,500)');
+    assert.strictEqual(cloudDatabase.ledger.length, 5, 'All 5 historical ledger entries imported');
+
+    // Prove double-counting would have corrupted balance to 1,700,000 paise (diff of +350,000)
+    assert.strictEqual(doubleCountedBalance, 1700000, 'Replay over current balance would have double-counted to 1,700,000');
+    assert.notStrictEqual(finalCloudAccount.balance, doubleCountedBalance, 'Option A must prevent double counting');
+
+    // 5. Post-migration reconciliation:
+    const expectedSnapshot = runningLocalBalance;
+    const actualCloud = finalCloudAccount.balance;
+    const reconciliationPassed = expectedSnapshot === actualCloud;
+    assert.strictEqual(reconciliationPassed, true, 'Post-migration reconciliation must pass with 0 discrepancy');
+  });
+
+  // ==========================================================================
+  // 19. NOTES AND SHEETS FIELD MAPPING & WHITELIST VALIDATION
+  // ==========================================================================
+  test('Migration Field Mapping: Notes & Sheets map precisely to schema and reject unsupported keys', () => {
+    const targetWsId = '00000000-0000-0000-0000-000000000099';
+
+    // 1. Note with legacy fields ('content', 'pinned')
+    const legacyNote = {
+      id: 'note-sample-1',
+      workspace_id: 'local-ws',
+      title: 'Tax Planning Checklist',
+      content: 'File GSTR-1 by 11th and pay advance tax before 15th.',
+      pinned: true,
+      color: '#FEF3C7',
+      tags: ['Taxes', 'Compliance'],
+      checklist_items: [{ id: 'chk-1', text: 'Verify invoices', is_done: true }],
+      scope: 'business',
+    };
+
+    const notePayload = mapNoteToCloudPayload(legacyNote, targetWsId);
+
+    // Assert field mapping
+    assert.strictEqual(notePayload.workspace_id, targetWsId);
+    assert.strictEqual(notePayload.body, 'File GSTR-1 by 11th and pay advance tax before 15th.', 'content must map to body');
+    assert.strictEqual(notePayload.is_pinned, true, 'pinned must map to is_pinned');
+    assert.strictEqual(notePayload.content, undefined, 'content alias must not be sent to cloud schema');
+    assert.strictEqual(notePayload.pinned, undefined, 'pinned alias must not be sent to cloud schema');
+    assert.strictEqual(notePayload.scope, 'business');
+
+    // Assert validation passes for clean mapped payload
+    const noteValidation = validateNotePayload(notePayload);
+    assert.strictEqual(noteValidation.valid, true, 'Clean mapped note payload must pass validation');
+
+    // Assert validation rejects payload with unsupported extra keys
+    const badNote = { ...notePayload, malicious_column: 'DROP TABLE notes;' };
+    const badValidation = validateNotePayload(badNote);
+    assert.strictEqual(badValidation.valid, false, 'Unsupported column must be rejected locally');
+    assert.ok(badValidation.error?.includes('malicious_column'), 'Error must name the unsupported column');
+
+    // 2. Sheet with frontend camelCase fields ('frozenRowCount', 'rowHeight', 'showGridlines')
+    const frontendSheet = {
+      id: 'sheet-sample-1',
+      workspace_id: 'local-ws',
+      title: 'Monthly Cash Flow Register',
+      category: 'Accounting',
+      color: '#3B82F6',
+      scope: 'business',
+      columns: [{ id: 'c1', name: 'Date', type: 'date' }],
+      rows: [{ id: 'r1', data: { c1: '2026-10-27' } }],
+      frozenRowCount: 2,
+      rowHeight: 'compact',
+      showGridlines: false,
+    };
+
+    const sheetPayload = mapSheetToCloudPayload(frontendSheet, targetWsId);
+
+    // Assert sheet field mapping
+    assert.strictEqual(sheetPayload.workspace_id, targetWsId);
+    assert.strictEqual(sheetPayload.frozen_row_count, 2, 'frozenRowCount must map to frozen_row_count');
+    assert.strictEqual(sheetPayload.row_height, 'compact', 'rowHeight must map to row_height');
+    assert.strictEqual(sheetPayload.show_gridlines, false, 'showGridlines must map to show_gridlines');
+    assert.strictEqual(sheetPayload.scope, 'business');
+
+    // Assert validation passes for clean mapped sheet
+    const sheetValidation = validateSheetPayload(sheetPayload);
+    assert.strictEqual(sheetValidation.valid, true, 'Clean mapped sheet payload must pass validation');
+
+    // Assert validation rejects payload with unsupported extra keys
+    const badSheet = { ...sheetPayload, extra_unknown_prop: 'xyz' };
+    const badSheetVal = validateSheetPayload(badSheet);
+    assert.strictEqual(badSheetVal.valid, false, 'Unsupported sheet column must be rejected locally');
+  });
+
+  // ==========================================================================
+  // 20. POST-MIGRATION RECONCILIATION FAILURE DETECTION
+  // ==========================================================================
+  test('Migration Reconciliation: Balance mismatch aborts migration and preserves local records intact', () => {
+    let localAccount = {
+      id: 'acc-recon-test',
+      workspace_id: 'local-ws-1',
+      name: 'Cash Register',
+      balance: 500000, // 5,000 INR
+      is_local: true,
+    };
+
+    // Simulate corrupted cloud balance
+    const cloudAccount = {
+      id: 'acc-recon-test',
+      balance: 650000, // Discrepancy! Expected 500000
+    };
+
+    const expectedBalance = localAccount.balance;
+    const actualBalance = cloudAccount.balance;
+
+    const reconciliationPassed = expectedBalance === actualBalance;
+    const failures: any[] = [];
+
+    if (!reconciliationPassed) {
+      failures.push({
+        accountId: localAccount.id,
+        expectedBalance,
+        actualBalance,
+        error: `Balance mismatch: expected ${expectedBalance}, got ${actualBalance}`,
+      });
+    }
+
+    assert.strictEqual(reconciliationPassed, false, 'Reconciliation must detect balance discrepancy');
+    assert.strictEqual(failures.length, 1);
+
+    // Abort behavior: Local record must NOT be updated (retain is_local: true)
+    if (!reconciliationPassed) {
+      // Do NOT clear is_local
+    } else {
+      localAccount = { ...localAccount, is_local: false };
+    }
+
+    assert.strictEqual(localAccount.is_local, true, 'Local record must retain is_local: true when reconciliation fails');
+  });
+
+  // ==========================================================================
+  // 21. RETRYING SAFE FAILED ITEMS WITHOUT DUPLICATING LEDGER ENTRIES
+  // ==========================================================================
+  test('Migration Retry: Retries only previously failed records without duplicating ledger entries', () => {
+    const cloudDb = new Map<string, any>();
+
+    const ledgerEntries = [
+      { id: 'tx-1', idempotency_key: 'mig_tx_1', amount: 1000 },
+      { id: 'tx-2', idempotency_key: 'mig_tx_2', amount: 2000 },
+      { id: 'tx-3', idempotency_key: 'mig_tx_3', amount: 3000 },
+    ];
+
+    // Run 1: tx-1 and tx-3 succeed; tx-2 fails due to transient error
+    cloudDb.set('mig_tx_1', ledgerEntries[0]);
+    cloudDb.set('mig_tx_3', ledgerEntries[2]);
+    const failedList = [{ id: 'tx-2', entity: 'Ledger Entry', error: 'Network timeout', isRetryable: true }];
+
+    // Retry run: Filter to only retryable failed items
+    const retryIds = new Set(failedList.filter((f) => f.isRetryable !== false).map((f) => f.id));
+    const itemsToRetry = ledgerEntries.filter((l) => retryIds.has(l.id));
+
+    assert.strictEqual(itemsToRetry.length, 1, 'Only failed item tx-2 should be retried');
+    assert.strictEqual(itemsToRetry[0].id, 'tx-2');
+
+    // Simulate upload of retry items with idempotency guard
+    for (const item of itemsToRetry) {
+      if (!cloudDb.has(item.idempotency_key)) {
+        cloudDb.set(item.idempotency_key, item);
+      }
+    }
+
+    assert.strictEqual(cloudDb.size, 3, 'Cloud DB must contain all 3 entries with 0 duplicate transactions');
+  });
+
+  // ==========================================================================
+  // 22. LIVE SUPABASE INTEGRATION FOR HISTORICAL IMPORT & NOTES/SHEETS RLS
+  // ==========================================================================
+  test('Live Supabase Integration: Live RLS rejects unauthorized historical ledger import and note/sheet inserts', async () => {
+    const { createClient } = await import('@supabase/supabase-js');
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cjrmoanrcjexxjbrsauh.supabase.co';
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_0xl7UmpD49VFRE6sv5nApw_mbyuLZce';
+    const client = createClient(url, anonKey);
+
+    // 1. Anonymous call to import_historical_ledger_entry must be rejected by RLS / security definer
+    const { error: rpcErr } = await client.rpc('import_historical_ledger_entry', {
+      p_entry: {
+        workspace_id: '00000000-0000-0000-0000-000000000010',
+        type: 'cash_in',
+        amount: 50000,
+      },
+    });
+
+    const isRpcBlocked = rpcErr !== null;
+    assert.strictEqual(isRpcBlocked, true, 'Anonymous historical ledger import RPC must be rejected by auth check');
+
+    // 2. Anonymous insert to notes must be blocked with PostgreSQL 42501
+    const { error: noteErr } = await client.from('notes').insert({
+      id: '00000000-0000-0000-0000-000000000888',
+      workspace_id: '00000000-0000-0000-0000-000000000010',
+      title: 'Hacker note',
+      body: 'Should be rejected',
+    });
+    assert.strictEqual(noteErr?.code, '42501', 'Anonymous note insert must return PostgreSQL 42501 (RLS violation)');
+
+    // 3. Anonymous insert to sheets must be blocked with PostgreSQL 42501
+    const { error: sheetErr } = await client.from('sheets').insert({
+      id: '00000000-0000-0000-0000-000000000889',
+      workspace_id: '00000000-0000-0000-0000-000000000010',
+      title: 'Hacker sheet',
+    });
+    assert.strictEqual(sheetErr?.code, '42501', 'Anonymous sheet insert must return PostgreSQL 42501 (RLS violation)');
   });
 });

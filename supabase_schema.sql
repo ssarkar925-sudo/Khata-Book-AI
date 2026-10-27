@@ -882,3 +882,126 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp;
+
+-- ============================================================================
+-- NOTES & SHEETS SCHEMA EXTENSIONS FOR MIGRATION
+-- ============================================================================
+ALTER TABLE public.notes ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'business';
+DO $$
+BEGIN
+    ALTER TABLE public.notes ADD CONSTRAINT chk_notes_scope CHECK (scope IN ('business', 'personal', 'family'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE public.sheets ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'business';
+DO $$
+BEGIN
+    ALTER TABLE public.sheets ADD CONSTRAINT chk_sheets_scope CHECK (scope IN ('business', 'personal', 'family'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+ALTER TABLE public.sheets ADD COLUMN IF NOT EXISTS frozen_row_count INT DEFAULT 0;
+ALTER TABLE public.sheets ADD COLUMN IF NOT EXISTS row_height TEXT DEFAULT 'normal';
+ALTER TABLE public.sheets ADD COLUMN IF NOT EXISTS show_gridlines BOOLEAN DEFAULT true;
+
+-- ============================================================================
+-- DEDICATED HISTORICAL IMPORT RPC (Option A: Snapshot Strategy)
+-- Inserts historical ledger entries idempotently without mutating account balances
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.import_historical_ledger_entry(
+    p_entry jsonb
+)
+RETURNS jsonb AS $$
+DECLARE
+    v_entry_id UUID;
+    v_workspace_id UUID;
+    v_idempotency_key TEXT;
+    v_existing_id UUID;
+    v_result jsonb;
+BEGIN
+    v_workspace_id := (p_entry->>'workspace_id')::UUID;
+    IF v_workspace_id IS NULL THEN
+        RAISE EXCEPTION 'Workspace ID is required';
+    END IF;
+
+    -- Strict WRITE authorization check (Viewer is rejected)
+    IF NOT public.check_user_workspace_write(v_workspace_id) THEN
+        RAISE EXCEPTION 'Unauthorized: User does not have write access to workspace %', v_workspace_id;
+    END IF;
+
+    -- 1. Check idempotency key if present
+    v_idempotency_key := p_entry->>'idempotency_key';
+    IF v_idempotency_key IS NOT NULL AND v_idempotency_key <> '' THEN
+        SELECT id INTO v_existing_id
+        FROM public.ledger_entries
+        WHERE workspace_id = v_workspace_id AND idempotency_key = v_idempotency_key
+        LIMIT 1;
+
+        IF v_existing_id IS NOT NULL THEN
+            SELECT to_jsonb(l.*) INTO v_result
+            FROM public.ledger_entries l
+            WHERE id = v_existing_id;
+            RETURN jsonb_build_object('status', 'duplicate_ignored', 'entry', v_result);
+        END IF;
+    END IF;
+
+    -- 2. Check primary key ID if present
+    v_entry_id := COALESCE((p_entry->>'id')::UUID, uuid_generate_v4());
+    SELECT id INTO v_existing_id
+    FROM public.ledger_entries
+    WHERE id = v_entry_id;
+
+    IF v_existing_id IS NOT NULL THEN
+        SELECT to_jsonb(l.*) INTO v_result
+        FROM public.ledger_entries l
+        WHERE id = v_existing_id;
+        RETURN jsonb_build_object('status', 'duplicate_ignored', 'entry', v_result);
+    END IF;
+
+    -- 3. Insert historical ledger entry WITHOUT updating cash_locations.balance
+    INSERT INTO public.ledger_entries (
+        id,
+        workspace_id,
+        type,
+        amount,
+        category_id,
+        cash_location_id,
+        customer_id,
+        card_id,
+        mode,
+        scope,
+        note,
+        entry_date,
+        is_billed,
+        idempotency_key,
+        created_by,
+        created_at,
+        updated_at
+    ) VALUES (
+        v_entry_id,
+        v_workspace_id,
+        p_entry->>'type',
+        (p_entry->>'amount')::BIGINT,
+        (p_entry->>'category_id')::UUID,
+        (p_entry->>'cash_location_id')::UUID,
+        (p_entry->>'customer_id')::UUID,
+        (p_entry->>'card_id')::UUID,
+        COALESCE(p_entry->>'mode', 'cash'),
+        COALESCE(p_entry->>'scope', 'business'),
+        p_entry->>'note',
+        COALESCE((p_entry->>'entry_date')::TIMESTAMPTZ, timezone('utc', now())),
+        (p_entry->>'is_billed')::BOOLEAN,
+        v_idempotency_key,
+        auth.uid(),
+        COALESCE((p_entry->>'created_at')::TIMESTAMPTZ, timezone('utc', now())),
+        COALESCE((p_entry->>'updated_at')::TIMESTAMPTZ, timezone('utc', now()))
+    );
+
+    SELECT to_jsonb(l.*) INTO v_result
+    FROM public.ledger_entries l
+    WHERE id = v_entry_id;
+
+    RETURN jsonb_build_object('status', 'success', 'entry', v_result);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp;
+

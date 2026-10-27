@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { User } from '@supabase/supabase-js';
-import { Workspace, WorkspaceRole, SyncStatus, MigrationProgress, MigrationResult } from '@/types';
+import { Workspace, WorkspaceRole, SyncStatus, MigrationProgress, MigrationResult, MigrationFailure } from '@/types';
 import { supabase } from '@/lib/supabase';
 import {
   migrationEngine,
@@ -96,6 +96,7 @@ interface SessionState {
   signOut: () => Promise<void>;
   refreshWorkspacesAndRole: (currentUser?: User | null) => Promise<void>;
   migrateLocalDataToCloud: (targetWorkspaceId: string) => Promise<MigrationResult>;
+  retryFailedMigration: (targetWorkspaceId: string, failedRecords: MigrationFailure[]) => Promise<MigrationResult>;
   resetSession: () => void;
 }
 
@@ -446,6 +447,21 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({ showMigrationPrompt: false, localItemsCount: 0 });
     } else {
       // Re-calculate remaining unmigrated items in case of partial failure
+      const remaining = countUnmigratedLocalRecords(targetWorkspaceId);
+      set({ localItemsCount: remaining });
+    }
+
+    return result;
+  },
+
+  retryFailedMigration: async (targetWorkspaceId: string, failedRecords: MigrationFailure[]) => {
+    const result = await migrationEngine.retryFailedRecords(targetWorkspaceId, failedRecords, (progress) => {
+      get().setMigrationProgress(progress);
+    });
+
+    if (result.success) {
+      set({ showMigrationPrompt: false, localItemsCount: 0 });
+    } else {
       const remaining = countUnmigratedLocalRecords(targetWorkspaceId);
       set({ localItemsCount: remaining });
     }

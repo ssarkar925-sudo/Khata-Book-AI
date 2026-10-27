@@ -31,6 +31,7 @@ export function AuthModal() {
     localItemsCount,
     activeWorkspaceId,
     migrateLocalDataToCloud,
+    retryFailedMigration,
     migrationProgress,
     setMigrationProgress,
   } = useSessionStore();
@@ -107,16 +108,23 @@ export function AuthModal() {
   const handleMigrate = async () => {
     setIsMigrating(true);
     setErrorMsg(null);
-    const result = await migrateLocalDataToCloud(activeWorkspaceId);
+    let result;
+    if (migrationProgress?.failedRecords && migrationProgress.failedRecords.length > 0) {
+      result = await retryFailedMigration(activeWorkspaceId, migrationProgress.failedRecords);
+    } else {
+      result = await migrateLocalDataToCloud(activeWorkspaceId);
+    }
     setIsMigrating(false);
 
     if (result.success) {
-      setSuccessMsg(`Successfully migrated all ${result.migrated} records to your cloud workspace.`);
+      setSuccessMsg(`Successfully migrated all ${result.migrated} records to your cloud workspace with verified balance reconciliation.`);
       setTimeout(() => {
         setMigrationProgress(null);
         setShowMigrationPrompt(false);
         setAuthModalOpen(false);
       }, 1500);
+    } else if (result.reconciliation && !result.reconciliation.passed) {
+      setErrorMsg(`Reconciliation failed: ${result.reconciliation.failures.length} account balance discrepancy detected. Local records kept intact.`);
     } else if (result.failed.length > 0) {
       setErrorMsg(`Partial upload: ${result.migrated} succeeded, ${result.failed.length} failed. You can retry.`);
     } else if (result.error) {
