@@ -301,7 +301,15 @@ ALTER TABLE public.workspaces ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspaces access policy" ON public.workspaces;
 DROP POLICY IF EXISTS "Workspaces select policy" ON public.workspaces;
 CREATE POLICY "Workspaces select policy" ON public.workspaces FOR SELECT
-    USING (public.check_user_workspace_read(id));
+    USING (
+        auth.uid() IS NOT NULL AND (
+            owner_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.workspace_members
+                WHERE workspace_id = workspaces.id AND user_id = auth.uid()
+            )
+        )
+    );
 
 DROP POLICY IF EXISTS "Workspaces insert policy" ON public.workspaces;
 CREATE POLICY "Workspaces insert policy" ON public.workspaces FOR INSERT
@@ -309,17 +317,8 @@ CREATE POLICY "Workspaces insert policy" ON public.workspaces FOR INSERT
 
 DROP POLICY IF EXISTS "Workspaces update policy" ON public.workspaces;
 CREATE POLICY "Workspaces update policy" ON public.workspaces FOR UPDATE
-    USING (
-        auth.uid() IS NOT NULL AND (
-            owner_id = auth.uid() OR public.check_user_workspace_admin(id)
-        )
-    )
-    WITH CHECK (
-        auth.uid() IS NOT NULL AND (
-            (owner_id = auth.uid()) OR
-            (public.check_user_workspace_admin(id) AND owner_id = (SELECT w.owner_id FROM public.workspaces w WHERE w.id = id))
-        )
-    );
+    USING (auth.uid() IS NOT NULL AND owner_id = auth.uid())
+    WITH CHECK (auth.uid() IS NOT NULL AND owner_id = auth.uid());
 
 DROP POLICY IF EXISTS "Workspaces delete policy" ON public.workspaces;
 CREATE POLICY "Workspaces delete policy" ON public.workspaces FOR DELETE
@@ -332,7 +331,11 @@ DROP POLICY IF EXISTS "Workspace members select policy" ON public.workspace_memb
 CREATE POLICY "Workspace members select policy" ON public.workspace_members FOR SELECT
     USING (
         auth.uid() IS NOT NULL AND (
-            user_id = auth.uid() OR public.check_user_workspace_read(workspace_id)
+            user_id = auth.uid() OR
+            EXISTS (
+                SELECT 1 FROM public.workspaces
+                WHERE id = workspace_members.workspace_id AND owner_id = auth.uid()
+            )
         )
     );
 
@@ -898,7 +901,7 @@ BEGIN
     END IF;
 
     -- 3. Check if user has pending invitations by email in workspace_members
-    SELECT email INTO v_user_email FROM auth.users WHERE id = v_user_id;
+    v_user_email := auth.jwt() ->> 'email';
     IF v_user_email IS NOT NULL AND v_user_email <> '' THEN
         -- Claim pending invitation
         UPDATE public.workspace_members
@@ -1429,6 +1432,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp;
 
 -- Function Execution Grants
+GRANT EXECUTE ON FUNCTION public.get_or_create_default_workspace() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.check_user_workspace_read(UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.check_user_workspace_write(UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.check_user_workspace_admin(UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.is_workspace_owner(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.record_ledger_entry_and_update_balance(jsonb) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.settle_due_atomically(UUID, BIGINT, jsonb) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.import_historical_ledger_entry(jsonb) TO authenticated, service_role;

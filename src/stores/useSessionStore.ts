@@ -268,11 +268,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   signIn: async (email, password) => {
-    set({ authLoading: true });
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const cleanEmail = email.trim().toLowerCase();
+      const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       if (error) {
-        set({ authLoading: false });
         return { success: false, error: error.message };
       }
       if (data.user && data.session) {
@@ -282,29 +281,26 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }
       return { success: false, error: 'Sign in failed' };
     } catch (err: any) {
-      set({ authLoading: false });
       return { success: false, error: err.message || 'Network error' };
     }
   },
 
   signUp: async (email, password, fullName) => {
-    set({ authLoading: true });
     try {
+      const cleanEmail = email.trim().toLowerCase();
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: cleanEmail,
         password,
         options: {
-          data: { full_name: fullName },
+          data: { full_name: fullName.trim() },
         },
       });
       if (error) {
-        set({ authLoading: false });
         return { success: false, error: error.message };
       }
 
       // Supabase Email Confirmation Mode: User created but session is null until email is confirmed
       if (data.user && !data.session) {
-        set({ authLoading: false });
         return {
           success: true,
           requiresEmailConfirmation: true,
@@ -321,7 +317,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
       return { success: false, error: 'Sign up failed' };
     } catch (err: any) {
-      set({ authLoading: false });
       return { success: false, error: err.message || 'Network error' };
     }
   },
@@ -396,6 +391,18 @@ export const useSessionStore = create<SessionState>((set, get) => ({
             updated_at: w.updated_at,
           }))
         : [];
+
+      // Guarantee at least one valid workspace for the user
+      if (availableWorkspaces.length === 0) {
+        availableWorkspaces.push({
+          id: user.id,
+          name: 'Personal Record Book',
+          currency: 'INR',
+          owner_id: user.id,
+          is_default: true,
+          created_at: new Date().toISOString(),
+        });
+      }
 
       if (availableWorkspaces.length > 0) {
         const currentActive = availableWorkspaces.find((w) => w.id === get().activeWorkspaceId);
