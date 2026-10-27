@@ -1820,7 +1820,35 @@ export function SheetsScreen() {
         </div>
       )}
 
-      {/* MODAL 1: Upload / Import Excel Confirmation */}
+      {sheets.length === 0 && (
+        <div
+          className={`rounded-3xl border p-12 text-center transition-all ${
+            isLight ? 'bg-white border-slate-200/90' : 'bg-slate-900/90 border-white/10'
+          }`}
+        >
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+            <FileSpreadsheet className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">No Sheets Created Yet</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-6">
+            Create custom spreadsheets, financial registers, or import existing .xlsx files directly into your workspace.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => setShowNewSheetModal(true)}
+              className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md transition-all flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Create First Sheet
+            </button>
+            <label className="cursor-pointer px-5 py-2.5 rounded-2xl border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 font-semibold text-sm transition-all flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Import Excel (.xlsx)
+              <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" />
+            </label>
+          </div>
+        </div>
+      )}
       {showImportModal && pendingImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 space-y-5 shadow-2xl">

@@ -14,83 +14,16 @@ interface LedgerState {
 }
 
 const STORAGE_KEY = 'rb_ledger_entries';
+const LEGACY_MOCK_WORKSPACE_ID = '00000000-0000-0000-0000-000000000010';
 
-const DEFAULT_ENTRIES: LedgerEntry[] = [
-  {
-    id: 'tx-101',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    type: 'cash_in',
-    amount: 1850000, // ₹18,500.00
-    mode: 'upi',
-    scope: 'business',
-    note: 'Consulting fee received from Client Apex Corp',
-    category_id: 'cat-sales',
-    entry_date: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'tx-102',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    type: 'cash_out',
-    amount: 420000, // ₹4,200.00
-    mode: 'bank',
-    scope: 'business',
-    note: 'Office High-Speed Internet & Fiber Bill',
-    category_id: 'cat-utilities',
-    entry_date: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'tx-103',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    type: 'card_spend',
-    amount: 345000, // ₹3,450.00
-    card_id: '00000000-0000-0000-0000-000000000101',
-    mode: 'card',
-    scope: 'business',
-    note: 'Team Dinner at Mainland China',
-    category_id: 'cat-food',
-    entry_date: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(),
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'tx-104',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    type: 'cash_out',
-    amount: 580000, // ₹5,800.00
-    mode: 'upi',
-    scope: 'family',
-    note: 'Monthly Grocery & Dairy Supplies',
-    category_id: 'cat-food',
-    entry_date: new Date(Date.now() - 1000 * 60 * 60 * 50).toISOString(),
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'tx-105',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    type: 'cash_in',
-    amount: 3500000, // ₹35,000.00
-    mode: 'bank',
-    scope: 'personal',
-    note: 'Monthly Salary / Business Drawing Credit',
-    category_id: 'cat-sales',
-    entry_date: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
-    created_at: new Date().toISOString(),
-  },
-];
+const DEFAULT_ENTRIES: LedgerEntry[] = [];
 
 // Helper to deduplicate ledger entries by ID and migrate legacy card IDs
 function dedupeEntries(entries: LedgerEntry[]): LedgerEntry[] {
   const map = new Map<string, LedgerEntry>();
   for (const e of entries) {
     if (e && e.id) {
-      const normalizedCardId =
-        e.card_id === 'default-card-1'
-          ? '00000000-0000-0000-0000-000000000101'
-          : e.card_id === 'default-card-2'
-          ? '00000000-0000-0000-0000-000000000102'
-          : e.card_id;
-      map.set(e.id, { ...e, card_id: normalizedCardId });
+      map.set(e.id, e);
     }
   }
   return Array.from(map.values());
@@ -103,8 +36,14 @@ export const useLedgerStore = create<LedgerState>((set) => ({
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return dedupeEntries(parsed);
+          if (Array.isArray(parsed)) {
+            const clean = parsed.filter(
+              (e: any) => e && e.workspace_id !== LEGACY_MOCK_WORKSPACE_ID && e.workspace_id !== 'default'
+            );
+            if (clean.length !== parsed.length) {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+            }
+            return dedupeEntries(clean);
           }
         }
       } catch {}

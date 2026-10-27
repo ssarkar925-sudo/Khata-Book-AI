@@ -13,61 +13,16 @@ interface CardState {
 }
 
 const STORAGE_KEY_CARDS = 'rb_cards';
+const LEGACY_MOCK_WORKSPACE_ID = '00000000-0000-0000-0000-000000000010';
 
-const DEFAULT_CARDS: Card[] = [
-  {
-    id: '00000000-0000-0000-0000-000000000101',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'HDFC Regalia Gold (Business)',
-    bank: 'HDFC Bank',
-    last4: '4892',
-    credit_limit: 30000000, // ₹3,00,000.00
-    statement_day: 15,
-    due_day: 5,
-    is_active: true,
-    scope: 'business',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000102',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'SBI Cashback (Personal)',
-    bank: 'State Bank of India',
-    last4: '1043',
-    credit_limit: 15000000, // ₹1,50,000.00
-    statement_day: 20,
-    due_day: 10,
-    is_active: true,
-    scope: 'personal',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000103',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'ICICI Amazon Pay (Family)',
-    bank: 'ICICI Bank',
-    last4: '8834',
-    credit_limit: 20000000, // ₹2,00,000.00
-    statement_day: 25,
-    due_day: 15,
-    is_active: true,
-    scope: 'family',
-    created_at: new Date().toISOString(),
-  },
-];
+const DEFAULT_CARDS: Card[] = [];
 
 // Helper to deduplicate cards array by ID and normalize legacy IDs to UUIDs
 function dedupeCards(cards: Card[]): Card[] {
   const map = new Map<string, Card>();
   for (const c of cards) {
     if (c && c.id) {
-      const normalizedId =
-        c.id === 'default-card-1'
-          ? '00000000-0000-0000-0000-000000000101'
-          : c.id === 'default-card-2'
-          ? '00000000-0000-0000-0000-000000000102'
-          : c.id;
-      map.set(normalizedId, { ...c, id: normalizedId });
+      map.set(c.id, c);
     }
   }
   return Array.from(map.values());
@@ -80,8 +35,14 @@ export const useCardStore = create<CardState>((set) => ({
         const stored = localStorage.getItem(STORAGE_KEY_CARDS);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return dedupeCards(parsed);
+          if (Array.isArray(parsed)) {
+            const clean = parsed.filter(
+              (c) => c && c.workspace_id !== LEGACY_MOCK_WORKSPACE_ID && c.workspace_id !== 'default'
+            );
+            if (clean.length !== parsed.length) {
+              localStorage.setItem(STORAGE_KEY_CARDS, JSON.stringify(clean));
+            }
+            return dedupeCards(clean);
           }
         }
       } catch {}

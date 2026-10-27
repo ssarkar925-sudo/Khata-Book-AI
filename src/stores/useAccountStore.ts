@@ -6,64 +6,8 @@ export interface BankAccountItem extends CashLocation {
   iconColor?: string;
 }
 
-const DEFAULT_ACCOUNTS: BankAccountItem[] = [
-  {
-    id: '00000000-0000-0000-0000-000000000101',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'Physical Cash Drawer',
-    balance: 1500000, // ₹15,000.00
-    is_default: true,
-    scope: 'business',
-    account_type: 'cash_counter',
-    bank_name: 'Cash In Hand',
-    account_number_last4: '0001',
-    color_theme: 'amber',
-    gradient: 'from-amber-500/20 via-orange-500/10 to-transparent',
-    iconColor: 'bg-amber-500 text-white',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000102',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'SBI Savings Account',
-    balance: 4500000, // ₹45,000.00
-    is_default: false,
-    scope: 'personal',
-    account_type: 'savings',
-    bank_name: 'State Bank of India',
-    account_number_last4: '3819',
-    color_theme: 'blue',
-    gradient: 'from-blue-600/20 via-cyan-500/10 to-transparent',
-    iconColor: 'bg-blue-600 text-white',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000103',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'HDFC Business Current',
-    balance: 8200000, // ₹82,000.00
-    is_default: false,
-    scope: 'business',
-    account_type: 'current',
-    bank_name: 'HDFC Bank',
-    account_number_last4: '9420',
-    color_theme: 'indigo',
-    gradient: 'from-indigo-600/20 via-purple-500/10 to-transparent',
-    iconColor: 'bg-indigo-600 text-white',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000104',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'Family Household Pool',
-    balance: 2800000, // ₹28,000.00
-    is_default: false,
-    scope: 'family',
-    account_type: 'savings',
-    bank_name: 'ICICI Bank',
-    account_number_last4: '5512',
-    color_theme: 'emerald',
-    gradient: 'from-emerald-600/20 via-teal-500/10 to-transparent',
-    iconColor: 'bg-emerald-600 text-white',
-  },
-];
+const DEFAULT_ACCOUNTS: BankAccountItem[] = [];
+const LEGACY_MOCK_WORKSPACE_ID = '00000000-0000-0000-0000-000000000010';
 
 interface AccountState {
   accounts: BankAccountItem[];
@@ -84,7 +28,18 @@ export const useAccountStore = create<AccountState>((set) => ({
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) return JSON.parse(stored);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const clean = parsed.filter(
+              (a) => a && a.workspace_id !== LEGACY_MOCK_WORKSPACE_ID && a.workspace_id !== 'default'
+            );
+            if (clean.length !== parsed.length) {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+            }
+            return clean;
+          }
+        }
       } catch {}
     }
     return DEFAULT_ACCOUNTS;

@@ -81,97 +81,36 @@ interface SheetState {
   insertColumnAt: (sheetId: string, column: SheetColumn, targetIndex: number) => void;
 }
 
-const DEFAULT_SHEETS: RecordSheet[] = [
-  {
-    id: 'sheet-pan-register',
-    workspace_id: 'default',
-    title: 'PAN & Aadhaar Register',
-    category: 'Documents',
-    color: '#3B82F6',
-    scope: 'business',
-    columns: [
-      { id: 'col_name', name: 'Person Name', type: 'text' },
-      { id: 'col_pan', name: 'PAN Number', type: 'text' },
-      { id: 'col_aadhaar', name: 'Aadhaar (Last 4)', type: 'number' },
-      { id: 'col_phone', name: 'Phone', type: 'phone' },
-      { id: 'col_status', name: 'Verification Status', type: 'status' },
-      { id: 'col_remarks', name: 'Remarks', type: 'text' },
-    ],
-    rows: [
-      {
-        id: 'row-1',
-        data: {
-          col_name: 'Rajesh Sharma',
-          col_pan: 'ABCDE1234F',
-          col_aadhaar: '8942',
-          col_phone: '9876543210',
-          col_status: 'Verified',
-          col_remarks: 'Primary Proprietor',
-        },
-      },
-      {
-        id: 'row-2',
-        data: {
-          col_name: 'Pooja Verma',
-          col_pan: 'PQRST5678K',
-          col_aadhaar: '5412',
-          col_phone: '9812345678',
-          col_status: 'Verified',
-          col_remarks: 'Partner',
-        },
-      },
-    ],
-  },
-  {
-    id: 'sheet-utility-bills',
-    workspace_id: 'default',
-    title: 'Monthly Utility & Bills',
-    category: 'Bills',
-    color: '#10B981',
-    scope: 'family',
-    columns: [
-      { id: 'col_bill', name: 'Bill Name / Service', type: 'text' },
-      { id: 'col_consumer', name: 'Consumer / Account ID', type: 'text' },
-      { id: 'col_duedate', name: 'Due Date', type: 'date' },
-      { id: 'col_amount', name: 'Approx Amount (₹)', type: 'amount' },
-      { id: 'col_status', name: 'Payment Status', type: 'status' },
-    ],
-    rows: [
-      {
-        id: 'row-u1',
-        data: {
-          col_bill: 'WBSEDCL Electricity',
-          col_consumer: '1092837465',
-          col_duedate: '2026-11-05',
-          col_amount: '2450',
-          col_status: 'Pending',
-        },
-      },
-      {
-        id: 'row-u2',
-        data: {
-          col_bill: 'Airtel Fiber Broadband',
-          col_consumer: '033-2894102',
-          col_duedate: '2026-11-12',
-          col_amount: '999',
-          col_status: 'Paid',
-        },
-      },
-    ],
-  },
-];
+const DEFAULT_SHEETS: RecordSheet[] = [];
+const LEGACY_MOCK_WORKSPACE_ID = '00000000-0000-0000-0000-000000000010';
 
 export const useSheetStore = create<SheetState>((set) => ({
   sheets: (() => {
     if (typeof window !== 'undefined') {
       try {
         const cached = localStorage.getItem('rb_saved_sheets');
-        if (cached) return JSON.parse(cached);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            const clean = parsed.filter(
+              (s: any) =>
+                s &&
+                s.workspace_id !== LEGACY_MOCK_WORKSPACE_ID &&
+                s.workspace_id !== 'default' &&
+                s.id !== 'sheet-pan-register' &&
+                s.id !== 'sheet-utility-bills'
+            );
+            if (clean.length !== parsed.length) {
+              localStorage.setItem('rb_saved_sheets', JSON.stringify(clean));
+            }
+            return clean;
+          }
+        }
       } catch {}
     }
     return DEFAULT_SHEETS;
   })(),
-  activeSheetId: DEFAULT_SHEETS[0].id,
+  activeSheetId: null,
 
   setSheets: (sheets) => {
     if (typeof window !== 'undefined') {

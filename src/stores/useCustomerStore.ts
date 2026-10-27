@@ -21,75 +21,10 @@ interface CustomerState {
 
 const STORAGE_KEY_CUSTOMERS = 'rb_customers';
 const STORAGE_KEY_DUES = 'rb_dues';
+const LEGACY_MOCK_WORKSPACE_ID = '00000000-0000-0000-0000-000000000010';
 
-const DEFAULT_CUSTOMERS: Customer[] = [
-  {
-    id: 'cust-101',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'Vikram Textiles',
-    phone: '9876543210',
-    address: 'Shop 12, Main Market',
-    type: 'customer',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'cust-102',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'Sharma Electronics & Parts',
-    phone: '9812345678',
-    address: 'Industrial Area Phase 2',
-    type: 'supplier',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'cust-103',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    name: 'Rajiv Sharma (Friend)',
-    phone: '9845112233',
-    address: 'Personal Circle',
-    type: 'customer',
-    created_at: new Date().toISOString(),
-  },
-];
-
-const DEFAULT_DUES: PeopleDue[] = [
-  {
-    id: 'due-101',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    customer_id: 'cust-101',
-    direction: 'you_will_get',
-    amount: 1450000, // ₹14,500.00
-    due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5).toISOString(),
-    status: 'pending',
-    scope: 'business',
-    notes: 'Order #4092 Silk Sarees delivery payment balance',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'due-102',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    customer_id: 'cust-102',
-    direction: 'you_will_give',
-    amount: 620000, // ₹6,200.00
-    due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString(),
-    status: 'pending',
-    scope: 'business',
-    notes: 'Batch #88 Invoice components raw material supply',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'due-103',
-    workspace_id: '00000000-0000-0000-0000-000000000010',
-    customer_id: 'cust-103',
-    direction: 'you_will_get',
-    amount: 500000, // ₹5,000.00
-    due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 12).toISOString(),
-    status: 'pending',
-    scope: 'personal',
-    notes: 'Personal friendly advance returned next week',
-    created_at: new Date().toISOString(),
-  },
-];
+const DEFAULT_CUSTOMERS: Customer[] = [];
+const DEFAULT_DUES: PeopleDue[] = [];
 
 // Helper to deduplicate items by ID
 function dedupeById<T extends { id: string }>(items: T[]): T[] {
@@ -109,8 +44,14 @@ export const useCustomerStore = create<CustomerState>((set) => ({
         const stored = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return dedupeById(parsed);
+          if (Array.isArray(parsed)) {
+            const clean = parsed.filter(
+              (c: any) => c && c.workspace_id !== LEGACY_MOCK_WORKSPACE_ID && c.workspace_id !== 'default'
+            );
+            if (clean.length !== parsed.length) {
+              localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(clean));
+            }
+            return dedupeById(clean);
           }
         }
       } catch {}
@@ -123,8 +64,14 @@ export const useCustomerStore = create<CustomerState>((set) => ({
         const stored = localStorage.getItem(STORAGE_KEY_DUES);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return dedupeById(parsed);
+          if (Array.isArray(parsed)) {
+            const clean = parsed.filter(
+              (d: any) => d && d.workspace_id !== LEGACY_MOCK_WORKSPACE_ID && d.workspace_id !== 'default'
+            );
+            if (clean.length !== parsed.length) {
+              localStorage.setItem(STORAGE_KEY_DUES, JSON.stringify(clean));
+            }
+            return dedupeById(clean);
           }
         }
       } catch {}

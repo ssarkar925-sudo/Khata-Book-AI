@@ -100,6 +100,58 @@ interface SessionState {
   resetSession: () => void;
 }
 
+function purgeLegacyDemoData() {
+  if (typeof window === 'undefined') return;
+  try {
+    const LEGACY_ID = '00000000-0000-0000-0000-000000000010';
+    const keys = [
+      'rb_accounts',
+      'rb_cards',
+      'rb_customers',
+      'rb_dues',
+      'rb_ledger_entries',
+      'rb_notes',
+      'rb_saved_sheets',
+    ];
+    keys.forEach((key) => {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const clean = parsed.filter(
+              (item: any) =>
+                item &&
+                item.workspace_id !== LEGACY_ID &&
+                item.workspace_id !== 'default' &&
+                item.id !== 'sheet-pan-register' &&
+                item.id !== 'sheet-utility-bills' &&
+                item.id !== 'note-101' &&
+                item.id !== 'note-102' &&
+                item.id !== 'cust-101' &&
+                item.id !== 'cust-102' &&
+                item.id !== 'cust-103' &&
+                item.id !== 'due-101' &&
+                item.id !== 'due-102' &&
+                item.id !== 'due-103' &&
+                item.id !== 'tx-101' &&
+                item.id !== 'tx-102' &&
+                item.id !== 'tx-103' &&
+                item.id !== 'tx-104' &&
+                item.id !== 'tx-105'
+            );
+            if (clean.length === 0) {
+              localStorage.removeItem(key);
+            } else if (clean.length !== parsed.length) {
+              localStorage.setItem(key, JSON.stringify(clean));
+            }
+          }
+        } catch {}
+      }
+    });
+  } catch {}
+}
+
 export const useSessionStore = create<SessionState>((set, get) => ({
   user: null, // Strictly null when unauthenticated
   userRole: null,
@@ -208,6 +260,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setMigrationProgress: (migrationProgress) => set({ migrationProgress }),
 
   initAuth: async () => {
+    purgeLegacyDemoData();
     set({ authLoading: true });
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
