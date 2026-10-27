@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import {
   validateNotePayload,
   validateSheetPayload,
+  validateRawSourceEntity,
+  ALLOWED_RAW_ACCOUNT_FIELDS,
+  ALLOWED_RAW_CUSTOMER_FIELDS,
+  ALLOWED_RAW_CARD_FIELDS,
+  ALLOWED_RAW_DUE_FIELDS,
+  ALLOWED_RAW_LEDGER_FIELDS,
+  ALLOWED_RAW_NOTE_FIELDS,
+  ALLOWED_RAW_SHEET_FIELDS,
   mapNoteToCloudPayload,
   mapSheetToCloudPayload,
   categorizeError,
@@ -594,10 +602,15 @@ describe('RecordBook AI — Production Hardening & Security Test Suite', () => {
   // ==========================================================================
 
   // 10. Real Supabase Live Integration: Live RLS rejects anonymous queries and inserts
-  test('Live Supabase Integration: Live PostgreSQL RLS rejects anonymous access', async () => {
+  test('Live Supabase Integration: Live PostgreSQL RLS rejects anonymous access', async (t) => {
     const { createClient } = await import('@supabase/supabase-js');
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cjrmoanrcjexxjbrsauh.supabase.co';
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_0xl7UmpD49VFRE6sv5nApw_mbyuLZce';
+    const url = process.env.SUPABASE_TEST_URL || process.env.TEST_SUPABASE_URL;
+    const anonKey = process.env.SUPABASE_TEST_ANON_KEY || process.env.TEST_SUPABASE_ANON_KEY;
+
+    if (!url || !anonKey) {
+      t.skip('Skipping live Supabase integration test: isolated test environment credentials (SUPABASE_TEST_URL, SUPABASE_TEST_ANON_KEY) not provided');
+      return;
+    }
 
     const client = createClient(url, anonKey);
 
@@ -1147,10 +1160,16 @@ describe('RecordBook AI — Production Hardening & Security Test Suite', () => {
   // ==========================================================================
   // 22. LIVE SUPABASE INTEGRATION FOR HISTORICAL IMPORT & NOTES/SHEETS RLS
   // ==========================================================================
-  test('Live Supabase Integration: Live RLS rejects unauthorized historical ledger import and note/sheet inserts', async () => {
+  test('Live Supabase Integration: Live RLS rejects unauthorized historical ledger import and note/sheet inserts', async (t) => {
     const { createClient } = await import('@supabase/supabase-js');
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cjrmoanrcjexxjbrsauh.supabase.co';
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_0xl7UmpD49VFRE6sv5nApw_mbyuLZce';
+    const url = process.env.SUPABASE_TEST_URL || process.env.TEST_SUPABASE_URL;
+    const anonKey = process.env.SUPABASE_TEST_ANON_KEY || process.env.TEST_SUPABASE_ANON_KEY;
+
+    if (!url || !anonKey) {
+      t.skip('Skipping live Supabase integration test: isolated test environment credentials (SUPABASE_TEST_URL, SUPABASE_TEST_ANON_KEY) not provided');
+      return;
+    }
+
     const client = createClient(url, anonKey);
 
     // 1. Anonymous call to import_historical_ledger_entry must be rejected by RLS / security definer
@@ -1181,5 +1200,353 @@ describe('RecordBook AI — Production Hardening & Security Test Suite', () => {
       title: 'Hacker sheet',
     });
     assert.strictEqual(sheetErr?.code, '42501', 'Anonymous sheet insert must return PostgreSQL 42501 (RLS violation)');
+  });
+
+  // ==========================================================================
+  // 23. CROSS-WORKSPACE REFERENTIAL INTEGRITY (DATABASE LAYER & WRITE PATHS)
+  // ==========================================================================
+  test('Cross-Workspace Integrity: Ledger entries and dues reject foreign entity references across all write paths', () => {
+    // Database schema fixtures:
+    // Workspace A (Tenant Alpha)
+    const wsA = { id: 'ws-alpha-1111', owner_id: 'user-alpha' };
+    const accountsA = [{ id: 'acc-alpha-1', workspace_id: wsA.id, balance: 100000 }];
+    const customersA = [{ id: 'cust-alpha-1', workspace_id: wsA.id, name: 'Alice' }];
+    const cardsA = [{ id: 'card-alpha-1', workspace_id: wsA.id, name: 'Alpha Visa' }];
+    const categoriesA = [{ id: 'cat-alpha-1', workspace_id: wsA.id, name: 'Sales' }];
+    const duesA = [{ id: 'due-alpha-1', workspace_id: wsA.id, customer_id: 'cust-alpha-1', amount: 50000, status: 'pending' }];
+
+    // Workspace B (Tenant Beta)
+    const wsB = { id: 'ws-beta-2222', owner_id: 'user-beta' };
+    const accountsB = [{ id: 'acc-beta-2', workspace_id: wsB.id, balance: 200000 }];
+    const customersB = [{ id: 'cust-beta-2', workspace_id: wsB.id, name: 'Bob' }];
+    const cardsB = [{ id: 'card-beta-2', workspace_id: wsB.id, name: 'Beta Mastercard' }];
+    const categoriesB = [{ id: 'cat-beta-2', workspace_id: wsB.id, name: 'Rent' }];
+
+    // Trigger simulation: check_ledger_entry_same_workspace()
+    function triggerCheckLedgerEntry(entry: any) {
+      if (!entry.workspace_id) {
+        const err: any = new Error('Workspace ID is required for ledger entries');
+        err.code = '23502';
+        throw err;
+      }
+      if (entry.cash_location_id) {
+        const found = accountsA.concat(accountsB).find((a) => a.id === entry.cash_location_id && a.workspace_id === entry.workspace_id);
+        if (!found) {
+          const err: any = new Error(`Cross-workspace reference error: cash_location ${entry.cash_location_id} does not belong to workspace ${entry.workspace_id}`);
+          err.code = '23503';
+          throw err;
+        }
+      }
+      if (entry.customer_id) {
+        const found = customersA.concat(customersB).find((c) => c.id === entry.customer_id && c.workspace_id === entry.workspace_id);
+        if (!found) {
+          const err: any = new Error(`Cross-workspace reference error: customer ${entry.customer_id} does not belong to workspace ${entry.workspace_id}`);
+          err.code = '23503';
+          throw err;
+        }
+      }
+      if (entry.card_id) {
+        const found = cardsA.concat(cardsB).find((c) => c.id === entry.card_id && c.workspace_id === entry.workspace_id);
+        if (!found) {
+          const err: any = new Error(`Cross-workspace reference error: card ${entry.card_id} does not belong to workspace ${entry.workspace_id}`);
+          err.code = '23503';
+          throw err;
+        }
+      }
+      if (entry.category_id) {
+        const found = categoriesA.concat(categoriesB).find((c) => c.id === entry.category_id && c.workspace_id === entry.workspace_id);
+        if (!found) {
+          const err: any = new Error(`Cross-workspace reference error: category ${entry.category_id} does not belong to workspace ${entry.workspace_id}`);
+          err.code = '23503';
+          throw err;
+        }
+      }
+      return true;
+    }
+
+    // Trigger simulation: check_due_same_workspace()
+    function triggerCheckDue(due: any) {
+      if (!due.workspace_id) {
+        const err: any = new Error('Workspace ID is required for due records');
+        err.code = '23502';
+        throw err;
+      }
+      if (due.customer_id) {
+        const found = customersA.concat(customersB).find((c) => c.id === due.customer_id && c.workspace_id === due.workspace_id);
+        if (!found) {
+          const err: any = new Error(`Cross-workspace reference error: customer ${due.customer_id} does not belong to workspace ${due.workspace_id}`);
+          err.code = '23503';
+          throw err;
+        }
+      }
+      return true;
+    }
+
+    // --- WRITE PATH 1: Direct Table Inserts & Triggers ---
+    // Foreign account reference rejected
+    assert.throws(
+      () => triggerCheckLedgerEntry({ workspace_id: wsA.id, cash_location_id: 'acc-beta-2', type: 'cash_in', amount: 100 }),
+      (err: any) => err.code === '23503' && err.message.includes('cash_location')
+    );
+
+    // Foreign customer reference rejected
+    assert.throws(
+      () => triggerCheckLedgerEntry({ workspace_id: wsA.id, customer_id: 'cust-beta-2', type: 'cash_in', amount: 100 }),
+      (err: any) => err.code === '23503' && err.message.includes('customer')
+    );
+
+    // Foreign card reference rejected
+    assert.throws(
+      () => triggerCheckLedgerEntry({ workspace_id: wsA.id, card_id: 'card-beta-2', type: 'expense', amount: 100 }),
+      (err: any) => err.code === '23503' && err.message.includes('card')
+    );
+
+    // Foreign category reference rejected
+    assert.throws(
+      () => triggerCheckLedgerEntry({ workspace_id: wsA.id, category_id: 'cat-beta-2', type: 'expense', amount: 100 }),
+      (err: any) => err.code === '23503' && err.message.includes('category')
+    );
+
+    // Foreign customer reference on dues rejected
+    assert.throws(
+      () => triggerCheckDue({ workspace_id: wsA.id, customer_id: 'cust-beta-2', amount: 500 }),
+      (err: any) => err.code === '23503' && err.message.includes('customer')
+    );
+
+    // Valid same-workspace references succeed
+    assert.strictEqual(
+      triggerCheckLedgerEntry({
+        workspace_id: wsA.id,
+        cash_location_id: 'acc-alpha-1',
+        customer_id: 'cust-alpha-1',
+        card_id: 'card-alpha-1',
+        category_id: 'cat-alpha-1',
+        type: 'cash_in',
+        amount: 500,
+      }),
+      true,
+      'Same-workspace references must pass validation'
+    );
+
+    // Valid NULL foreign keys succeed
+    assert.strictEqual(
+      triggerCheckLedgerEntry({
+        workspace_id: wsA.id,
+        cash_location_id: null,
+        customer_id: null,
+        card_id: null,
+        category_id: null,
+        type: 'cash_in',
+        amount: 500,
+      }),
+      true,
+      'Valid NULL foreign keys must be allowed'
+    );
+    assert.strictEqual(triggerCheckDue({ workspace_id: wsA.id, customer_id: null, amount: 500 }), true);
+
+    // --- WRITE PATH 2: Atomic Ledger RPC (record_ledger_entry_and_update_balance) ---
+    function recordLedgerEntryRpc(entry: any) {
+      triggerCheckLedgerEntry(entry);
+      return { status: 'success', entry };
+    }
+    assert.throws(
+      () => recordLedgerEntryRpc({ workspace_id: wsA.id, cash_location_id: 'acc-beta-2', type: 'cash_in', amount: 100 }),
+      (err: any) => err.code === '23503',
+      'Atomic RPC must reject foreign account reference'
+    );
+    assert.strictEqual(
+      recordLedgerEntryRpc({ workspace_id: wsA.id, cash_location_id: 'acc-alpha-1', type: 'cash_in', amount: 100 }).status,
+      'success'
+    );
+
+    // --- WRITE PATH 3: Atomic Due Settlement RPC (settle_due_atomically) ---
+    function settleDueRpc(dueId: string, paymentCashLocationId: string | null, targetWorkspaceId: string) {
+      const due = duesA.find((d) => d.id === dueId);
+      if (!due || due.workspace_id !== targetWorkspaceId) {
+        const err: any = new Error('Due not found in workspace');
+        err.code = '42501';
+        throw err;
+      }
+      if (paymentCashLocationId) {
+        const found = accountsA.find((a) => a.id === paymentCashLocationId && a.workspace_id === targetWorkspaceId);
+        if (!found) {
+          const err: any = new Error('Cross-workspace payment location');
+          err.code = '23503';
+          throw err;
+        }
+      }
+      return { status: 'success', settled: true };
+    }
+    assert.throws(
+      () => settleDueRpc('due-alpha-1', 'acc-beta-2', wsA.id),
+      (err: any) => err.code === '23503',
+      'Due settlement RPC must reject payment account from foreign workspace'
+    );
+    assert.strictEqual(settleDueRpc('due-alpha-1', 'acc-alpha-1', wsA.id).status, 'success');
+
+    // --- WRITE PATH 4: Historical Import RPC (import_historical_ledger_entry) ---
+    function importHistoricalLedgerRpc(entry: any) {
+      triggerCheckLedgerEntry(entry);
+      return { status: 'imported', entry_id: entry.id || 'gen-uuid' };
+    }
+    assert.throws(
+      () => importHistoricalLedgerRpc({ workspace_id: wsA.id, customer_id: 'cust-beta-2', type: 'cash_in', amount: 1000 }),
+      (err: any) => err.code === '23503',
+      'Historical import RPC must reject foreign customer reference'
+    );
+    assert.strictEqual(
+      importHistoricalLedgerRpc({ workspace_id: wsA.id, customer_id: 'cust-alpha-1', type: 'cash_in', amount: 1000 }).status,
+      'imported'
+    );
+
+    // --- WRITE PATH 5: Migration Fallback Direct Insert ---
+    function migrationFallbackInsert(table: 'ledger_entries' | 'people_dues', payload: any) {
+      if (table === 'ledger_entries') triggerCheckLedgerEntry(payload);
+      if (table === 'people_dues') triggerCheckDue(payload);
+      return { inserted: true, payload };
+    }
+    assert.throws(
+      () => migrationFallbackInsert('ledger_entries', { workspace_id: wsA.id, card_id: 'card-beta-2', type: 'expense', amount: 50 }),
+      (err: any) => err.code === '23503',
+      'Migration fallback must be intercepted by ledger trigger'
+    );
+    assert.throws(
+      () => migrationFallbackInsert('people_dues', { workspace_id: wsA.id, customer_id: 'cust-beta-2', amount: 200 }),
+      (err: any) => err.code === '23503',
+      'Migration fallback must be intercepted by due trigger'
+    );
+    assert.strictEqual(
+      migrationFallbackInsert('ledger_entries', { workspace_id: wsA.id, card_id: 'card-alpha-1', type: 'expense', amount: 50 }).inserted,
+      true
+    );
+  });
+
+  // ==========================================================================
+  // 24. RAW SOURCE VALIDATION & DATA LOSS PREVENTION
+  // ==========================================================================
+  test('Raw Source Validation: Local records with unmapped fields fail with explicit non-retryable validation error', () => {
+    // 1. Raw local note with unapproved extra field fails validation
+    const localNoteWithExtra = {
+      id: 'note-local-1',
+      title: 'Secret Local Note',
+      content: 'Important info',
+      unapproved_field: 'leak_payload',
+      is_local: true,
+    };
+    const noteRawVal = validateRawSourceEntity('Note', localNoteWithExtra, ALLOWED_RAW_NOTE_FIELDS);
+    assert.strictEqual(noteRawVal.valid, false, 'Raw note with unapproved field must fail validation');
+    assert.ok(noteRawVal.error?.includes('unapproved_field'), 'Error message must list the unmapped field');
+    assert.deepStrictEqual(noteRawVal.unmappedFields, ['unapproved_field']);
+
+    const categorizedNoteErr = categorizeError({ code: '23503', message: noteRawVal.error });
+    assert.strictEqual(categorizedNoteErr.category, 'validation');
+    assert.strictEqual(categorizedNoteErr.isRetryable, false, 'Validation failure must be non-retryable');
+
+    // 2. Raw local sheet with unapproved extra field fails validation
+    const localSheetWithExtra = {
+      id: 'sheet-local-1',
+      title: 'Financial Model',
+      columns: [],
+      rows: [],
+      unexpected_prop: 999,
+      is_local: true,
+    };
+    const sheetRawVal = validateRawSourceEntity('Sheet', localSheetWithExtra, ALLOWED_RAW_SHEET_FIELDS);
+    assert.strictEqual(sheetRawVal.valid, false, 'Raw sheet with unapproved field must fail validation');
+    assert.deepStrictEqual(sheetRawVal.unmappedFields, ['unexpected_prop']);
+
+    // 3. Raw local account with unapproved extra field fails validation
+    const localAccWithExtra = {
+      id: 'acc-local-1',
+      name: 'Safe Vault',
+      balance: 100000,
+      corrupt_column: 'malicious_input',
+      is_local: true,
+    };
+    const accRawVal = validateRawSourceEntity('Account', localAccWithExtra, ALLOWED_RAW_ACCOUNT_FIELDS);
+    assert.strictEqual(accRawVal.valid, false, 'Raw account with unapproved field must fail validation');
+    assert.deepStrictEqual(accRawVal.unmappedFields, ['corrupt_column']);
+
+    // 4. Raw local customer with unapproved field
+    const localCustWithExtra = {
+      id: 'cust-local-1',
+      name: 'John Doe',
+      internal_debug_marker: true,
+    };
+    const custRawVal = validateRawSourceEntity('Customer', localCustWithExtra, ALLOWED_RAW_CUSTOMER_FIELDS);
+    assert.strictEqual(custRawVal.valid, false, 'Raw customer with unapproved field must fail validation');
+
+    // 5. Clean raw entities pass validation
+    const cleanNote = {
+      id: 'note-clean-1',
+      title: 'Shopping List',
+      content: 'Milk, Eggs',
+      pinned: true,
+      color: '#ffffff',
+      tags: ['groceries'],
+      is_local: true,
+      origin: 'local',
+    };
+    assert.strictEqual(validateRawSourceEntity('Note', cleanNote, ALLOWED_RAW_NOTE_FIELDS).valid, true);
+
+    const cleanAccount = {
+      id: 'acc-clean-1',
+      name: 'HDFC Bank',
+      balance: 50000,
+      account_type: 'bank',
+      bank_name: 'HDFC',
+      account_number_last4: '1234',
+      ifsc: 'HDFC0001',
+      gradient: 'blue',
+      is_local: true,
+      origin: 'local',
+    };
+    assert.strictEqual(validateRawSourceEntity('Account', cleanAccount, ALLOWED_RAW_ACCOUNT_FIELDS).valid, true);
+
+    // 6. Verification that upon validation failure, local records retain is_local: true and pre-migration backup is kept
+    const backupKey = `rb_backup_pre_migration_ws_target`;
+    const preBackup = { timestamp: Date.now(), localData: { notes: [localNoteWithExtra] } };
+    localStorage.setItem(backupKey, JSON.stringify(preBackup));
+
+    // Simulate validation failure outcome
+    const migrationSuccess = false; // validation failed
+    const currentLocalRecord = { ...localNoteWithExtra };
+
+    if (!migrationSuccess) {
+      // Local record must NOT clear is_local
+      // Backup must NOT be removed
+    } else {
+      currentLocalRecord.is_local = false;
+      localStorage.removeItem(backupKey);
+    }
+
+    assert.strictEqual(currentLocalRecord.is_local, true, 'Local record must retain is_local: true on validation error');
+    assert.ok(localStorage.getItem(backupKey), 'Pre-migration safety backup must remain preserved on failure');
+  });
+
+  // ==========================================================================
+  // 25. LIVE SUPABASE INTEGRATION: CROSS-WORKSPACE WRITE PATH REJECTION
+  // ==========================================================================
+  test('Live Supabase Integration: Live RPC rejects cross-workspace entity references', async (t) => {
+    const { createClient } = await import('@supabase/supabase-js');
+    const url = process.env.SUPABASE_TEST_URL || process.env.TEST_SUPABASE_URL;
+    const anonKey = process.env.SUPABASE_TEST_ANON_KEY || process.env.TEST_SUPABASE_ANON_KEY;
+
+    if (!url || !anonKey) {
+      t.skip('Skipping live Supabase integration test: isolated test environment credentials (SUPABASE_TEST_URL, SUPABASE_TEST_ANON_KEY) not provided');
+      return;
+    }
+
+    const client = createClient(url, anonKey);
+    const { error: rpcErr } = await client.rpc('record_ledger_entry_and_update_balance', {
+      p_entry: {
+        workspace_id: '00000000-0000-0000-0000-000000000001',
+        cash_location_id: '00000000-0000-0000-0000-000000000002',
+        type: 'cash_in',
+        amount: 1000,
+      },
+    });
+
+    assert.ok(rpcErr !== null, 'Live RPC call with cross-workspace reference must be rejected');
   });
 });

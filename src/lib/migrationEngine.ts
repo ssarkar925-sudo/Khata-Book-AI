@@ -197,6 +197,160 @@ export const ALLOWED_SHEET_FIELDS = new Set([
   'updated_at',
 ]);
 
+// Allowed fields on original local source objects (raw offline entities)
+export const ALLOWED_RAW_ACCOUNT_FIELDS = new Set([
+  'id',
+  'workspace_id',
+  'name',
+  'balance',
+  'is_default',
+  'scope',
+  'account_type',
+  'bank_name',
+  'account_number_last4',
+  'ifsc',
+  'gradient',
+  'icon_color',
+  'iconColor',
+  'created_at',
+  'updated_at',
+  'is_local',
+  'origin',
+]);
+
+export const ALLOWED_RAW_CUSTOMER_FIELDS = new Set([
+  'id',
+  'workspace_id',
+  'name',
+  'phone',
+  'address',
+  'scope',
+  'type',
+  'created_at',
+  'updated_at',
+  'is_local',
+  'origin',
+]);
+
+export const ALLOWED_RAW_CARD_FIELDS = new Set([
+  'id',
+  'workspace_id',
+  'name',
+  'bank',
+  'last4',
+  'credit_limit',
+  'statement_day',
+  'due_day',
+  'is_active',
+  'scope',
+  'created_at',
+  'updated_at',
+  'is_local',
+  'origin',
+]);
+
+export const ALLOWED_RAW_DUE_FIELDS = new Set([
+  'id',
+  'workspace_id',
+  'customer_id',
+  'direction',
+  'amount',
+  'due_date',
+  'status',
+  'scope',
+  'notes',
+  'created_at',
+  'updated_at',
+  'is_local',
+  'origin',
+]);
+
+export const ALLOWED_RAW_LEDGER_FIELDS = new Set([
+  'id',
+  'workspace_id',
+  'type',
+  'amount',
+  'category_id',
+  'cash_location_id',
+  'customer_id',
+  'card_id',
+  'mode',
+  'scope',
+  'note',
+  'entry_date',
+  'is_billed',
+  'idempotency_key',
+  'created_by',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+  'is_local',
+  'origin',
+]);
+
+export const ALLOWED_RAW_NOTE_FIELDS = new Set([
+  'id',
+  'workspace_id',
+  'title',
+  'body',
+  'content',
+  'color',
+  'tags',
+  'is_pinned',
+  'pinned',
+  'checklist_items',
+  'checklistItems',
+  'scope',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+  'is_local',
+  'origin',
+]);
+
+export const ALLOWED_RAW_SHEET_FIELDS = new Set([
+  'id',
+  'workspace_id',
+  'title',
+  'category',
+  'color',
+  'columns',
+  'rows',
+  'scope',
+  'frozen_row_count',
+  'frozenRowCount',
+  'row_height',
+  'rowHeight',
+  'show_gridlines',
+  'showGridlines',
+  'created_at',
+  'updated_at',
+  'is_local',
+  'origin',
+]);
+
+export function validateRawSourceEntity(
+  entityName: string,
+  sourceItem: Record<string, any>,
+  allowedFields: Set<string>
+): { valid: boolean; error?: string; unmappedFields?: string[] } {
+  if (!sourceItem || typeof sourceItem !== 'object') {
+    return { valid: false, error: `${entityName} source item is not a valid object` };
+  }
+  if (!sourceItem.id) {
+    return { valid: false, error: `${entityName} source item is missing required id` };
+  }
+  const unexpected = Object.keys(sourceItem).filter((k) => !allowedFields.has(k));
+  if (unexpected.length > 0) {
+    return {
+      valid: false,
+      error: `Unsupported source field(s) on local ${entityName} (${sourceItem.id}): [${unexpected.join(', ')}]. Migration rejected to prevent silent data loss.`,
+      unmappedFields: unexpected,
+    };
+  }
+  return { valid: true };
+}
+
 export function validateNotePayload(payload: Record<string, any>): { valid: boolean; error?: string } {
   if (!payload.id || !payload.workspace_id || !payload.title) {
     return { valid: false, error: 'Note payload missing required fields: id, workspace_id, or title' };
@@ -458,6 +612,19 @@ export class MigrationEngine {
     // Step 3a: Upload Accounts with SNAPSHOT BALANCES (Option A)
     for (const acc of accountsToMigrate) {
       updateProgress(`Uploading Bank Account: ${acc.name}...`);
+      const rawVal = validateRawSourceEntity('Account', acc, ALLOWED_RAW_ACCOUNT_FIELDS);
+      if (!rawVal.valid) {
+        failedRecords.push({
+          entity: 'Account',
+          id: acc.id,
+          error: rawVal.error!,
+          errorCategory: 'validation',
+          isRetryable: false,
+        });
+        processed++;
+        continue;
+      }
+
       const payload = {
         id: acc.id,
         workspace_id: targetWorkspaceId,
@@ -492,6 +659,19 @@ export class MigrationEngine {
     // Step 3b: Upload Customers
     for (const cust of customersToMigrate) {
       updateProgress(`Uploading Contact: ${cust.name}...`);
+      const rawVal = validateRawSourceEntity('Customer', cust, ALLOWED_RAW_CUSTOMER_FIELDS);
+      if (!rawVal.valid) {
+        failedRecords.push({
+          entity: 'Customer',
+          id: cust.id,
+          error: rawVal.error!,
+          errorCategory: 'validation',
+          isRetryable: false,
+        });
+        processed++;
+        continue;
+      }
+
       const payload = {
         id: cust.id,
         workspace_id: targetWorkspaceId,
@@ -521,6 +701,19 @@ export class MigrationEngine {
     // Step 3c: Upload Cards
     for (const card of cardsToMigrate) {
       updateProgress(`Uploading Card: ${card.name}...`);
+      const rawVal = validateRawSourceEntity('Card', card, ALLOWED_RAW_CARD_FIELDS);
+      if (!rawVal.valid) {
+        failedRecords.push({
+          entity: 'Card',
+          id: card.id,
+          error: rawVal.error!,
+          errorCategory: 'validation',
+          isRetryable: false,
+        });
+        processed++;
+        continue;
+      }
+
       const payload = {
         id: card.id,
         workspace_id: targetWorkspaceId,
@@ -553,6 +746,19 @@ export class MigrationEngine {
     // Step 3d: Upload Dues
     for (const due of duesToMigrate) {
       updateProgress(`Uploading Due / Udhar record...`);
+      const rawVal = validateRawSourceEntity('Due', due, ALLOWED_RAW_DUE_FIELDS);
+      if (!rawVal.valid) {
+        failedRecords.push({
+          entity: 'Due',
+          id: due.id,
+          error: rawVal.error!,
+          errorCategory: 'validation',
+          isRetryable: false,
+        });
+        processed++;
+        continue;
+      }
+
       const payload = {
         id: due.id,
         workspace_id: targetWorkspaceId,
@@ -586,6 +792,19 @@ export class MigrationEngine {
     // That would mutate balances and cause double counting!
     for (const entry of ledgerToMigrate) {
       updateProgress(`Uploading Ledger Entry: ${entry.note || entry.id}...`);
+      const rawVal = validateRawSourceEntity('Ledger Entry', entry, ALLOWED_RAW_LEDGER_FIELDS);
+      if (!rawVal.valid) {
+        failedRecords.push({
+          entity: 'Ledger Entry',
+          id: entry.id,
+          error: rawVal.error!,
+          errorCategory: 'validation',
+          isRetryable: false,
+        });
+        processed++;
+        continue;
+      }
+
       const cleanEntry = sanitizeLedgerPayload({
         ...entry,
         workspace_id: targetWorkspaceId,
@@ -633,6 +852,19 @@ export class MigrationEngine {
     // Step 3f: Upload Notes with Strict Whitelist Mapping & Validation
     for (const note of notesToMigrate) {
       updateProgress(`Uploading Note: ${note.title}...`);
+      const rawVal = validateRawSourceEntity('Note', note, ALLOWED_RAW_NOTE_FIELDS);
+      if (!rawVal.valid) {
+        failedRecords.push({
+          entity: 'Note',
+          id: note.id,
+          error: rawVal.error!,
+          errorCategory: 'validation',
+          isRetryable: false,
+        });
+        processed++;
+        continue;
+      }
+
       const payload = mapNoteToCloudPayload(note, targetWorkspaceId);
       const validation = validateNotePayload(payload);
 
@@ -667,6 +899,19 @@ export class MigrationEngine {
     // Step 3g: Upload Sheets with Strict Whitelist Mapping & Validation
     for (const sheet of sheetsToMigrate) {
       updateProgress(`Uploading Sheet: ${sheet.title}...`);
+      const rawVal = validateRawSourceEntity('Sheet', sheet, ALLOWED_RAW_SHEET_FIELDS);
+      if (!rawVal.valid) {
+        failedRecords.push({
+          entity: 'Sheet',
+          id: sheet.id,
+          error: rawVal.error!,
+          errorCategory: 'validation',
+          isRetryable: false,
+        });
+        processed++;
+        continue;
+      }
+
       const payload = mapSheetToCloudPayload(sheet, targetWorkspaceId);
       const validation = validateSheetPayload(payload);
 
