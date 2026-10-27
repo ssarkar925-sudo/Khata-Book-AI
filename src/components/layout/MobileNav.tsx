@@ -119,14 +119,14 @@ export function MobileNav({ activeTab, setActiveTab, onOpenMore }: MobileNavProp
         <button
           onClick={onOpenMore}
           className={`flex flex-col items-center justify-center py-1 transition-all touch-press ${
-            activeTab === 'vault' || activeTab === 'reports'
+            activeTab === 'vault' || activeTab === 'reports' || activeTab === 'expenses' || activeTab === 'sheets'
               ? 'text-violet-600 dark:text-violet-400 font-bold'
               : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
           }`}
         >
           <div
             className={`flex items-center justify-center w-11 h-7 rounded-xl transition-all ${
-              activeTab === 'vault' || activeTab === 'reports'
+              activeTab === 'vault' || activeTab === 'reports' || activeTab === 'expenses' || activeTab === 'sheets'
                 ? 'bg-violet-500/15 text-violet-600 dark:text-violet-400 scale-105'
                 : 'bg-transparent'
             }`}

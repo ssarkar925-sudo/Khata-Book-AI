@@ -126,6 +126,7 @@ const SheetCellInput = React.memo(function SheetCellInput({
   isItalic,
   align,
   textColor,
+  cellColor,
   wrapText,
   onChange,
   onEnterAtLastRow,
@@ -136,6 +137,7 @@ const SheetCellInput = React.memo(function SheetCellInput({
   isItalic: boolean;
   align: 'left' | 'center' | 'right';
   textColor?: string;
+  cellColor?: string;
   wrapText: boolean;
   onChange: (val: string) => void;
   onEnterAtLastRow?: () => void;
@@ -145,6 +147,9 @@ const SheetCellInput = React.memo(function SheetCellInput({
   useEffect(() => {
     setLocalVal(value);
   }, [value]);
+
+  const hasPastelFill = Boolean(cellColor && cellColor !== 'none' && cellColor !== 'transparent');
+  const effectiveTextColor = textColor || (hasPastelFill ? '#0f172a' : undefined);
 
   return (
     <input
@@ -168,12 +173,14 @@ const SheetCellInput = React.memo(function SheetCellInput({
         fontWeight: isBold ? 'bold' : undefined,
         fontStyle: isItalic ? 'italic' : undefined,
         textAlign: align,
-        color: textColor || undefined,
+        color: effectiveTextColor,
       }}
       className={`w-full bg-transparent px-1.5 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 transition-colors ${
         wrapText ? '' : 'truncate'
       } ${
-        type === 'amount'
+        hasPastelFill
+          ? 'text-slate-950 font-semibold'
+          : type === 'amount'
           ? 'font-bold font-mono text-emerald-600 dark:text-emerald-400'
           : type === 'status'
           ? 'font-bold text-blue-600 dark:text-blue-400'
@@ -1044,7 +1051,9 @@ export function SheetsScreen() {
                   <button
                     onClick={() => setRowHeight(activeSheet.id, 'compact')}
                     className={`px-1.5 py-0.5 rounded-lg transition-all ${
-                      rowHeightMode === 'compact' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                      rowHeightMode === 'compact'
+                        ? 'bg-blue-600 text-white font-bold'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title="Compact Row Height (28px)"
                   >
@@ -1053,7 +1062,9 @@ export function SheetsScreen() {
                   <button
                     onClick={() => setRowHeight(activeSheet.id, 'normal')}
                     className={`px-1.5 py-0.5 rounded-lg transition-all ${
-                      rowHeightMode === 'normal' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                      rowHeightMode === 'normal'
+                        ? 'bg-blue-600 text-white font-bold'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title="Default Row Height (38px)"
                   >
@@ -1062,7 +1073,9 @@ export function SheetsScreen() {
                   <button
                     onClick={() => setRowHeight(activeSheet.id, 'relaxed')}
                     className={`px-1.5 py-0.5 rounded-lg transition-all ${
-                      rowHeightMode === 'relaxed' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                      rowHeightMode === 'relaxed'
+                        ? 'bg-blue-600 text-white font-bold'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title="Relaxed Row Height (48px)"
                   >
@@ -1382,8 +1395,10 @@ export function SheetsScreen() {
                 <div className="flex items-center rounded-lg border border-slate-200 dark:border-white/10 p-0.5">
                   <button
                     onClick={() => handleSetAlignment('left')}
-                    className={`p-0.5 rounded ${
-                      cellAlignment === 'left' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                    className={`p-0.5 rounded transition-colors ${
+                      cellAlignment === 'left'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title="Align Left"
                   >
@@ -1391,8 +1406,10 @@ export function SheetsScreen() {
                   </button>
                   <button
                     onClick={() => handleSetAlignment('center')}
-                    className={`p-0.5 rounded ${
-                      cellAlignment === 'center' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                    className={`p-0.5 rounded transition-colors ${
+                      cellAlignment === 'center'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title="Align Center"
                   >
@@ -1400,8 +1417,10 @@ export function SheetsScreen() {
                   </button>
                   <button
                     onClick={() => handleSetAlignment('right')}
-                    className={`p-0.5 rounded ${
-                      cellAlignment === 'right' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                    className={`p-0.5 rounded transition-colors ${
+                      cellAlignment === 'right'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                     title="Align Right"
                   >
@@ -1625,19 +1644,23 @@ export function SheetsScreen() {
                                       fontWeight: isBold ? 'bold' : 'normal',
                                       fontStyle: isItalic ? 'italic' : 'normal',
                                       textAlign: align,
-                                      color: textColor || undefined,
+                                      color: textColor || (cellColor && cellColor !== 'none' ? '#0f172a' : undefined),
                                     }}
                                     className={`w-full bg-transparent focus:outline-none cursor-pointer ${
                                       wrapText ? '' : 'truncate'
                                     } ${
-                                      displayVal === 'Active' || displayVal === 'Verified' || displayVal === 'Paid'
-                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                      cellColor && cellColor !== 'none'
+                                        ? 'text-slate-950 font-semibold'
+                                        : displayVal === 'Active' || displayVal === 'Verified' || displayVal === 'Paid'
+                                        ? 'text-emerald-600 dark:text-emerald-400 font-bold'
                                         : displayVal === 'Pending' || displayVal === 'Inactive'
-                                        ? 'text-amber-600 dark:text-amber-400'
+                                        ? 'text-amber-600 dark:text-amber-400 font-bold'
                                         : 'text-slate-800 dark:text-slate-200'
                                     }`}
                                   >
-                                    <option value="">-- Select --</option>
+                                    <option value="" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                                      -- Select --
+                                    </option>
                                     {(col.options || [
                                       'Active',
                                       'Pending',
@@ -1645,7 +1668,7 @@ export function SheetsScreen() {
                                       'Male',
                                       'Female',
                                     ]).map((opt) => (
-                                      <option key={opt} value={opt} className="text-slate-900 bg-white">
+                                      <option key={opt} value={opt} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                                         {opt}
                                       </option>
                                     ))}
@@ -1664,9 +1687,13 @@ export function SheetsScreen() {
                                       fontWeight: isBold ? 'bold' : 'normal',
                                       fontStyle: isItalic ? 'italic' : 'normal',
                                       textAlign: align,
-                                      color: textColor || undefined,
+                                      color: textColor || (cellColor && cellColor !== 'none' ? '#0f172a' : undefined),
                                     }}
-                                    className="w-full bg-transparent px-1 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 font-mono text-slate-800 dark:text-slate-200"
+                                    className={`w-full bg-transparent px-1 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 font-mono ${
+                                      cellColor && cellColor !== 'none'
+                                        ? 'text-slate-950 font-semibold'
+                                        : 'text-slate-800 dark:text-slate-200'
+                                    }`}
                                   />
                                 </div>
                               ) : (
@@ -1678,6 +1705,7 @@ export function SheetsScreen() {
                                   isItalic={isItalic}
                                   align={align}
                                   textColor={textColor}
+                                  cellColor={cellColor}
                                   wrapText={wrapText}
                                   onChange={(val) => updateCell(activeSheet.id, row.id, col.id, val)}
                                   onEnterAtLastRow={
@@ -1957,7 +1985,7 @@ export function SheetsScreen() {
                     max={600}
                     value={colWidth}
                     onChange={(e) => setColWidth(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs font-mono font-bold"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs font-mono font-bold text-slate-900 dark:text-white"
                   />
                 </div>
 

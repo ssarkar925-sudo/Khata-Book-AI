@@ -18,6 +18,42 @@
   }
 }
 
+/* Universal Form Elements & High Contrast Dropdown Fixes */
+select {
+  color-scheme: light;
+}
+
+.dark select,
+html.dark select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.dark select option,
+html.dark select option {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+/* Ensure placeholder text contrast across light and dark modes */
+::placeholder {
+  opacity: 0.65;
+}
+
+.dark ::placeholder {
+  color: #94a3b8;
+  opacity: 0.75;
+}
+
+/* Date input calendar icon inversion for dark mode */
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
 body {
   background-color: var(--bg-app);
   color: var(--text-main);

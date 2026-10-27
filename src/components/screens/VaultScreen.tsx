@@ -596,26 +596,34 @@ export function VaultScreen() {
                 All ({vaultItems.length})
               </button>
 
-              {VAULT_COLORS.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategoryFilter(cat.label)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all ${
-                    activeCategoryFilter === cat.label
-                      ? 'text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
-                  }`}
-                  style={{
-                    backgroundColor: activeCategoryFilter === cat.label ? cat.id : undefined,
-                  }}
-                >
-                  <div
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: activeCategoryFilter === cat.label ? '#FFFFFF' : cat.id }}
-                  />
-                  <span>{cat.label}</span>
-                </button>
-              ))}
+              {VAULT_COLORS.map((cat) => {
+                const isActive = activeCategoryFilter === cat.label;
+                const isBright = cat.id === '#F59E0B' || cat.id === '#06B6D4';
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategoryFilter(cat.label)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all ${
+                      isActive
+                        ? isBright
+                          ? 'text-slate-950 font-black shadow-sm'
+                          : 'text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
+                    }`}
+                    style={{
+                      backgroundColor: isActive ? cat.id : undefined,
+                    }}
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{
+                        backgroundColor: isActive ? (isBright ? '#0f172a' : '#FFFFFF') : cat.id,
+                      }}
+                    />
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Search Input */}
@@ -714,7 +722,7 @@ export function VaultScreen() {
                       <div className="flex items-center justify-between text-xs px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
                         <span className="text-slate-400 text-[11px]">User / ID:</span>
                         <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                          <span className="font-mono font-bold text-slate-800 dark:text-slate-100">
                             {item.username}
                           </span>
                           <button
@@ -750,7 +758,7 @@ export function VaultScreen() {
                               </div>
 
                               <div className="flex items-center justify-between font-mono text-xs">
-                                <span className="truncate pr-2 font-bold text-slate-800 dark:text-slate-200">
+                                <span className="truncate pr-2 font-bold text-slate-800 dark:text-slate-100">
                                   {isRevealed ? secret.value : '••••••••••••'}
                                 </span>
 

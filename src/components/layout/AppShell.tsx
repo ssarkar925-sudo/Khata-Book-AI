@@ -84,6 +84,19 @@ export function AppShell() {
     };
   }, [activeWorkspaceId]);
 
+  // Synchronize documentElement theme class with current session state
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      }
+    }
+  }, [theme]);
+
   const handleRefresh = async () => {
     const wsId = activeWorkspaceId || '00000000-0000-0000-0000-000000000010';
     await syncEngine.pullAll(wsId);
@@ -226,7 +239,11 @@ export function AppShell() {
                   setActiveTab('expenses');
                   setIsMobileMoreOpen(false);
                 }}
-                className="p-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 text-center font-bold text-xs text-rose-600 dark:text-rose-400"
+                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all ${
+                  activeTab === 'expenses'
+                    ? 'border-rose-500 bg-rose-500/25 text-rose-600 dark:text-rose-300 ring-2 ring-rose-500'
+                    : 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20'
+                }`}
               >
                 📉 Expenses
               </button>
@@ -235,7 +252,11 @@ export function AppShell() {
                   setActiveTab('sheets');
                   setIsMobileMoreOpen(false);
                 }}
-                className="p-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-center font-bold text-xs text-slate-800 dark:text-slate-200"
+                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all ${
+                  activeTab === 'sheets'
+                    ? 'border-blue-500 bg-blue-500/25 text-blue-600 dark:text-blue-300 ring-2 ring-blue-500'
+                    : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10'
+                }`}
               >
                 📊 Sheets
               </button>
@@ -244,7 +265,11 @@ export function AppShell() {
                   setActiveTab('vault');
                   setIsMobileMoreOpen(false);
                 }}
-                className="p-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-center font-bold text-xs text-slate-800 dark:text-slate-200"
+                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all ${
+                  activeTab === 'vault'
+                    ? 'border-violet-500 bg-violet-500/25 text-violet-600 dark:text-violet-300 ring-2 ring-violet-500'
+                    : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10'
+                }`}
               >
                 🔐 Vault
               </button>
@@ -253,7 +278,11 @@ export function AppShell() {
                   setActiveTab('reports');
                   setIsMobileMoreOpen(false);
                 }}
-                className="p-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-center font-bold text-xs text-slate-800 dark:text-slate-200"
+                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all ${
+                  activeTab === 'reports'
+                    ? 'border-indigo-500 bg-indigo-500/25 text-indigo-600 dark:text-indigo-300 ring-2 ring-indigo-500'
+                    : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10'
+                }`}
               >
                 📈 Reports
               </button>
