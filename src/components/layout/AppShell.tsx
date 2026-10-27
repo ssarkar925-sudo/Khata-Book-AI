@@ -42,9 +42,13 @@ const QuickTransactionModal = dynamic(
 const BackupRestoreModal = dynamic(
   () => import('@/components/modals/BackupRestoreModal').then((m) => m.BackupRestoreModal)
 );
+const AuthModal = dynamic(() => import('@/components/auth/AuthModal').then((m) => m.AuthModal));
+const WorkspaceMembersModal = dynamic(
+  () => import('@/components/modals/WorkspaceMembersModal').then((m) => m.WorkspaceMembersModal)
+);
 
 export function AppShell() {
-  const { user, authLoading, theme, activeWorkspaceId, setWorkspaces, setActiveWorkspaceId, setSyncStatus, setUser } = useSessionStore();
+  const { user, authLoading, theme, activeWorkspaceId, initAuth } = useSessionStore();
   const { addEntryOptimistic } = useLedgerStore();
   const isLight = theme === 'light';
 
@@ -58,31 +62,22 @@ export function AppShell() {
   // Quick transaction modals
   const [showCashModal, setShowCashModal] = useState<'in' | 'out' | null>(null);
 
+  // Initialize authentic Supabase session and workspace role mapping
   useEffect(() => {
-    // Supabase auth subscription
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
+    initAuth();
+  }, [initAuth]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [setUser]);
-
-  // Cloud Sync & Realtime Engine
+  // Cloud Sync & Realtime Engine (Active only when user is authenticated)
   useEffect(() => {
-    const wsId = activeWorkspaceId || '00000000-0000-0000-0000-000000000010';
-    syncEngine.pullAll(wsId);
-    syncEngine.subscribeRealtime(wsId);
+    if (user && activeWorkspaceId) {
+      syncEngine.pullAll(activeWorkspaceId);
+      syncEngine.subscribeRealtime(activeWorkspaceId);
+    }
 
     return () => {
       syncEngine.destroy();
     };
-  }, [activeWorkspaceId]);
+  }, [user, activeWorkspaceId]);
 
   // Synchronize documentElement theme class with current session state
   useEffect(() => {
@@ -332,6 +327,12 @@ export function AppShell() {
           }}
         />
       )}
+
+      {/* Supabase Authentication & Local Data Migration Modal */}
+      <AuthModal />
+
+      {/* Role-Aware Workspace Membership Modal */}
+      <WorkspaceMembersModal />
     </div>
   );
 }

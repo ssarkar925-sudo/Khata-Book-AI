@@ -4,12 +4,23 @@ export type LedgerEntryType = 'cash_in' | 'cash_out' | 'expense' | 'bill_payment
 export type DueDirection = 'you_will_get' | 'you_will_give';
 export type CustomerType = 'customer' | 'supplier';
 export type EntityScope = 'business' | 'personal' | 'family';
+export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer';
+
+export interface WorkspaceMember {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  member_email?: string;
+  role: WorkspaceRole;
+  created_at?: string;
+}
 
 export interface Workspace {
   id: string;
   name: string;
   currency: string;
   owner_id: string;
+  is_local?: boolean;
   created_at?: string;
   updated_at?: string;
 }

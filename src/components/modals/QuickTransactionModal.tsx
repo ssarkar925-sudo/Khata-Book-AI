@@ -28,6 +28,7 @@ import {
 import { PaymentMode, LedgerEntry, EntityScope } from '@/types';
 import { parseToPaise, formatPaise } from '@/lib/money';
 import { useAccountStore } from '@/stores/useAccountStore';
+import { useSessionStore } from '@/stores/useSessionStore';
 import { EXPENSE_CATEGORIES, ExpenseCategoryDef } from '@/lib/categories';
 
 interface QuickTransactionModalProps {
@@ -52,6 +53,8 @@ export function QuickTransactionModal({
   onSubmit,
 }: QuickTransactionModalProps) {
   const { accounts } = useAccountStore();
+  const { userRole } = useSessionStore();
+  const isViewer = userRole === 'viewer';
 
   const [amountRupees, setAmountRupees] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('general');
@@ -378,6 +381,13 @@ export function QuickTransactionModal({
             </div>
           </div>
 
+          {/* Viewer Role Notice */}
+          {isViewer && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs">
+              <span className="font-bold">Read-Only Workspace:</span> You have Viewer access. Creating or modifying financial records is restricted to owners and members.
+            </div>
+          )}
+
           {/* Form Actions */}
           <div className="pt-2 flex gap-2 shrink-0 border-t border-slate-100 dark:border-white/5">
             <button
@@ -389,14 +399,14 @@ export function QuickTransactionModal({
             </button>
             <button
               type="submit"
-              disabled={!amountRupees || parseFloat(amountRupees) <= 0}
-              className={`flex-1 py-2.5 rounded-xl font-bold text-xs text-white shadow-md transition-all disabled:opacity-50 ${
+              disabled={isViewer || !amountRupees || parseFloat(amountRupees) <= 0}
+              className={`flex-1 py-2.5 rounded-xl font-bold text-xs text-white shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 isInflow
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-emerald-500/25'
                   : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 shadow-rose-500/25'
               }`}
             >
-              {isInflow ? 'Save Inflow' : 'Save Expense'}
+              {isViewer ? 'Read-Only (Viewer)' : isInflow ? 'Save Inflow' : 'Save Expense'}
             </button>
           </div>
         </form>

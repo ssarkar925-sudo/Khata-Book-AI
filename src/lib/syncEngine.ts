@@ -106,6 +106,17 @@ class SyncEngine {
   }
 
   public async flushQueue() {
+    const user = useSessionStore.getState().user;
+    if (!user) {
+      // Cannot push to cloud without authenticated Supabase session
+      return;
+    }
+    const userRole = useSessionStore.getState().userRole;
+    if (userRole === 'viewer') {
+      console.warn('[SyncEngine] Viewer role cannot flush mutations to cloud');
+      return;
+    }
+
     const queue = this.getQueue();
     if (queue.length === 0) return;
 
@@ -161,6 +172,13 @@ class SyncEngine {
   // CLOUD PULL & HYDRATION (Stale-While-Revalidate)
   // ==========================================
   public async pullAll(workspaceId: string): Promise<boolean> {
+    const user = useSessionStore.getState().user;
+    if (!user) {
+      // Unauthenticated mode is strictly local-only: never poll cloud or report synced
+      useSessionStore.getState().setSyncStatus('offline');
+      return false;
+    }
+
     if (this.isSyncing) return false;
     this.isSyncing = true;
     this.currentWorkspaceId = workspaceId;
@@ -186,6 +204,7 @@ class SyncEngine {
           id: workspaceId,
           name: 'Primary Record Book',
           currency: 'INR',
+          owner_id: user.id, // Strictly authenticated auth.uid()
         });
       }
 
@@ -286,6 +305,12 @@ class SyncEngine {
   public subscribeRealtime(workspaceId: string) {
     if (this.channel) {
       this.channel.unsubscribe();
+    }
+
+    const user = useSessionStore.getState().user;
+    if (!user) {
+      // Do not subscribe anonymously
+      return;
     }
 
     this.currentWorkspaceId = workspaceId;
@@ -411,8 +436,30 @@ class SyncEngine {
   // 1. Instant local update + 2. Background push + 3. Offline queue
   // ==========================================
 
+  public checkWritePermission(): { allowed: boolean; isOfflineMode: boolean; error?: string } {
+    const user = useSessionStore.getState().user;
+    if (!user) {
+      return { allowed: true, isOfflineMode: true };
+    }
+    const role = useSessionStore.getState().userRole;
+    if (role === 'viewer') {
+      return {
+        allowed: false,
+        isOfflineMode: false,
+        error: 'Viewer role has read-only access. Financial modifications cannot be saved to cloud.',
+      };
+    }
+    return { allowed: true, isOfflineMode: false };
+  }
+
   // Ledger
   public async pushLedgerEntry(entry: LedgerEntry) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) {
+      useSessionStore.getState().setLastSyncError(perm.error || 'Permission denied');
+      throw new Error(perm.error);
+    }
+
     const entryWithMeta: LedgerEntry = {
       ...entry,
       scope: entry.scope || 'business',
@@ -439,6 +486,13 @@ class SyncEngine {
     }
 
     const cleanEntry = sanitizeLedgerPayload(entryWithMeta);
+
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      this.enqueue('ledger_entries', 'upsert', cleanEntry);
+      return;
+    }
+
     try {
       // 1. Try atomic RPC transaction in Supabase
       const { error } = await supabase.rpc('record_ledger_entry_and_update_balance', {
@@ -763,6 +817,12 @@ class SyncEngine {
     cashLocationId?: string,
     remark?: string
   ) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) {
+      useSessionStore.getState().setLastSyncError(perm.error || 'Permission denied');
+      throw new Error(perm.error);
+    }
+
     const due = useCustomerStore.getState().dues.find((d) => d.id === dueId);
     if (!due) return;
 
@@ -795,6 +855,17 @@ class SyncEngine {
     };
 
     const cleanLedger = sanitizeLedgerPayload(ledgerEntry);
+
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      this.enqueue('people_dues', 'upsert', {
+        id: dueId,
+        amount: isFullSettlement ? 0 : due.amount - paidAmountPaise,
+        status: isFullSettlement ? 'settled' : 'pending',
+      });
+      this.enqueue('ledger_entries', 'upsert', cleanLedger);
+      return;
+    }
 
     // 3. Persist atomically via RPC (with robust fallback)
     try {

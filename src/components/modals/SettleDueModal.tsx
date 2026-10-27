@@ -15,6 +15,7 @@ import {
 import { PeopleDue, Customer, PaymentMode } from '@/types';
 import { formatPaise, parseToPaise, paiseToRupees } from '@/lib/money';
 import { useAccountStore } from '@/stores/useAccountStore';
+import { useSessionStore } from '@/stores/useSessionStore';
 import { syncEngine } from '@/lib/syncEngine';
 
 interface SettleDueModalProps {
@@ -31,6 +32,8 @@ export function SettleDueModal({
   onClose,
 }: SettleDueModalProps) {
   const { accounts } = useAccountStore();
+  const { userRole } = useSessionStore();
+  const isViewer = userRole === 'viewer';
 
   const [settleAmountRupees, setSettleAmountRupees] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState(
@@ -215,6 +218,13 @@ export function SettleDueModal({
             />
           </div>
 
+          {/* Viewer Role Notice */}
+          {isViewer && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs">
+              <span className="font-bold">Read-Only Workspace:</span> Due settlements are disabled for Viewer role.
+            </div>
+          )}
+
           {/* Submit Actions */}
           <div className="pt-2 flex gap-2 border-t border-slate-100 dark:border-white/5">
             <button
@@ -226,14 +236,16 @@ export function SettleDueModal({
             </button>
             <button
               type="submit"
-              disabled={settleAmountPaise <= 0}
-              className={`flex-1 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 ${
+              disabled={isViewer || settleAmountPaise <= 0}
+              className={`flex-1 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 isReceivable
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-emerald-500/25'
                   : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 shadow-rose-500/25'
               }`}
             >
-              {isFullSettlement
+              {isViewer
+                ? 'Read-Only (Viewer)'
+                : isFullSettlement
                 ? `Confirm Settlement (${formatPaise(settleAmountPaise)})`
                 : `Save Partial (${formatPaise(settleAmountPaise)})`}
             </button>

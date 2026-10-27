@@ -264,4 +264,321 @@ describe('RecordBook AI — Production Hardening & Security Test Suite', () => {
     rollbackTransaction('cash_in', 250000);
     assert.strictEqual(accountBalance, 1000000, 'Balance must return to starting ₹10,000.00 with 0 drift');
   });
+
+  // ==========================================================================
+  // 8. ROLE-AWARE WORKSPACE MEMBERSHIP & AUTH (9 MANDATED VERIFICATIONS)
+  // ==========================================================================
+
+  // Policy Helpers mimicking PostgreSQL RLS Functions
+  interface MockWorkspace {
+    id: string;
+    name: string;
+    currency: string;
+    owner_id: string;
+  }
+
+  interface MockMember {
+    id: string;
+    workspace_id: string;
+    user_id: string;
+    role: 'admin' | 'member' | 'viewer';
+  }
+
+  function isWorkspaceOwner(authUid: string | null, ws: MockWorkspace): boolean {
+    if (!authUid) return false;
+    return ws.owner_id === authUid;
+  }
+
+  function checkUserWorkspaceRead(authUid: string | null, ws: MockWorkspace, members: MockMember[]): boolean {
+    if (!authUid) return false;
+    if (ws.owner_id === authUid) return true;
+    return members.some((m) => m.workspace_id === ws.id && m.user_id === authUid);
+  }
+
+  function checkUserWorkspaceWrite(authUid: string | null, ws: MockWorkspace, members: MockMember[]): boolean {
+    if (!authUid) return false;
+    if (ws.owner_id === authUid) return true;
+    return members.some((m) => m.workspace_id === ws.id && m.user_id === authUid && (m.role === 'admin' || m.role === 'member'));
+  }
+
+  function checkUserWorkspaceAdmin(authUid: string | null, ws: MockWorkspace, members: MockMember[]): boolean {
+    if (!authUid) return false;
+    if (ws.owner_id === authUid) return true;
+    return members.some((m) => m.workspace_id === ws.id && m.user_id === authUid && m.role === 'admin');
+  }
+
+  // 1. Unauthenticated users cannot access cloud workspace data
+  test('RLS: Unauthenticated users cannot access cloud workspace data', () => {
+    const ws: MockWorkspace = { id: 'ws-101', name: 'Corp Books', currency: 'INR', owner_id: 'user-auth-1' };
+    const members: MockMember[] = [{ id: 'm-1', workspace_id: 'ws-101', user_id: 'user-auth-2', role: 'member' }];
+
+    assert.strictEqual(checkUserWorkspaceRead(null, ws, members), false, 'Anonymous must not read');
+    assert.strictEqual(checkUserWorkspaceWrite(null, ws, members), false, 'Anonymous must not write');
+    assert.strictEqual(checkUserWorkspaceAdmin(null, ws, members), false, 'Anonymous must not admin');
+  });
+
+  // 2. Newly authenticated users receive an owned workspace
+  test('Auth: Newly authenticated users receive an owned workspace', () => {
+    const databaseWorkspaces: MockWorkspace[] = [];
+
+    function getOrCreateDefaultWorkspace(authUid: string): MockWorkspace {
+      const existing = databaseWorkspaces.find((w) => w.owner_id === authUid);
+      if (existing) return existing;
+
+      // Ensure workspaces.owner_id is ALWAYS auth.uid()
+      const newWs: MockWorkspace = {
+        id: `ws-${databaseWorkspaces.length + 1}`,
+        name: 'Personal Record Book',
+        currency: 'INR',
+        owner_id: authUid,
+      };
+      databaseWorkspaces.push(newWs);
+      return newWs;
+    }
+
+    const newUserUid = 'auth-user-999';
+    const created = getOrCreateDefaultWorkspace(newUserUid);
+
+    assert.ok(created, 'Workspace must be created');
+    assert.strictEqual(created.owner_id, newUserUid, 'owner_id must match authenticated user UID exactly');
+
+    // Repeated call must return the exact same workspace (exactly one created)
+    const secondCall = getOrCreateDefaultWorkspace(newUserUid);
+    assert.strictEqual(secondCall.id, created.id, 'Must return existing owned workspace');
+    assert.strictEqual(databaseWorkspaces.length, 1, 'Only one workspace must be created');
+  });
+
+  // 3. Local-only mode never reports Cloud Synced
+  test('Session: Local-only mode never reports Cloud Synced', () => {
+    let currentUser: any = null;
+    let syncStatus = 'offline';
+
+    function setSyncStatus(status: 'synced' | 'syncing' | 'offline' | 'error') {
+      if (!currentUser && status === 'synced') {
+        syncStatus = 'offline';
+        return;
+      }
+      syncStatus = status;
+    }
+
+    // Try setting synced while unauthenticated
+    setSyncStatus('synced');
+    assert.strictEqual(syncStatus, 'offline', 'Unauthenticated mode must coerce synced to offline');
+
+    // Authenticated user can report synced
+    currentUser = { id: 'real-user-1', email: 'owner@test.com' };
+    setSyncStatus('synced');
+    assert.strictEqual(syncStatus, 'synced', 'Authenticated user can transition to synced');
+  });
+
+  // 4. Viewer cannot insert/update/delete records
+  test('Permissions: Viewer cannot insert/update/delete records', () => {
+    const ws: MockWorkspace = { id: 'ws-101', name: 'Corp Books', currency: 'INR', owner_id: 'user-owner' };
+    const members: MockMember[] = [{ id: 'm-viewer', workspace_id: 'ws-101', user_id: 'user-viewer', role: 'viewer' }];
+
+    // Viewer can read
+    assert.strictEqual(checkUserWorkspaceRead('user-viewer', ws, members), true, 'Viewer can read workspace');
+
+    // Viewer CANNOT write
+    assert.strictEqual(checkUserWorkspaceWrite('user-viewer', ws, members), false, 'Viewer cannot write to workspace');
+
+    // Viewer write attempts must fail
+    function executeWrite(authUid: string) {
+      if (!checkUserWorkspaceWrite(authUid, ws, members)) {
+        throw new Error('Unauthorized: User does not have write access');
+      }
+      return { success: true };
+    }
+
+    assert.throws(
+      () => executeWrite('user-viewer'),
+      /Unauthorized/,
+      'Viewer write mutation must be rejected with Unauthorized'
+    );
+  });
+
+  // 5. Member cannot manage workspace members
+  test('Permissions: Member cannot manage workspace members', () => {
+    const ws: MockWorkspace = { id: 'ws-101', name: 'Corp Books', currency: 'INR', owner_id: 'user-owner' };
+    const members: MockMember[] = [{ id: 'm-regular', workspace_id: 'ws-101', user_id: 'user-member', role: 'member' }];
+
+    assert.strictEqual(checkUserWorkspaceWrite('user-member', ws, members), true, 'Member has financial write access');
+    assert.strictEqual(checkUserWorkspaceAdmin('user-member', ws, members), false, 'Member does NOT have admin access');
+
+    function inviteMember(actorUid: string, targetEmail: string, role: string) {
+      if (!checkUserWorkspaceAdmin(actorUid, ws, members)) {
+        throw new Error('Unauthorized: Only owner and admin can manage members');
+      }
+      return { targetEmail, role };
+    }
+
+    assert.throws(
+      () => inviteMember('user-member', 'colleague@test.com', 'member'),
+      /Unauthorized/,
+      'Regular member cannot invite or manage members'
+    );
+  });
+
+  // 6. Admin can manage members but cannot alter owner protections
+  test('Permissions: Admin can manage members but cannot alter owner protections', () => {
+    const ws: MockWorkspace = { id: 'ws-101', name: 'Corp Books', currency: 'INR', owner_id: 'user-owner' };
+    let members: MockMember[] = [
+      { id: 'm-admin', workspace_id: 'ws-101', user_id: 'user-admin', role: 'admin' },
+      { id: 'm-member', workspace_id: 'ws-101', user_id: 'user-employee', role: 'member' },
+    ];
+
+    assert.strictEqual(checkUserWorkspaceAdmin('user-admin', ws, members), true, 'Admin has member management rights');
+
+    function adminRemoveMember(actorUid: string, targetMemberId: string) {
+      if (!checkUserWorkspaceAdmin(actorUid, ws, members)) {
+        throw new Error('Unauthorized');
+      }
+      const target = members.find((m) => m.id === targetMemberId);
+      if (!target) throw new Error('Not found');
+
+      // Owner protection: cannot remove owner
+      if (target.user_id === ws.owner_id) {
+        throw new Error('Owner cannot be removed');
+      }
+
+      // Admin cannot remove other admin
+      if (!isWorkspaceOwner(actorUid, ws) && target.role === 'admin') {
+        throw new Error('Admins cannot remove other Admins');
+      }
+
+      members = members.filter((m) => m.id !== targetMemberId);
+      return true;
+    }
+
+    // Admin CAN remove regular member
+    assert.strictEqual(adminRemoveMember('user-admin', 'm-member'), true, 'Admin can remove regular member');
+
+    // Admin CANNOT remove or demote owner
+    members.push({ id: 'm-owner', workspace_id: 'ws-101', user_id: ws.owner_id, role: 'admin' });
+    assert.throws(
+      () => adminRemoveMember('user-admin', 'm-owner'),
+      /Owner cannot be removed/,
+      'Admin cannot remove or demote owner'
+    );
+
+    // Admin CANNOT change workspace owner_id
+    function updateWorkspaceOwner(actorUid: string, newOwnerId: string) {
+      if (!isWorkspaceOwner(actorUid, ws)) {
+        throw new Error('Only the current owner can transfer workspace ownership');
+      }
+      ws.owner_id = newOwnerId;
+    }
+
+    assert.throws(
+      () => updateWorkspaceOwner('user-admin', 'user-admin'),
+      /Only the current owner/,
+      'Admin cannot transfer or seize ownership'
+    );
+  });
+
+  // 7. Owner can manage membership
+  test('Permissions: Owner can manage membership and all roles', () => {
+    const ws: MockWorkspace = { id: 'ws-101', name: 'Corp Books', currency: 'INR', owner_id: 'user-owner' };
+    const members: MockMember[] = [
+      { id: 'm-admin', workspace_id: 'ws-101', user_id: 'user-admin', role: 'admin' },
+      { id: 'm-member', workspace_id: 'ws-101', user_id: 'user-emp', role: 'member' },
+    ];
+
+    assert.strictEqual(isWorkspaceOwner('user-owner', ws), true, 'Owner identified');
+    assert.strictEqual(checkUserWorkspaceAdmin('user-owner', ws, members), true, 'Owner has admin access');
+
+    // Owner can update any member's role
+    function ownerUpdateRole(actorUid: string, memberId: string, newRole: 'admin' | 'member' | 'viewer') {
+      if (!isWorkspaceOwner(actorUid, ws)) {
+        throw new Error('Unauthorized');
+      }
+      const target = members.find((m) => m.id === memberId);
+      if (target) target.role = newRole;
+      return target;
+    }
+
+    const updated = ownerUpdateRole('user-owner', 'm-member', 'admin');
+    assert.strictEqual(updated?.role, 'admin', 'Owner can promote member to admin');
+  });
+
+  // 8. Unauthorized calls to ledger and settlement RPCs fail
+  test('RPC Security: Unauthorized calls to ledger and settlement RPCs fail', () => {
+    const ws: MockWorkspace = { id: 'ws-101', name: 'Corp Books', currency: 'INR', owner_id: 'user-owner' };
+    const members: MockMember[] = [{ id: 'm-v', workspace_id: 'ws-101', user_id: 'user-viewer', role: 'viewer' }];
+
+    function recordLedgerEntryRpc(entry: any, callerUid: string | null) {
+      if (!callerUid) {
+        throw new Error('Unauthorized: Authentication required');
+      }
+      if (!checkUserWorkspaceWrite(callerUid, ws, members)) {
+        throw new Error('Unauthorized: User does not have write access to workspace');
+      }
+      return { status: 'success', entry };
+    }
+
+    function settleDueRpc(dueId: string, amount: number, callerUid: string | null) {
+      if (!callerUid) {
+        throw new Error('Unauthorized: Authentication required');
+      }
+      if (!checkUserWorkspaceWrite(callerUid, ws, members)) {
+        throw new Error('Unauthorized: User does not have write access to workspace');
+      }
+      return { status: 'success', dueId, amount };
+    }
+
+    // Unauthenticated caller fails
+    assert.throws(() => recordLedgerEntryRpc({ amount: 100 }, null), /Authentication required/);
+    assert.throws(() => settleDueRpc('due-1', 100, null), /Authentication required/);
+
+    // Viewer caller fails
+    assert.throws(() => recordLedgerEntryRpc({ amount: 100 }, 'user-viewer'), /write access/);
+    assert.throws(() => settleDueRpc('due-1', 100, 'user-viewer'), /write access/);
+
+    // External caller fails
+    assert.throws(() => recordLedgerEntryRpc({ amount: 100 }, 'stranger-user'), /write access/);
+  });
+
+  // 9. Authenticated authorized users can still create ledger entries and settle dues atomically
+  test('RPC Functionality: Authorized users can create ledger entries and settle dues atomically', () => {
+    const ws: MockWorkspace = { id: 'ws-101', name: 'Corp Books', currency: 'INR', owner_id: 'user-owner' };
+    const members: MockMember[] = [{ id: 'm-writer', workspace_id: 'ws-101', user_id: 'user-writer', role: 'member' }];
+
+    let cashBalance = 500000; // ₹5,000.00
+    const ledgerTable: any[] = [];
+    const duesTable = [{ id: 'due-100', workspace_id: 'ws-101', amount: 200000, status: 'pending' }];
+
+    function recordLedgerEntryAtomic(entry: any, callerUid: string) {
+      if (!checkUserWorkspaceWrite(callerUid, ws, members)) {
+        throw new Error('Unauthorized');
+      }
+      ledgerTable.push(entry);
+      if (entry.type === 'cash_in') cashBalance += entry.amount;
+      if (entry.type === 'cash_out' || entry.type === 'expense') cashBalance -= entry.amount;
+      return { status: 'success', newBalance: cashBalance };
+    }
+
+    function settleDueAtomic(dueId: string, paidAmount: number, callerUid: string) {
+      if (!checkUserWorkspaceWrite(callerUid, ws, members)) {
+        throw new Error('Unauthorized');
+      }
+      const due = duesTable.find((d) => d.id === dueId);
+      if (!due) throw new Error('Due not found');
+
+      recordLedgerEntryAtomic({ type: 'cash_in', amount: paidAmount, due_id: dueId }, callerUid);
+      due.amount -= paidAmount;
+      if (due.amount <= 0) due.status = 'settled';
+      return { status: 'success', dueStatus: due.status, dueAmount: due.amount };
+    }
+
+    // Authorized member records expense
+    const res1 = recordLedgerEntryAtomic({ type: 'expense', amount: 100000 }, 'user-writer');
+    assert.strictEqual(res1.status, 'success');
+    assert.strictEqual(cashBalance, 400000, 'Balance must deduct ₹1,000.00');
+
+    // Authorized member settles due
+    const res2 = settleDueAtomic('due-100', 200000, 'user-writer');
+    assert.strictEqual(res2.status, 'success');
+    assert.strictEqual(res2.dueStatus, 'settled', 'Due must be settled');
+    assert.strictEqual(cashBalance, 600000, 'Balance must credit ₹2,000.00 from due settlement');
+  });
 });

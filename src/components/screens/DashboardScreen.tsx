@@ -71,7 +71,8 @@ export function DashboardScreen({
   const { sheets } = useSheetStore();
   const { notes } = useNoteStore();
   const { vaultItems, isUnlocked } = useVaultStore();
-  const { theme } = useSessionStore();
+  const { theme, userRole } = useSessionStore();
+  const isViewer = userRole === 'viewer';
   const isLight = theme === 'light';
 
   // Active Scope Lens: 'all' (Combined) | 'business' | 'personal' | 'family'
@@ -565,16 +566,28 @@ export function DashboardScreen({
         {/* Core Primary Financial Actions */}
         <div className="flex items-center gap-2 flex-1">
           <button
-            onClick={onQuickCashIn}
-            className="flex-1 py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all hover-lift touch-press cursor-pointer"
+            onClick={isViewer ? undefined : onQuickCashIn}
+            disabled={isViewer}
+            title={isViewer ? 'Read-only access: Viewer role cannot add transactions' : undefined}
+            className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all ${
+              isViewer
+                ? 'bg-slate-400 text-white cursor-not-allowed opacity-60'
+                : 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-emerald-600/25 hover-lift touch-press cursor-pointer'
+            }`}
           >
             <ArrowDownLeft className="w-4 h-4 stroke-[3]" />
             <span>+ Add Income</span>
           </button>
 
           <button
-            onClick={onQuickCashOut}
-            className="flex-1 py-3 px-4 rounded-2xl bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-black text-xs sm:text-sm shadow-md shadow-rose-600/25 flex items-center justify-center gap-2 transition-all hover-lift touch-press cursor-pointer"
+            onClick={isViewer ? undefined : onQuickCashOut}
+            disabled={isViewer}
+            title={isViewer ? 'Read-only access: Viewer role cannot add transactions' : undefined}
+            className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all ${
+              isViewer
+                ? 'bg-slate-400 text-white cursor-not-allowed opacity-60'
+                : 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white shadow-rose-600/25 hover-lift touch-press cursor-pointer'
+            }`}
           >
             <ArrowUpRight className="w-4 h-4 stroke-[3]" />
             <span>− Add Expense</span>
