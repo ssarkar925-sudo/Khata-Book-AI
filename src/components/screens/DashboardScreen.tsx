@@ -45,6 +45,7 @@ import { formatPaise } from '@/lib/money';
 import { TabType, LedgerEntry, EntityScope } from '@/types';
 import { TransactionDetailModal } from '@/components/modals/TransactionDetailModal';
 import { InterSphereTransferModal } from '@/components/modals/InterSphereTransferModal';
+import { CardSpendModal } from '@/components/modals/CardSpendModal';
 import { getCategoryById } from '@/lib/categories';
 
 interface DashboardProps {
@@ -83,6 +84,7 @@ export function DashboardScreen({
   // Modals state
   const [selectedEntryForDetail, setSelectedEntryForDetail] = useState<LedgerEntry | null>(null);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [isSpendModalOpen, setIsSpendModalOpen] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
 
   // ==========================================
@@ -612,6 +614,20 @@ export function DashboardScreen({
             <span>Transfer</span>
           </button>
 
+          <button
+            onClick={isViewer ? undefined : () => setIsSpendModalOpen(true)}
+            disabled={isViewer}
+            title={isViewer ? 'Read-only access: Viewer role cannot record card spends' : undefined}
+            className={`flex-1 sm:flex-initial py-3 px-3.5 rounded-2xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+              isViewer
+                ? 'border-slate-200 dark:border-white/10 text-slate-400 cursor-not-allowed opacity-60'
+                : 'border-purple-200 dark:border-purple-500/30 bg-purple-50/80 dark:bg-purple-950/30 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 hover-lift touch-press'
+            }`}
+          >
+            <CreditCard className="w-4 h-4 text-purple-600 dark:text-purple-400 stroke-[2.5]" />
+            <span>Spend (Swipe)</span>
+          </button>
+
           {/* Overflow Menu for AI Tools */}
           {(onOpenScanner || onOpenVoice) && (
             <div className="relative">
@@ -1060,7 +1076,17 @@ export function DashboardScreen({
             </div>
             <div className="flex items-center justify-between mt-3 pt-2 border-t border-purple-100 dark:border-purple-500/15 text-xs text-slate-500 dark:text-slate-400 font-medium">
               <span>{metrics.filteredCards.length} Active Cards</span>
-              <span className="font-bold text-purple-600 dark:text-purple-400 text-[11px]">Billing →</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!isViewer) setIsSpendModalOpen(true);
+                }}
+                disabled={isViewer}
+                className="font-bold text-purple-600 dark:text-purple-400 text-[11px] px-2.5 py-1 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition-all cursor-pointer flex items-center gap-1"
+              >
+                <span>⚡ Spend (Swipe)</span>
+              </button>
             </div>
           </div>
 
@@ -1299,6 +1325,13 @@ export function DashboardScreen({
         isOpen={isTransferModalOpen}
         onClose={() => setIsTransferModalOpen(false)}
         defaultSourceScope={selectedScope === 'all' ? 'business' : selectedScope}
+      />
+
+      {/* Credit Card Spend (Swipe) Modal */}
+      <CardSpendModal
+        isOpen={isSpendModalOpen}
+        onClose={() => setIsSpendModalOpen(false)}
+        onNavigateToCards={() => onNavigateTab('cards')}
       />
     </div>
   );

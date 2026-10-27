@@ -43,6 +43,7 @@ const BackupRestoreModal = dynamic(
   () => import('@/components/modals/BackupRestoreModal').then((m) => m.BackupRestoreModal)
 );
 const AuthModal = dynamic(() => import('@/components/auth/AuthModal').then((m) => m.AuthModal));
+const LoginPage = dynamic(() => import('@/components/auth/LoginPage').then((m) => m.LoginPage));
 const WorkspaceMembersModal = dynamic(
   () => import('@/components/modals/WorkspaceMembersModal').then((m) => m.WorkspaceMembersModal)
 );
@@ -96,6 +97,29 @@ export function AppShell() {
     const wsId = activeWorkspaceId || '00000000-0000-0000-0000-000000000010';
     await syncEngine.pullAll(wsId);
   };
+
+  // 1. Initial Authentication Check Loading State
+  if (authLoading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isLight ? 'bg-slate-50' : 'bg-[#070a12]'}`}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-teal-400 flex items-center justify-center font-black text-sm text-white shadow-xl shadow-indigo-600/30 animate-pulse">
+            RB
+          </div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
+            <span>Verifying secure session...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Strict Authentication Guard: If not signed in, show ONLY LoginPage
+  // Absolutely no app module (Navbar, Sidebar, Dashboard, Cash, Expenses, Dues, Cards, Sheets, Notes, Vault, Reports) is rendered!
+  if (!user) {
+    return <LoginPage />;
+  }
 
   return (
     <div
