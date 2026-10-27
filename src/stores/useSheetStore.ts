@@ -43,7 +43,9 @@ interface SheetState {
   updateCell: (sheetId: string, rowId: string, colId: string, value: any) => void;
   deleteRow: (sheetId: string, rowId: string) => void;
   addColumn: (sheetId: string, column: SheetColumn) => void;
+  updateColumn: (sheetId: string, columnId: string, updates: Partial<SheetColumn>) => void;
   deleteColumn: (sheetId: string, columnId: string) => void;
+  setCellColor: (sheetId: string, rowId: string, colId: string, color: string | null) => void;
 }
 
 const DEFAULT_SHEETS: RecordSheet[] = [
@@ -286,12 +288,54 @@ export const useSheetStore = create<SheetState>((set) => ({
       return { sheets: updated };
     }),
 
+  updateColumn: (sheetId, columnId, updates) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== sheetId) return s;
+        const columns = s.columns.map((c) => (c.id === columnId ? { ...c, ...updates } : c));
+        targetSheet = { ...s, columns };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
+
   deleteColumn: (sheetId, columnId) =>
     set((state) => {
       let targetSheet: RecordSheet | undefined;
       const updated = state.sheets.map((s) => {
         if (s.id !== sheetId) return s;
         targetSheet = { ...s, columns: s.columns.filter((c) => c.id !== columnId) };
+        return targetSheet;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      if (targetSheet) syncSheetToCloud(targetSheet);
+      return { sheets: updated };
+    }),
+
+  setCellColor: (sheetId, rowId, colId, color) =>
+    set((state) => {
+      let targetSheet: RecordSheet | undefined;
+      const updated = state.sheets.map((s) => {
+        if (s.id !== sheetId) return s;
+        const colorKey = `_color_${colId}`;
+        const rows = s.rows.map((r) => {
+          if (r.id !== rowId) return r;
+          const updatedData = { ...r.data };
+          if (color) {
+            updatedData[colorKey] = color;
+          } else {
+            delete updatedData[colorKey];
+          }
+          return { ...r, data: updatedData };
+        });
+        targetSheet = { ...s, rows };
         return targetSheet;
       });
       if (typeof window !== 'undefined') {

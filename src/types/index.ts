@@ -164,12 +164,15 @@ export interface VaultItem {
   deleted_at?: string | null;
 }
 
-export type SheetColumnType = 'text' | 'number' | 'date' | 'amount' | 'status' | 'phone';
+export type SheetColumnType = 'text' | 'number' | 'date' | 'amount' | 'status' | 'phone' | 'select';
 
 export interface SheetColumn {
   id: string;
   name: string;
   type: SheetColumnType;
+  width?: number;
+  options?: string[];
+  isPinned?: boolean;
 }
 
 export interface SheetRow {
