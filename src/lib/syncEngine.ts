@@ -206,7 +206,7 @@ class SyncEngine {
         supabase.from('ledger_entries').select('*').eq('workspace_id', workspaceId).is('deleted_at', null).order('entry_date', { ascending: false }),
         supabase.from('notes').select('*').eq('workspace_id', workspaceId).is('deleted_at', null),
         supabase.from('sheets').select('*').eq('workspace_id', workspaceId),
-        supabase.from('vault_items').select('*').eq('workspace_id', workspaceId).is('deleted_at', null),
+        supabase.from('vault_items').select('*').eq('workspace_id', workspaceId),
       ]);
 
       // 1. Process Bank Accounts

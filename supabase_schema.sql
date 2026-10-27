@@ -987,6 +987,7 @@ END $$;
 ALTER TABLE public.sheets ADD COLUMN IF NOT EXISTS frozen_row_count INT DEFAULT 0;
 ALTER TABLE public.sheets ADD COLUMN IF NOT EXISTS row_height TEXT DEFAULT 'normal';
 ALTER TABLE public.sheets ADD COLUMN IF NOT EXISTS show_gridlines BOOLEAN DEFAULT true;
+ALTER TABLE public.vault_items ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 -- ============================================================================
 -- ============================================================================
