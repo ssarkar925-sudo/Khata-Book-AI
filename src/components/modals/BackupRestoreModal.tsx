@@ -27,6 +27,7 @@ import { useVaultStore } from '@/stores/useVaultStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { useAppLockStore } from '@/stores/useAppLockStore';
 import { syncEngine } from '@/lib/syncEngine';
+import { encryptData, decryptData } from '@/lib/crypto';
 
 interface BackupRestoreModalProps {
   isOpen: boolean;
@@ -69,6 +70,20 @@ export function BackupRestoreModal({
   const [restoreSuccess, setRestoreSuccess] = useState('');
   const [isCopied, setIsCopied] = useState(false);
 
+  // Encrypted Backup & Restore State
+  const [encryptBackup, setEncryptBackup] = useState(false);
+  const [backupPassword, setBackupPassword] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [isEncryptedFile, setIsEncryptedFile] = useState(false);
+  const [restorePasswordInput, setRestorePasswordInput] = useState('');
+  const [rawEncryptedPayload, setRawEncryptedPayload] = useState<{
+    encrypted_backup: boolean;
+    iv: string;
+    salt: string;
+    payload: string;
+    exported_at?: string;
+  } | null>(null);
+
   // App Lock Form State
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -108,18 +123,46 @@ export function BackupRestoreModal({
     };
   };
 
-  const handleDownloadBackup = () => {
-    const payload = generateBackupPayload();
-    const jsonStr = JSON.stringify(payload, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const nowStr = new Date().toISOString().slice(0, 10);
-    link.download = `RecordBook_FullBackup_${nowStr}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownloadBackup = async () => {
+    try {
+      setIsExporting(true);
+      const payload = generateBackupPayload();
+      const jsonStr = JSON.stringify(payload, null, 2);
+      const nowStr = new Date().toISOString().slice(0, 10);
+
+      let finalContent: string;
+      let filename: string;
+
+      if (encryptBackup && backupPassword.trim().length >= 4) {
+        const enc = await encryptData(jsonStr, backupPassword.trim());
+        const envelope = {
+          encrypted_backup: true,
+          algorithm: 'AES-GCM-256-PBKDF2',
+          exported_at: new Date().toISOString(),
+          iv: enc.iv,
+          salt: enc.salt,
+          payload: enc.encrypted,
+        };
+        finalContent = JSON.stringify(envelope, null, 2);
+        filename = `RecordBook_SecureBackup_${nowStr}.enc.json`;
+      } else {
+        finalContent = jsonStr;
+        filename = `RecordBook_FullBackup_${nowStr}.json`;
+      }
+
+      const blob = new Blob([finalContent], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      alert('Failed to generate backup.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleCopyBackupJSON = () => {
@@ -133,6 +176,11 @@ export function BackupRestoreModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setRestoreError('');
     setRestoreSuccess('');
+    setIsEncryptedFile(false);
+    setRawEncryptedPayload(null);
+    setRestoreFile(null);
+    setRestorePasswordInput('');
+
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -140,6 +188,12 @@ export function BackupRestoreModal({
     reader.onload = (evt) => {
       try {
         const parsed = JSON.parse(evt.target?.result as string);
+        if (parsed.encrypted_backup === true) {
+          setIsEncryptedFile(true);
+          setRawEncryptedPayload(parsed);
+          return;
+        }
+
         if (!parsed.data || typeof parsed.data !== 'object') {
           throw new Error('Invalid Record Book backup format');
         }
@@ -150,6 +204,28 @@ export function BackupRestoreModal({
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleDecryptBackup = async () => {
+    if (!rawEncryptedPayload || !restorePasswordInput) return;
+    setRestoreError('');
+    try {
+      const decryptedStr = await decryptData(
+        rawEncryptedPayload.payload,
+        rawEncryptedPayload.iv,
+        rawEncryptedPayload.salt,
+        restorePasswordInput
+      );
+      const parsed = JSON.parse(decryptedStr);
+      if (!parsed.data || typeof parsed.data !== 'object') {
+        throw new Error('Invalid decrypted payload');
+      }
+      setRestoreFile(parsed);
+      setIsEncryptedFile(false);
+      setRestoreSuccess('Backup file successfully unlocked & verified!');
+    } catch {
+      setRestoreError('Incorrect password! Unable to decrypt this backup file.');
+    }
   };
 
   // Confirm Restore Action
@@ -355,14 +431,49 @@ export function BackupRestoreModal({
                 </div>
               </div>
 
+              {/* Optional AES-256 Password Protection */}
+              <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={encryptBackup}
+                    onChange={(e) => setEncryptBackup(e.target.checked)}
+                    className="rounded text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>🔒 Protect Backup with Password (AES-GCM 256-bit)</span>
+                </label>
+
+                {encryptBackup && (
+                  <div className="pt-1 space-y-1">
+                    <input
+                      type="password"
+                      placeholder="Create a Backup Password (min 4 characters)"
+                      value={backupPassword}
+                      onChange={(e) => setBackupPassword(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white font-mono"
+                    />
+                    <span className="text-[10px] text-slate-400 block">
+                      This password will be required when restoring this backup file on any device.
+                    </span>
+                  </div>
+                )}
+              </div>
+
               {/* Action Buttons */}
               <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
                 <button
                   onClick={handleDownloadBackup}
-                  className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all hover-lift touch-press"
+                  disabled={isExporting || (encryptBackup && backupPassword.trim().length < 4)}
+                  className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all hover-lift touch-press disabled:opacity-50"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download Full Backup (.json)</span>
+                  <span>
+                    {isExporting
+                      ? 'Encrypting & Packaging...'
+                      : encryptBackup
+                      ? 'Download Encrypted Backup (.enc.json)'
+                      : 'Download Full Backup (.json)'}
+                  </span>
                 </button>
 
                 <button
@@ -405,7 +516,63 @@ export function BackupRestoreModal({
                 </div>
               )}
 
-              {!restoreFile ? (
+              {isEncryptedFile ? (
+                <div className="p-4 rounded-3xl border border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/20 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-blue-200/50 dark:border-blue-900/30">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-xs text-slate-900 dark:text-white">Password Protected Backup</h4>
+                        <p className="text-[10px] text-slate-400">
+                          {rawEncryptedPayload?.exported_at
+                            ? `Exported: ${new Date(rawEncryptedPayload.exported_at).toLocaleString('en-IN')}`
+                            : 'AES-GCM-256 Encrypted'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsEncryptedFile(false);
+                        setRawEncryptedPayload(null);
+                        setRestorePasswordInput('');
+                        setRestoreError('');
+                      }}
+                      className="text-xs text-rose-500 hover:underline font-bold"
+                    >
+                      Change File
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+                      Enter Backup Decryption Password
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Enter password..."
+                      value={restorePasswordInput}
+                      onChange={(e) => setRestorePasswordInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && restorePasswordInput) {
+                          handleDecryptBackup();
+                        }
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleDecryptBackup}
+                    disabled={!restorePasswordInput}
+                    className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Unlock &amp; Verify Backup</span>
+                  </button>
+                </div>
+              ) : !restoreFile ? (
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full py-8 border-2 border-dashed border-slate-300 dark:border-white/20 hover:border-blue-500 dark:hover:border-blue-500 rounded-3xl flex flex-col items-center justify-center text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all space-y-2"

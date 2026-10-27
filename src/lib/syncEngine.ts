@@ -56,10 +56,11 @@ function sanitizeLedgerPayload(obj: any): any {
 class SyncEngine {
   private isSyncing = false;
   private channel: ReturnType<typeof supabase.channel> | null = null;
-  private currentWorkspaceId = '00000000-0000-0000-0000-000000000010';
+  private currentWorkspaceId = '';
 
   constructor() {
     if (typeof window !== 'undefined') {
+      this.currentWorkspaceId = useSessionStore.getState().activeWorkspaceId || '';
       window.addEventListener('online', () => {
         console.log('[SyncEngine] Device back online. Flushing queue...');
         this.flushQueue();

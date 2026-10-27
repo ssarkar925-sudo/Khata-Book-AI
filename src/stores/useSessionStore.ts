@@ -27,6 +27,31 @@ export const DEFAULT_LOCAL_WORKSPACE: Workspace = {
   updated_at: new Date().toISOString(),
 };
 
+function getOrCreateLocalWorkspace(): Workspace {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('rb_active_workspace');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id) return parsed;
+      }
+      // Generate unique persistent device workspace UUID for multi-tenant isolation
+      const uniqueId = crypto.randomUUID();
+      const uniqueWs: Workspace = {
+        id: uniqueId,
+        name: 'Primary Record Book',
+        currency: 'INR',
+        owner_id: DEFAULT_LOCAL_USER.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      localStorage.setItem('rb_active_workspace', JSON.stringify(uniqueWs));
+      return uniqueWs;
+    } catch {}
+  }
+  return DEFAULT_LOCAL_WORKSPACE;
+}
+
 interface SessionState {
   user: User | null;
   authLoading: boolean;
@@ -58,8 +83,14 @@ export const useSessionStore = create<SessionState>((set) => ({
     return DEFAULT_LOCAL_USER;
   })(),
   authLoading: false,
-  workspaces: [DEFAULT_LOCAL_WORKSPACE],
-  activeWorkspaceId: DEFAULT_LOCAL_WORKSPACE.id,
+  workspaces: (() => {
+    const ws = getOrCreateLocalWorkspace();
+    return [ws];
+  })(),
+  activeWorkspaceId: (() => {
+    const ws = getOrCreateLocalWorkspace();
+    return ws.id;
+  })(),
   syncStatus: 'synced',
   theme: (() => {
     if (typeof window !== 'undefined') {
