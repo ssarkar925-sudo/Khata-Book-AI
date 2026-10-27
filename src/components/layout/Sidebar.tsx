@@ -4,6 +4,7 @@ import React from 'react';
 import {
   LayoutDashboard,
   Wallet,
+  TrendingDown,
   Users,
   CreditCard,
   Table,
@@ -48,6 +49,14 @@ export function Sidebar({ activeTab, setActiveTab, onOpenBackupRestore }: Sideba
       color: 'from-emerald-500 to-teal-600',
       activeText: 'text-emerald-600 dark:text-emerald-300',
       iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    },
+    {
+      id: 'expenses' as TabType,
+      label: 'Expense Manager',
+      icon: TrendingDown,
+      color: 'from-rose-500 to-red-600',
+      activeText: 'text-rose-600 dark:text-rose-300',
+      iconBg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
     },
     {
       id: 'dues' as TabType,

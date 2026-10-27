@@ -18,6 +18,9 @@ const DashboardScreen = dynamic(
   () => import('@/components/screens/DashboardScreen').then((m) => m.DashboardScreen)
 );
 const CashScreen = dynamic(() => import('@/components/screens/CashScreen').then((m) => m.CashScreen));
+const ExpensesScreen = dynamic(
+  () => import('@/components/screens/ExpensesScreen').then((m) => m.ExpensesScreen)
+);
 const DuesScreen = dynamic(() => import('@/components/screens/DuesScreen').then((m) => m.DuesScreen));
 const CardsScreen = dynamic(() => import('@/components/screens/CardsScreen').then((m) => m.CardsScreen));
 const SheetsScreen = dynamic(() => import('@/components/screens/SheetsScreen').then((m) => m.SheetsScreen));
@@ -120,12 +123,22 @@ export function AppShell() {
             />
           )}
           {activeTab === 'cash' && <CashScreen />}
+          {activeTab === 'expenses' && (
+            <ExpensesScreen
+              onNavigateTab={(tab) => setActiveTab(tab)}
+              onOpenScanner={() => setIsScannerOpen(true)}
+              onOpenVoice={() => setIsVoiceOpen(true)}
+              onOpenQuickExpense={() => setShowCashModal('out')}
+            />
+          )}
           {activeTab === 'dues' && <DuesScreen />}
           {activeTab === 'cards' && <CardsScreen />}
           {activeTab === 'sheets' && <SheetsScreen />}
           {activeTab === 'notes' && <NotesScreen />}
           {activeTab === 'vault' && <VaultScreen />}
-          {activeTab === 'reports' && <ReportsScreen />}
+          {activeTab === 'reports' && (
+            <ReportsScreen onNavigateTab={(tab) => setActiveTab(tab)} />
+          )}
         </main>
       </div>
 
@@ -207,6 +220,15 @@ export function AppShell() {
                 className="p-3 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 text-center font-bold text-xs text-indigo-600 dark:text-indigo-400"
               >
                 🎙️ Voice Entry
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('expenses');
+                  setIsMobileMoreOpen(false);
+                }}
+                className="p-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 text-center font-bold text-xs text-rose-600 dark:text-rose-400"
+              >
+                📉 Expenses
               </button>
               <button
                 onClick={() => {

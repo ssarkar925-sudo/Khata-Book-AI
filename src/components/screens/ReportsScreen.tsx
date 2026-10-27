@@ -35,11 +35,16 @@ import { paiseToRupees, formatPaise } from '@/lib/money';
 import { calculateAllCardsBillingReport } from '@/lib/cardBilling';
 import { getCategoryById, EXPENSE_CATEGORIES } from '@/lib/categories';
 import { StatementPrintModal } from '@/components/modals/StatementPrintModal';
+import { TabType } from '@/types';
 
 type DatePreset = 'today' | 'this_week' | 'this_month' | 'last_month' | 'this_fy' | 'all_time' | 'custom';
 type ReportTab = 'pnl' | 'cashflow' | 'udhar' | 'cards';
 
-export function ReportsScreen() {
+interface ReportsScreenProps {
+  onNavigateTab?: (tab: TabType) => void;
+}
+
+export function ReportsScreen({ onNavigateTab }: ReportsScreenProps = {}) {
   const { entries: ledger } = useLedgerStore();
   const { customers, dues } = useCustomerStore();
   const { cards } = useCardStore();
@@ -479,6 +484,17 @@ export function ReportsScreen() {
 
         {/* Global Controls */}
         <div className="flex flex-wrap items-center gap-2">
+          {onNavigateTab && (
+            <button
+              onClick={() => onNavigateTab('expenses')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/20 text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-all touch-press"
+              title="Open full Expense Manager"
+            >
+              <TrendingDown className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+              <span>Expense Manager</span>
+            </button>
+          )}
+
           {/* WhatsApp Share Button */}
           <button
             onClick={handleShareWhatsAppSummary}

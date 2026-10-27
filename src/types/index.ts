@@ -198,4 +198,4 @@ export interface RecordSheet {
 }
 
 export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error';
-export type TabType = 'dashboard' | 'cash' | 'dues' | 'cards' | 'sheets' | 'notes' | 'vault' | 'reports';
+export type TabType = 'dashboard' | 'cash' | 'expenses' | 'dues' | 'cards' | 'sheets' | 'notes' | 'vault' | 'reports';

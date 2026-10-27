@@ -359,25 +359,53 @@ export function DashboardScreen({
         </div>
       </div>
 
-      {/* Expense Categories Breakdown Strip */}
-      {topCategories.length > 0 && (
-        <div
-          className={`rounded-3xl border p-5 transition-all ${
-            isLight ? 'bg-white border-slate-200/90 shadow-sm' : 'bg-slate-900/80 border-white/10 shadow-lg'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Top Expense Categories ({formatPaise(totalExpenses)} total spent)
-            </span>
-            <span className="text-[11px] font-semibold text-slate-400">This Period</span>
+      {/* 2.5 DEDICATED EXPENSE MANAGER BANNER (NOT ALL IN DASHBOARD) */}
+      <div
+        className={`rounded-3xl border p-5 transition-all ${
+          isLight ? 'bg-white border-slate-200/90 shadow-sm' : 'bg-slate-900/80 border-white/10 shadow-lg'
+        }`}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-white/5">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+              <TrendingDown className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                Expense Management ({formatPaise(totalExpenses)} total spent)
+              </h3>
+              <p className="text-xs text-slate-400">
+                Track business & personal spending, categorize vendors, and manage receipts
+              </p>
+            </div>
           </div>
 
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onNavigateTab('expenses')}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition-all hover-lift touch-press"
+            >
+              <span>Open Expenses Tab</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onNavigateTab('reports')}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5"
+            >
+              <span>Reports</span>
+              <ArrowUpRight className="w-3 h-3 text-slate-400" />
+            </button>
+          </div>
+        </div>
+
+        {/* Compact Top Categories Preview */}
+        {topCategories.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {topCategories.map(({ category, amount, pct }) => (
               <div
                 key={category.id}
-                className="p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 space-y-1.5"
+                onClick={() => onNavigateTab('expenses')}
+                className="cursor-pointer p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 space-y-1.5 hover:border-rose-500/30 transition-all"
               >
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
@@ -400,8 +428,8 @@ export function DashboardScreen({
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* 3. RECENT TRANSACTIONS WITH COLORFUL AVATARS */}
       <div
