@@ -19,41 +19,8 @@ interface QueueItem {
 
 const QUEUE_STORAGE_KEY = 'rb_sync_queue';
 
-// Whitelist of columns physically present in public.ledger_entries Supabase table
-const LEDGER_ENTRY_VALID_COLUMNS = new Set([
-  'id',
-  'workspace_id',
-  'type',
-  'amount',
-  'category_id',
-  'cash_location_id',
-  'customer_id',
-  'card_id',
-  'mode',
-  'scope',
-  'note',
-  'entry_date',
-  'is_billed',
-  'idempotency_key',
-  'created_by',
-  'created_at',
-  'updated_at',
-  'deleted_at',
-]);
-
-export function sanitizeLedgerPayload(obj: any): any {
-  if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) {
-    return obj.map(sanitizeLedgerPayload);
-  }
-  const clean: Record<string, any> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (LEDGER_ENTRY_VALID_COLUMNS.has(k) && v !== undefined) {
-      clean[k] = v;
-    }
-  }
-  return clean;
-}
+import { LEDGER_ENTRY_VALID_COLUMNS, sanitizeLedgerPayload } from '@/lib/ledgerSanitizer';
+export { LEDGER_ENTRY_VALID_COLUMNS, sanitizeLedgerPayload };
 
 class SyncEngine {
   private isSyncing = false;
@@ -62,12 +29,20 @@ class SyncEngine {
 
   constructor() {
     if (typeof window !== 'undefined') {
-      this.currentWorkspaceId = useSessionStore.getState().activeWorkspaceId || '';
-      useSessionStore.getState().setPendingSyncCount(this.getQueue().length);
       window.addEventListener('online', () => {
         console.log('[SyncEngine] Device back online. Flushing queue...');
         this.flushQueue();
       });
+
+      // Defer store access until next tick to avoid circular import TDZ
+      setTimeout(() => {
+        try {
+          if (typeof useSessionStore !== 'undefined' && useSessionStore?.getState) {
+            this.currentWorkspaceId = useSessionStore.getState().activeWorkspaceId || '';
+            useSessionStore.getState().setPendingSyncCount(this.getQueue().length);
+          }
+        } catch {}
+      }, 0);
     }
   }
 

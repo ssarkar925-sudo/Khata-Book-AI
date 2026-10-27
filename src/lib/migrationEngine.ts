@@ -8,7 +8,7 @@ import {
   ReconciliationReport,
   EntityScope,
 } from '@/types';
-import { sanitizeLedgerPayload } from '@/lib/syncEngine';
+import { sanitizeLedgerPayload } from '@/lib/ledgerSanitizer';
 
 const LOCAL_WORKSPACE_IDS_KEY = 'rb_local_workspace_ids';
 const LAST_BACKUP_KEY = 'rb_last_migration_backup';
