@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Wallet,
   CreditCard,
@@ -50,61 +50,87 @@ export function DashboardScreen({
 
   const [selectedEntryForDetail, setSelectedEntryForDetail] = useState<LedgerEntry | null>(null);
 
-  // Live financial metrics
-  const totalReceivables = dues
-    .filter((d) => d.status === 'pending' && d.direction === 'you_will_get')
-    .reduce((sum, d) => sum + Number(d.amount), 0);
+  // Live financial metrics (memoized for high FPS)
+  const {
+    totalReceivables,
+    totalPayables,
+    totalCardDues,
+    totalInflow,
+    totalOutflow,
+    totalCash,
+    netPosition,
+    cashPct,
+    recPct,
+    totalExpenses,
+    topCategories,
+  } = useMemo(() => {
+    const receivables = dues
+      .filter((d) => d.status === 'pending' && d.direction === 'you_will_get')
+      .reduce((sum, d) => sum + Number(d.amount), 0);
 
-  const totalPayables = dues
-    .filter((d) => d.status === 'pending' && d.direction === 'you_will_give')
-    .reduce((sum, d) => sum + Number(d.amount), 0);
+    const payables = dues
+      .filter((d) => d.status === 'pending' && d.direction === 'you_will_give')
+      .reduce((sum, d) => sum + Number(d.amount), 0);
 
-  const totalCardDues = cards.reduce((sum, card) => {
-    const spend = ledger
-      .filter((e) => e.card_id === card.id && e.type === 'card_spend')
+    const cardDues = cards.reduce((sum, card) => {
+      const spend = ledger
+        .filter((e) => e.card_id === card.id && e.type === 'card_spend')
+        .reduce((s, e) => s + Number(e.amount), 0);
+      const paid = ledger
+        .filter((e) => e.card_id === card.id && e.type === 'bill_payment')
+        .reduce((s, e) => s + Number(e.amount), 0);
+      return sum + Math.max(0, spend - paid);
+    }, 0);
+
+    const inflow = ledger
+      .filter((e) => e.type === 'cash_in')
       .reduce((s, e) => s + Number(e.amount), 0);
-    const paid = ledger
-      .filter((e) => e.card_id === card.id && e.type === 'bill_payment')
+    const outflow = ledger
+      .filter((e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment')
       .reduce((s, e) => s + Number(e.amount), 0);
-    return sum + Math.max(0, spend - paid);
-  }, 0);
+    const accountBalance = accounts.reduce((s, a) => s + Number(a.balance), 0);
+    const cash = accountBalance > 0 ? accountBalance : Math.max(0, inflow - outflow);
 
-  const totalInflow = ledger
-    .filter((e) => e.type === 'cash_in')
-    .reduce((s, e) => s + Number(e.amount), 0);
-  const totalOutflow = ledger
-    .filter((e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment')
-    .reduce((s, e) => s + Number(e.amount), 0);
-  const totalAccountBalance = accounts.reduce((s, a) => s + Number(a.balance), 0);
-  const totalCash = totalAccountBalance > 0 ? totalAccountBalance : Math.max(0, totalInflow - totalOutflow);
+    const net = cash + receivables - (payables + cardDues);
 
-  const netPosition = totalCash + totalReceivables - (totalPayables + totalCardDues);
+    const totalAssets = Math.max(1, cash + receivables);
+    const cPct = Math.round((cash / totalAssets) * 100);
+    const rPct = Math.round((receivables / totalAssets) * 100);
 
-  // Asset distribution calculation for colorful bar
-  const totalAssets = Math.max(1, totalCash + totalReceivables);
-  const cashPct = Math.round((totalCash / totalAssets) * 100);
-  const recPct = Math.round((totalReceivables / totalAssets) * 100);
+    const expenseEntries = ledger.filter(
+      (e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment'
+    );
+    const totalExpenses = expenseEntries.reduce((s, e) => s + Number(e.amount), 0);
 
-  // Top Expense Categories Breakdown
-  const expenseEntries = ledger.filter(
-    (e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment'
-  );
-  const totalExpenses = expenseEntries.reduce((s, e) => s + Number(e.amount), 0);
+    const categoryMap = new Map<string, number>();
+    for (const e of expenseEntries) {
+      const catId = e.category_id || 'general';
+      categoryMap.set(catId, (categoryMap.get(catId) || 0) + Number(e.amount));
+    }
 
-  const categoryMap = new Map<string, number>();
-  for (const e of expenseEntries) {
-    const catId = e.category_id || 'general';
-    categoryMap.set(catId, (categoryMap.get(catId) || 0) + Number(e.amount));
-  }
+    const categories = Array.from(categoryMap.entries())
+      .map(([catId, amount]) => ({
+        category: getCategoryById(catId),
+        amount,
+        pct: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0,
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 4);
 
-  const topCategories = Array.from(categoryMap.entries())
-    .map(([catId, amount]) => ({
-      category: getCategoryById(catId),
-      amount,
-      pct: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0,
-    }))
-    .sort((a, b) => b.amount - a.amount)
-    .slice(0, 4);
+    return {
+      totalReceivables: receivables,
+      totalPayables: payables,
+      totalCardDues: cardDues,
+      totalInflow: inflow,
+      totalOutflow: outflow,
+      totalCash: cash,
+      netPosition: net,
+      cashPct: cPct,
+      recPct: rPct,
+      totalExpenses,
+      topCategories: categories,
+    };
+  }, [dues, cards, ledger, accounts]);
 
   return (
     <div className="space-y-6">

@@ -184,201 +184,65 @@ class SyncEngine {
         });
       }
 
-      // 2. Pull Bank Accounts
-      const { data: accData } = await supabase
-        .from('cash_locations')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .is('deleted_at', null);
+      // Parallel Fetch: Fetch all 8 tables simultaneously with Promise.allSettled
+      const [
+        accResult,
+        custResult,
+        duesResult,
+        cardResult,
+        ledgerResult,
+        noteResult,
+        sheetResult,
+        vaultResult,
+      ] = await Promise.allSettled([
+        supabase.from('cash_locations').select('*').eq('workspace_id', workspaceId).is('deleted_at', null),
+        supabase.from('customers').select('*').eq('workspace_id', workspaceId).is('deleted_at', null),
+        supabase.from('people_dues').select('*').eq('workspace_id', workspaceId).is('deleted_at', null),
+        supabase.from('cards').select('*').eq('workspace_id', workspaceId).is('deleted_at', null),
+        supabase.from('ledger_entries').select('*').eq('workspace_id', workspaceId).is('deleted_at', null).order('entry_date', { ascending: false }),
+        supabase.from('notes').select('*').eq('workspace_id', workspaceId).is('deleted_at', null),
+        supabase.from('sheets').select('*').eq('workspace_id', workspaceId),
+        supabase.from('vault_items').select('*').eq('workspace_id', workspaceId).is('deleted_at', null),
+      ]);
 
-      if (accData && accData.length > 0) {
-        useAccountStore.getState().setAccounts(accData);
-      } else {
-        const localAccounts = useAccountStore.getState().accounts;
-        if (localAccounts.length > 0) {
-          await supabase.from('cash_locations').upsert(
-            localAccounts.map((a) => ({
-              id: a.id,
-              workspace_id: workspaceId,
-              name: a.name,
-              balance: a.balance,
-              is_default: a.is_default,
-              gradient: a.gradient,
-              icon_color: a.iconColor,
-            }))
-          );
-        }
+      // 1. Process Bank Accounts
+      if (accResult.status === 'fulfilled' && accResult.value.data && accResult.value.data.length > 0) {
+        useAccountStore.getState().setAccounts(accResult.value.data);
       }
 
-      // 3. Pull Customers & Dues
-      const { data: custData } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .is('deleted_at', null);
-
-      if (custData && custData.length > 0) {
-        useCustomerStore.getState().setCustomers(custData);
-      } else {
-        const localCust = useCustomerStore.getState().customers;
-        if (localCust.length > 0) {
-          await supabase.from('customers').upsert(
-            localCust.map((c) => ({
-              id: c.id,
-              workspace_id: workspaceId,
-              name: c.name,
-              phone: c.phone,
-              address: c.address,
-              type: c.type,
-            }))
-          );
-        }
+      // 2. Process Customers
+      if (custResult.status === 'fulfilled' && custResult.value.data && custResult.value.data.length > 0) {
+        useCustomerStore.getState().setCustomers(custResult.value.data);
       }
 
-      const { data: duesData } = await supabase
-        .from('people_dues')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .is('deleted_at', null);
-
-      if (duesData && duesData.length > 0) {
-        useCustomerStore.getState().setDues(duesData);
-      } else {
-        const localDues = useCustomerStore.getState().dues;
-        if (localDues.length > 0) {
-          await supabase.from('people_dues').upsert(
-            localDues.map((d) => ({
-              id: d.id,
-              workspace_id: workspaceId,
-              customer_id: d.customer_id,
-              direction: d.direction,
-              amount: d.amount,
-              due_date: d.due_date,
-              status: d.status,
-              notes: d.notes,
-            }))
-          );
-        }
+      // 3. Process Dues
+      if (duesResult.status === 'fulfilled' && duesResult.value.data && duesResult.value.data.length > 0) {
+        useCustomerStore.getState().setDues(duesResult.value.data);
       }
 
-      // 4. Pull Cards
-      const { data: cardData } = await supabase
-        .from('cards')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .is('deleted_at', null);
-
-      if (cardData && cardData.length > 0) {
-        useCardStore.getState().setCards(cardData);
-      } else {
-        const localCards = useCardStore.getState().cards;
-        if (localCards.length > 0) {
-          await supabase.from('cards').upsert(
-            localCards.map((c) => ({
-              id: c.id,
-              workspace_id: workspaceId,
-              name: c.name,
-              bank: c.bank,
-              last4: c.last4,
-              credit_limit: c.credit_limit,
-              statement_day: c.statement_day,
-              is_active: c.is_active,
-            }))
-          );
-        }
+      // 4. Process Cards
+      if (cardResult.status === 'fulfilled' && cardResult.value.data && cardResult.value.data.length > 0) {
+        useCardStore.getState().setCards(cardResult.value.data);
       }
 
-      // 5. Pull Ledger Entries
-      const { data: ledgerData } = await supabase
-        .from('ledger_entries')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .is('deleted_at', null)
-        .order('entry_date', { ascending: false });
-
-      if (ledgerData && ledgerData.length > 0) {
-        useLedgerStore.getState().setEntries(ledgerData);
-      } else {
-        const localEntries = useLedgerStore.getState().entries;
-        if (localEntries.length > 0) {
-          await supabase.from('ledger_entries').upsert(
-            localEntries.map((e) => ({
-              id: e.id,
-              workspace_id: workspaceId,
-              type: e.type,
-              amount: e.amount,
-              category_id: e.category_id,
-              cash_location_id: e.cash_location_id,
-              customer_id: e.customer_id,
-              card_id: e.card_id,
-              mode: e.mode,
-              note: e.note,
-              entry_date: e.entry_date,
-            }))
-          );
-        }
+      // 5. Process Ledger Entries
+      if (ledgerResult.status === 'fulfilled' && ledgerResult.value.data && ledgerResult.value.data.length > 0) {
+        useLedgerStore.getState().setEntries(ledgerResult.value.data);
       }
 
-      // 6. Pull Notes
-      const { data: noteData } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .is('deleted_at', null);
-
-      if (noteData && noteData.length > 0) {
-        useNoteStore.getState().setNotes(noteData);
-      } else {
-        const localNotes = useNoteStore.getState().notes;
-        if (localNotes.length > 0) {
-          await supabase.from('notes').upsert(
-            localNotes.map((n) => ({
-              id: n.id,
-              workspace_id: workspaceId,
-              title: n.title,
-              body: n.body,
-              color: n.color,
-              tags: n.tags,
-              is_pinned: n.is_pinned,
-              checklist_items: n.checklist_items,
-            }))
-          );
-        }
+      // 6. Process Notes
+      if (noteResult.status === 'fulfilled' && noteResult.value.data && noteResult.value.data.length > 0) {
+        useNoteStore.getState().setNotes(noteResult.value.data);
       }
 
-      // 7. Pull Sheets
-      const { data: sheetData } = await supabase
-        .from('sheets')
-        .select('*')
-        .eq('workspace_id', workspaceId);
-
-      if (sheetData && sheetData.length > 0) {
-        useSheetStore.getState().setSheets(sheetData);
-      } else {
-        const localSheets = useSheetStore.getState().sheets;
-        if (localSheets.length > 0) {
-          await supabase.from('sheets').upsert(
-            localSheets.map((s) => ({
-              id: s.id,
-              workspace_id: workspaceId,
-              title: s.title,
-              category: s.category,
-              color: s.color,
-              columns: s.columns,
-              rows: s.rows,
-            }))
-          );
-        }
+      // 7. Process Sheets
+      if (sheetResult.status === 'fulfilled' && sheetResult.value.data && sheetResult.value.data.length > 0) {
+        useSheetStore.getState().setSheets(sheetResult.value.data);
       }
 
-      // 8. Pull Encrypted Vault Items
-      const { data: vaultData } = await supabase
-        .from('vault_items')
-        .select('*')
-        .eq('workspace_id', workspaceId);
-
-      if (vaultData && vaultData.length > 0) {
-        useVaultStore.getState().setVaultItems(vaultData);
+      // 8. Process Vault Items
+      if (vaultResult.status === 'fulfilled' && vaultResult.value.data && vaultResult.value.data.length > 0) {
+        useVaultStore.getState().setVaultItems(vaultResult.value.data);
       }
 
       // Flush any queued offline mutations

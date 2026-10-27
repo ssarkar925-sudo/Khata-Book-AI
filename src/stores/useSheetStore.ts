@@ -2,6 +2,26 @@ import { create } from 'zustand';
 import { RecordSheet, SheetRow, SheetColumn } from '@/types';
 import { supabase } from '@/lib/supabase';
 
+let saveTimer: any = null;
+let cloudTimer: any = null;
+
+function debouncedSaveToLocalStorage(sheets: RecordSheet[]) {
+  if (typeof window === 'undefined') return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem('rb_saved_sheets', JSON.stringify(sheets));
+    } catch {}
+  }, 350);
+}
+
+function debouncedSyncSheetToCloud(sheet: RecordSheet) {
+  if (cloudTimer) clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(() => {
+    syncSheetToCloud(sheet);
+  }, 1200);
+}
+
 function syncSheetToCloud(sheet: RecordSheet) {
   try {
     supabase.from('sheets').upsert({
@@ -197,10 +217,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, ...updates, updated_at: new Date().toISOString() };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -230,10 +248,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, rows: [newRow, ...s.rows] };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -246,10 +262,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, rows };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -264,10 +278,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, rows };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -279,10 +291,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, rows: s.rows.filter((r) => r.id !== rowId) };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -294,10 +304,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, columns: [...s.columns, column] };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -310,10 +318,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, columns };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -325,10 +331,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, columns: s.columns.filter((c) => c.id !== columnId) };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -351,10 +355,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, rows };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -366,10 +368,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, frozenRowCount: Math.max(0, count) };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -393,10 +393,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, rows };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -420,10 +418,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, rows };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -445,10 +441,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, rows };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -460,10 +454,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, rowHeight: height };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -489,10 +481,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, rows: sorted };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -524,10 +514,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, rows };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 
@@ -545,10 +533,8 @@ export const useSheetStore = create<SheetState>((set) => ({
         targetSheet = { ...s, columns: cols };
         return targetSheet;
       });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
-      if (targetSheet) syncSheetToCloud(targetSheet);
+      debouncedSaveToLocalStorage(updated);
+      if (targetSheet) debouncedSyncSheetToCloud(targetSheet);
       return { sheets: updated };
     }),
 }));

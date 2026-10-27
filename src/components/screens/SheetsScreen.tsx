@@ -118,6 +118,71 @@ function getColumnLetter(colIndex: number): string {
   return letter;
 }
 
+// Fast Memoized Cell Input with Zero Lag
+const SheetCellInput = React.memo(function SheetCellInput({
+  value,
+  type,
+  isBold,
+  isItalic,
+  align,
+  textColor,
+  wrapText,
+  onChange,
+  onEnterAtLastRow,
+}: {
+  value: string;
+  type: SheetColumnType;
+  isBold: boolean;
+  isItalic: boolean;
+  align: 'left' | 'center' | 'right';
+  textColor?: string;
+  wrapText: boolean;
+  onChange: (val: string) => void;
+  onEnterAtLastRow?: () => void;
+}) {
+  const [localVal, setLocalVal] = useState(value);
+
+  useEffect(() => {
+    setLocalVal(value);
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      value={localVal}
+      onChange={(e) => {
+        setLocalVal(e.target.value);
+        onChange(e.target.value);
+      }}
+      onBlur={() => {
+        if (localVal !== value) {
+          onChange(localVal);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && onEnterAtLastRow) {
+          onEnterAtLastRow();
+        }
+      }}
+      style={{
+        fontWeight: isBold ? 'bold' : undefined,
+        fontStyle: isItalic ? 'italic' : undefined,
+        textAlign: align,
+        color: textColor || undefined,
+      }}
+      className={`w-full bg-transparent px-1.5 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 transition-colors ${
+        wrapText ? '' : 'truncate'
+      } ${
+        type === 'amount'
+          ? 'font-bold font-mono text-emerald-600 dark:text-emerald-400'
+          : type === 'status'
+          ? 'font-bold text-blue-600 dark:text-blue-400'
+          : 'text-slate-800 dark:text-slate-200'
+      }`}
+    />
+  );
+});
+
 export function SheetsScreen() {
   const {
     sheets,
@@ -794,7 +859,7 @@ export function SheetsScreen() {
           : String(maxVal)
         : null,
     };
-  }, [activeSheet, activeCol]);
+  }, [activeSheet?.id, activeCol?.id, activeCol?.type, activeSheet?.rows]);
 
   return (
     <div className="space-y-3 animate-fade-in pb-16">
@@ -1605,33 +1670,19 @@ export function SheetsScreen() {
                                   />
                                 </div>
                               ) : (
-                                /* CASE 3: TEXT / AMOUNT / NUMBER FREE EDIT */
-                                <input
-                                  type="text"
-                                  value={displayVal}
-                                  onChange={(e) =>
-                                    updateCell(activeSheet.id, row.id, col.id, e.target.value)
+                                /* CASE 3: FAST TEXT / AMOUNT / NUMBER CELL */
+                                <SheetCellInput
+                                  value={String(displayVal ?? '')}
+                                  type={col.type}
+                                  isBold={isBold}
+                                  isItalic={isItalic}
+                                  align={align}
+                                  textColor={textColor}
+                                  wrapText={wrapText}
+                                  onChange={(val) => updateCell(activeSheet.id, row.id, col.id, val)}
+                                  onEnterAtLastRow={
+                                    rowIdx === filteredRows.length - 1 ? handleQuickAddRow : undefined
                                   }
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && rowIdx === filteredRows.length - 1) {
-                                      handleQuickAddRow();
-                                    }
-                                  }}
-                                  style={{
-                                    fontWeight: isBold ? 'bold' : undefined,
-                                    fontStyle: isItalic ? 'italic' : undefined,
-                                    textAlign: align,
-                                    color: textColor || undefined,
-                                  }}
-                                  className={`w-full bg-transparent px-1.5 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 transition-colors ${
-                                    wrapText ? '' : 'truncate'
-                                  } ${
-                                    col.type === 'amount'
-                                      ? 'font-bold font-mono text-emerald-600 dark:text-emerald-400'
-                                      : col.type === 'status'
-                                      ? 'font-bold text-blue-600 dark:text-blue-400'
-                                      : 'text-slate-800 dark:text-slate-200'
-                                  }`}
                                 />
                               )}
                             </td>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { TabType, LedgerEntry } from '@/types';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { useLedgerStore } from '@/stores/useLedgerStore';
@@ -8,22 +9,36 @@ import { supabase } from '@/lib/supabase';
 import { Navbar } from '@/components/layout/Navbar';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
-import { AskAIModal } from '@/components/ai/AskAIModal';
-import { DashboardScreen } from '@/components/screens/DashboardScreen';
-import { CashScreen } from '@/components/screens/CashScreen';
-import { DuesScreen } from '@/components/screens/DuesScreen';
-import { CardsScreen } from '@/components/screens/CardsScreen';
-import { NotesScreen } from '@/components/screens/NotesScreen';
-import { VaultScreen } from '@/components/screens/VaultScreen';
-import { ReportsScreen } from '@/components/screens/ReportsScreen';
-import { SheetsScreen } from '@/components/screens/SheetsScreen';
-import { ReceiptScannerModal } from '@/components/modals/ReceiptScannerModal';
-import { VoiceExpenseModal } from '@/components/modals/VoiceExpenseModal';
-import { QuickTransactionModal } from '@/components/modals/QuickTransactionModal';
-import { BackupRestoreModal } from '@/components/modals/BackupRestoreModal';
 import { AppLockScreen } from '@/components/security/AppLockScreen';
 import { syncEngine } from '@/lib/syncEngine';
 import { X, Camera, Mic, Shield } from 'lucide-react';
+
+// Dynamic Code Splitting for ultra-fast startup
+const DashboardScreen = dynamic(
+  () => import('@/components/screens/DashboardScreen').then((m) => m.DashboardScreen)
+);
+const CashScreen = dynamic(() => import('@/components/screens/CashScreen').then((m) => m.CashScreen));
+const DuesScreen = dynamic(() => import('@/components/screens/DuesScreen').then((m) => m.DuesScreen));
+const CardsScreen = dynamic(() => import('@/components/screens/CardsScreen').then((m) => m.CardsScreen));
+const SheetsScreen = dynamic(() => import('@/components/screens/SheetsScreen').then((m) => m.SheetsScreen));
+const NotesScreen = dynamic(() => import('@/components/screens/NotesScreen').then((m) => m.NotesScreen));
+const VaultScreen = dynamic(() => import('@/components/screens/VaultScreen').then((m) => m.VaultScreen));
+const ReportsScreen = dynamic(() => import('@/components/screens/ReportsScreen').then((m) => m.ReportsScreen));
+
+// Modals dynamically imported and mounted only on user trigger
+const AskAIModal = dynamic(() => import('@/components/ai/AskAIModal').then((m) => m.AskAIModal));
+const ReceiptScannerModal = dynamic(
+  () => import('@/components/modals/ReceiptScannerModal').then((m) => m.ReceiptScannerModal)
+);
+const VoiceExpenseModal = dynamic(
+  () => import('@/components/modals/VoiceExpenseModal').then((m) => m.VoiceExpenseModal)
+);
+const QuickTransactionModal = dynamic(
+  () => import('@/components/modals/QuickTransactionModal').then((m) => m.QuickTransactionModal)
+);
+const BackupRestoreModal = dynamic(
+  () => import('@/components/modals/BackupRestoreModal').then((m) => m.BackupRestoreModal)
+);
 
 export function AppShell() {
   const { user, authLoading, theme, activeWorkspaceId, setWorkspaces, setActiveWorkspaceId, setSyncStatus, setUser } = useSessionStore();
@@ -121,30 +136,36 @@ export function AppShell() {
       />
 
       {/* Ask AI Modal */}
-      <AskAIModal
-        isOpen={isAskAIOpen}
-        onClose={() => setIsAskAIOpen(false)}
-        onOpenScanner={() => {
-          setIsAskAIOpen(false);
-          setIsScannerOpen(true);
-        }}
-        onOpenVoice={() => {
-          setIsAskAIOpen(false);
-          setIsVoiceOpen(true);
-        }}
-      />
+      {isAskAIOpen && (
+        <AskAIModal
+          isOpen={isAskAIOpen}
+          onClose={() => setIsAskAIOpen(false)}
+          onOpenScanner={() => {
+            setIsAskAIOpen(false);
+            setIsScannerOpen(true);
+          }}
+          onOpenVoice={() => {
+            setIsAskAIOpen(false);
+            setIsVoiceOpen(true);
+          }}
+        />
+      )}
 
       {/* Receipt Scanner Modal */}
-      <ReceiptScannerModal
-        isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-      />
+      {isScannerOpen && (
+        <ReceiptScannerModal
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+        />
+      )}
 
       {/* Voice Expense Modal */}
-      <VoiceExpenseModal
-        isOpen={isVoiceOpen}
-        onClose={() => setIsVoiceOpen(false)}
-      />
+      {isVoiceOpen && (
+        <VoiceExpenseModal
+          isOpen={isVoiceOpen}
+          onClose={() => setIsVoiceOpen(false)}
+        />
+      )}
 
       {/* Mobile More Sheet */}
       {isMobileMoreOpen && (
@@ -229,32 +250,36 @@ export function AppShell() {
       )}
 
       {/* Full Backup, Restore & App Lock Modal */}
-      <BackupRestoreModal
-        isOpen={isBackupModalOpen}
-        onClose={() => setIsBackupModalOpen(false)}
-      />
+      {isBackupModalOpen && (
+        <BackupRestoreModal
+          isOpen={isBackupModalOpen}
+          onClose={() => setIsBackupModalOpen(false)}
+        />
+      )}
 
       {/* Quick Transaction Modal (Inflow / Outflow / Expense) */}
-      <QuickTransactionModal
-        isOpen={showCashModal !== null}
-        type={showCashModal || 'out'}
-        onClose={() => setShowCashModal(null)}
-        onSubmit={({ amountPaise, categoryId, accountId, mode, note, entryDate }) => {
-          const newEntry: LedgerEntry = {
-            id: crypto.randomUUID(),
-            workspace_id: activeWorkspaceId || '00000000-0000-0000-0000-000000000010',
-            type: showCashModal === 'in' ? 'cash_in' : 'cash_out',
-            amount: amountPaise,
-            category_id: categoryId,
-            cash_location_id: accountId,
-            mode,
-            note: note.trim() || (showCashModal === 'in' ? 'Cash Received' : 'Expense Recorded'),
-            entry_date: entryDate,
-          };
-          syncEngine.pushLedgerEntry(newEntry);
-          setShowCashModal(null);
-        }}
-      />
+      {showCashModal !== null && (
+        <QuickTransactionModal
+          isOpen={showCashModal !== null}
+          type={showCashModal || 'out'}
+          onClose={() => setShowCashModal(null)}
+          onSubmit={({ amountPaise, categoryId, accountId, mode, note, entryDate }) => {
+            const newEntry: LedgerEntry = {
+              id: crypto.randomUUID(),
+              workspace_id: activeWorkspaceId || '00000000-0000-0000-0000-000000000010',
+              type: showCashModal === 'in' ? 'cash_in' : 'cash_out',
+              amount: amountPaise,
+              category_id: categoryId,
+              cash_location_id: accountId,
+              mode,
+              note: note.trim() || (showCashModal === 'in' ? 'Cash Received' : 'Expense Recorded'),
+              entry_date: entryDate,
+            };
+            syncEngine.pushLedgerEntry(newEntry);
+            setShowCashModal(null);
+          }}
+        />
+      )}
     </div>
   );
 }
