@@ -1,6 +1,7 @@
 const CACHE_NAME = 'record-book-v4';
 const STATIC_ASSETS = [
   '/',
+  '/offline',
   '/offline.html',
   '/manifest.json',
   '/icon-192.svg',
@@ -61,8 +62,8 @@ self.addEventListener('fetch', (event) => {
         return caches.match(event.request).then((cached) => {
           if (cached) return cached;
           if (event.request.mode === 'navigate') {
-            return caches.match('/offline.html').then((offlinePage) => {
-              return offlinePage || caches.match('/');
+            return caches.match('/offline').then((offlinePage) => {
+              return offlinePage || caches.match('/offline.html') || caches.match('/');
             });
           }
           return undefined;
