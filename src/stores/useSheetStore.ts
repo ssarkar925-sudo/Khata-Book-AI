@@ -258,9 +258,7 @@ export const useSheetStore = create<SheetState>((set) => ({
         }
       }
       const merged = Array.from(sheetsMap.values());
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(merged));
-      }
+      debouncedSaveToLocalStorage(merged);
       return {
         sheets: merged,
         activeSheetId: state.activeSheetId && sheetsMap.has(state.activeSheetId)
@@ -285,15 +283,11 @@ export const useSheetStore = create<SheetState>((set) => ({
           const repaired = { ...norm, workspace_id: workspaceId };
           syncSheetToCloud(repaired);
           return repaired;
-        } else {
-          // Push to cloud to ensure multi-device synchronization
-          syncSheetToCloud(norm);
-          return norm;
         }
+        return norm;
       });
-      if (changed && typeof window !== 'undefined') {
-        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
-      }
+      if (!changed) return state; // Avoid re-render if nothing changed
+      debouncedSaveToLocalStorage(updated);
       return { sheets: updated };
     });
   },

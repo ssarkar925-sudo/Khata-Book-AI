@@ -80,10 +80,14 @@ export function AppShell() {
     };
   }, [user, activeWorkspaceId]);
 
-  // Pull latest updates when user returns to app from phone background or switches tabs
+  // Pull latest updates when user returns to app from phone background or screen unlock (throttled to max 1 pull per 45s)
   useEffect(() => {
+    let lastPull = 0;
     const handleForeground = () => {
+      const now = Date.now();
+      if (now - lastPull < 45000) return;
       if (typeof document !== 'undefined' && document.visibilityState === 'visible' && user && activeWorkspaceId) {
+        lastPull = now;
         syncEngine.pullAll(activeWorkspaceId);
       }
     };
@@ -91,16 +95,10 @@ export function AppShell() {
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleForeground);
     }
-    if (typeof window !== 'undefined') {
-      window.addEventListener('focus', handleForeground);
-    }
 
     return () => {
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', handleForeground);
-      }
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('focus', handleForeground);
       }
     };
   }, [user, activeWorkspaceId]);

@@ -221,13 +221,13 @@ export function SheetsScreen() {
   const isLight = theme === 'light';
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Auto-pull sheets from Supabase on screen mount & workspace switch
+  // Auto-pull sheets from Supabase only if store is completely empty
   useEffect(() => {
     const wsId = activeWorkspaceId || useSessionStore.getState().activeWorkspaceId;
-    if (wsId) {
+    if (wsId && sheets.length === 0) {
       syncEngine.pullAll(wsId);
     }
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, sheets.length]);
 
   const handleManualSync = async () => {
     setIsRefreshing(true);
@@ -324,6 +324,7 @@ export function SheetsScreen() {
 
   // 1-Click Scroll to Row 1
   const scrollToRow1 = () => {
+    setCurrentPage(1);
     if (tableContainerRef.current) {
       tableContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -331,6 +332,7 @@ export function SheetsScreen() {
 
   // 1-Click Scroll to Bottom
   const scrollToBottom = () => {
+    setCurrentPage(totalPages);
     if (tableContainerRef.current) {
       tableContainerRef.current.scrollTo({
         top: tableContainerRef.current.scrollHeight,
@@ -353,6 +355,28 @@ export function SheetsScreen() {
       return Object.values(r.data).some((val) => String(val).toLowerCase().includes(q));
     });
   }, [activeSheet?.rows, searchQuery]);
+
+  // ==========================================
+  // PERFORMANCE PAGINATION & WINDOWING
+  // Keeps rendering blazing fast (60 FPS) for large Excel sheets (up to thousands of rows)
+  // ==========================================
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Total pages
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / (pageSize > 0 ? pageSize : 1)));
+
+  // Reset to page 1 when search or sheet changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeSheet?.id, searchQuery]);
+
+  // Paginated visible rows
+  const paginatedRows = useMemo(() => {
+    if (pageSize <= 0) return filteredRows;
+    const start = (currentPage - 1) * pageSize;
+    return filteredRows.slice(start, start + pageSize);
+  }, [filteredRows, currentPage, pageSize]);
 
   // Selected row object
   const activeRow = useMemo(() => {
@@ -485,6 +509,8 @@ export function SheetsScreen() {
       blankData[col.id] = '';
     });
     addRow(activeSheet.id, blankData);
+    setCurrentPage(1);
+    scrollToRow1();
   };
 
   // Insert Row Above Selected
@@ -1607,11 +1633,12 @@ export function SheetsScreen() {
                     </td>
                   </tr>
                 ) : (
-                  filteredRows.map((row, rowIdx) => {
-                    // Check if this row is frozen at top
+                  paginatedRows.map((row, idx) => {
+                    const rowIdx = (pageSize > 0 ? (currentPage - 1) * pageSize : 0) + idx;
+                    // Check if this row is frozen at top (only within top rows on page 1)
                     const isRowFrozen = rowIdx < frozenRowCount;
-                    // Sticky top offset for frozen row: 40px (header height) + rowIdx * rowHeightPx
-                    const frozenRowTop = 40 + rowIdx * rowHeightPx;
+                    // Sticky top offset for frozen row: 40px (header height) + idx * rowHeightPx
+                    const frozenRowTop = 40 + idx * rowHeightPx;
                     const isLastFrozenRow = rowIdx === frozenRowCount - 1;
 
                     return (
@@ -1830,6 +1857,79 @@ export function SheetsScreen() {
               </tbody>
             </table>
           </div>
+
+          {/* ========================================================
+              PAGINATION & ROW WINDOWING BAR (60 FPS PERFORMANCE)
+             ======================================================== */}
+          {filteredRows.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-4 py-2.5 bg-white/95 dark:bg-slate-900/95 border-t border-slate-200 dark:border-white/10 text-xs text-slate-500 font-medium">
+              <div className="flex items-center gap-3">
+                <span>
+                  Showing <strong className="text-slate-900 dark:text-white font-bold">{filteredRows.length === 0 ? 0 : (pageSize > 0 ? (currentPage - 1) * pageSize + 1 : 1)}</strong> to{' '}
+                  <strong className="text-slate-900 dark:text-white font-bold">
+                    {pageSize > 0 ? Math.min(currentPage * pageSize, filteredRows.length) : filteredRows.length}
+                  </strong>{' '}
+                  of <strong className="text-slate-900 dark:text-white font-bold">{filteredRows.length}</strong> records
+                </span>
+
+                <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-white/10">
+                  <span className="text-[11px] text-slate-400">Rows per page:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="px-2 py-0.5 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={200}>200</option>
+                    <option value={-1}>All ({filteredRows.length})</option>
+                  </select>
+                </div>
+              </div>
+
+              {totalPages > 1 && pageSize > 0 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="px-2 py-1 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 disabled:opacity-40 font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                    title="First Page"
+                  >
+                    «
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 disabled:opacity-40 font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    Prev
+                  </button>
+                  <span className="px-3 py-1 font-mono text-xs font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 disabled:opacity-40 font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    Next
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="px-2 py-1 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 disabled:opacity-40 font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                    title="Last Page"
+                  >
+                    »
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ========================================================
               BOTTOM EXCEL STATUS BAR (CALCULATIONS & SHEET METRICS)
