@@ -7,6 +7,12 @@ import {
   registerLocalWorkspaceId,
   countUnmigratedLocalRecords,
 } from '@/lib/migrationEngine';
+import { useAccountStore } from '@/stores/useAccountStore';
+import { useCardStore } from '@/stores/useCardStore';
+import { useCustomerStore } from '@/stores/useCustomerStore';
+import { useLedgerStore } from '@/stores/useLedgerStore';
+import { useNoteStore } from '@/stores/useNoteStore';
+import { useVaultStore } from '@/stores/useVaultStore';
 
 export const DEFAULT_LOCAL_WORKSPACE: Workspace = {
   id: '00000000-0000-0000-0000-000000000010',
@@ -560,6 +566,28 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   resetSession: () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('rb_cached_user');
+      localStorage.removeItem('rb_last_sync_time');
+      localStorage.removeItem('rb_sync_queue');
+      localStorage.removeItem('rb_accounts');
+      localStorage.removeItem('rb_cards');
+      localStorage.removeItem('rb_customers');
+      localStorage.removeItem('rb_dues');
+      localStorage.removeItem('rb_ledger_entries');
+      localStorage.removeItem('rb_notes');
+      localStorage.removeItem('rb_saved_sheets');
+      localStorage.removeItem('rb_vault_saved_items');
+      localStorage.removeItem('rb_vault_auth_token');
+      localStorage.removeItem('rb_vault_lockout');
+
+      try {
+        useAccountStore.getState().clearAccounts();
+        useCardStore.getState().clearCardData();
+        useCustomerStore.getState().clearCustomerData();
+        useLedgerStore.getState().clearLedger();
+        useNoteStore.getState().clearNotes();
+        useVaultStore.getState().resetVault();
+        import('@/stores/useSheetStore').then((m) => m.useSheetStore.getState().setSheets([]));
+      } catch {}
     }
     const localWs = getOrCreateLocalWorkspace();
     set({

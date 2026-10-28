@@ -13,9 +13,9 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAccountStore } from '@/stores/useAccountStore';
-import { useLedgerStore } from '@/stores/useLedgerStore';
 import { EntityScope, LedgerEntry } from '@/types';
 import { formatPaise } from '@/lib/money';
+import { syncEngine } from '@/lib/syncEngine';
 
 interface InterSphereTransferModalProps {
   isOpen: boolean;
@@ -28,8 +28,7 @@ export function InterSphereTransferModal({
   onClose,
   defaultSourceScope = 'business',
 }: InterSphereTransferModalProps) {
-  const { accounts, updateAccountBalance } = useAccountStore();
-  const { addEntryOptimistic } = useLedgerStore();
+  const { accounts } = useAccountStore();
 
   const [fromScope, setFromScope] = useState<EntityScope>(defaultSourceScope);
   const [toScope, setToScope] = useState<EntityScope>(
@@ -84,13 +83,7 @@ export function InterSphereTransferModal({
     e.preventDefault();
     if (amountPaise <= 0 || !selectedFromAccount || !selectedToAccount) return;
 
-    // 1. Deduct from source
-    updateAccountBalance(selectedFromAccount.id, selectedFromAccount.balance - amountPaise);
-
-    // 2. Add to destination
-    updateAccountBalance(selectedToAccount.id, selectedToAccount.balance + amountPaise);
-
-    // 3. Log paired entries in ledger
+    // Log paired entries in ledger (syncEngine handles atomic balance update and cloud sync)
     const now = new Date().toISOString();
     const memo = note ? `${reason}: ${note}` : reason;
 
@@ -124,8 +117,8 @@ export function InterSphereTransferModal({
       created_at: now,
     };
 
-    addEntryOptimistic(outEntry);
-    addEntryOptimistic(inEntry);
+    syncEngine.pushLedgerEntry(outEntry);
+    syncEngine.pushLedgerEntry(inEntry);
 
     setSuccessMsg(true);
     setTimeout(() => {

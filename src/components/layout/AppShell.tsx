@@ -103,6 +103,45 @@ export function AppShell() {
     };
   }, [user, activeWorkspaceId]);
 
+  // Hardware Back Button & Modal Dismissal Listener (for Android Back Button & Browser Back)
+  useEffect(() => {
+    const handlePopState = () => {
+      // If any modal is open, dismiss it
+      if (isAskAIOpen || isScannerOpen || isVoiceOpen || isBackupModalOpen || showCashModal !== null || isMobileMoreOpen) {
+        setIsAskAIOpen(false);
+        setIsScannerOpen(false);
+        setIsVoiceOpen(false);
+        setIsBackupModalOpen(false);
+        setShowCashModal(null);
+        setIsMobileMoreOpen(false);
+        return;
+      }
+      // If not on dashboard, return to dashboard
+      if (activeTab !== 'dashboard') {
+        setActiveTab('dashboard');
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('popstate', handlePopState);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('popstate', handlePopState);
+      }
+    };
+  }, [isAskAIOpen, isScannerOpen, isVoiceOpen, isBackupModalOpen, showCashModal, isMobileMoreOpen, activeTab]);
+
+  // Push history entry whenever a modal opens so back button dismisses modal first
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const anyModalOpen = Boolean(isAskAIOpen || isScannerOpen || isVoiceOpen || isBackupModalOpen || showCashModal !== null || isMobileMoreOpen);
+      if (anyModalOpen) {
+        window.history.pushState({ modalOpen: true }, '');
+      }
+    }
+  }, [isAskAIOpen, isScannerOpen, isVoiceOpen, isBackupModalOpen, showCashModal, isMobileMoreOpen]);
+
   // Synchronize documentElement theme class with current session state
   useEffect(() => {
     if (typeof window !== 'undefined') {

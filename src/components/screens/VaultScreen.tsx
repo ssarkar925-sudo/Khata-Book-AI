@@ -27,6 +27,7 @@ import { VaultItem, VaultSecretField } from '@/types';
 import { useVaultStore } from '@/stores/useVaultStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { encryptData, decryptData } from '@/lib/crypto';
+import { syncEngine } from '@/lib/syncEngine';
 
 const VAULT_COLORS = [
   { id: '#3B82F6', name: 'Blue', label: 'Banking & Finance', bg: 'bg-blue-500', text: 'text-blue-500' },
@@ -347,6 +348,7 @@ export function VaultScreen() {
       };
 
       addVaultItemOptimistic(newItem);
+      syncEngine.pushVaultItem(newItem);
       setDecryptedSecretsMap((prev) => ({ ...prev, [newItem.id]: validSecrets }));
       setShowAddModal(false);
 
@@ -409,6 +411,7 @@ export function VaultScreen() {
       };
 
       updateVaultItemOptimistic(editingItem.id, updates);
+      syncEngine.updateVaultItem(editingItem.id, updates);
       setDecryptedSecretsMap((prev) => ({ ...prev, [editingItem.id]: validSecrets }));
       setEditingItem(null);
     } catch {
@@ -747,6 +750,7 @@ export function VaultScreen() {
                           onClick={() => {
                             if (confirm(`Delete "${item.title}" from vault?`)) {
                               deleteVaultItemOptimistic(item.id);
+                              syncEngine.deleteVaultItem(item.id);
                             }
                           }}
                           className="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"

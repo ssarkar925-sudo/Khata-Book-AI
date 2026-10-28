@@ -103,6 +103,16 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onBackPressed() {
+        WebView webView = (getBridge() != null) ? getBridge().getWebView() : null;
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
     public void onDestroy() {
         super.onDestroy();
         if (connectivityManager != null && networkCallback != null) {

@@ -22,6 +22,31 @@ const QUEUE_STORAGE_KEY = 'rb_sync_queue';
 import { LEDGER_ENTRY_VALID_COLUMNS, sanitizeLedgerPayload } from '@/lib/ledgerSanitizer';
 export { LEDGER_ENTRY_VALID_COLUMNS, sanitizeLedgerPayload };
 
+export const VAULT_ITEM_VALID_COLUMNS = new Set([
+  'id',
+  'workspace_id',
+  'title',
+  'item_type',
+  'username',
+  'encrypted_password',
+  'iv',
+  'salt',
+  'auth_tag',
+  'url',
+  'notes',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+]);
+
+export function sanitizeVaultPayload(obj: Record<string, any>) {
+  const clean: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (VAULT_ITEM_VALID_COLUMNS.has(k) && v !== undefined) clean[k] = v;
+  }
+  return clean;
+}
+
 class SyncEngine {
   private isSyncing = false;
   private channel: ReturnType<typeof supabase.channel> | null = null;
@@ -122,6 +147,8 @@ class SyncEngine {
         let cleanPayload = item.payload;
         if (item.table === 'ledger_entries') {
           cleanPayload = sanitizeLedgerPayload(cleanPayload);
+        } else if (item.table === 'vault_items') {
+          cleanPayload = sanitizeVaultPayload(cleanPayload);
         }
 
         if (item.action === 'upsert') {
@@ -224,43 +251,43 @@ class SyncEngine {
       ]);
 
       // 1. Process Bank Accounts
-      if (accResult.status === 'fulfilled' && accResult.value.data && accResult.value.data.length > 0) {
+      if (accResult.status === 'fulfilled' && Array.isArray(accResult.value.data)) {
         useAccountStore.getState().setAccounts(accResult.value.data);
       }
 
       // 2. Process Customers
-      if (custResult.status === 'fulfilled' && custResult.value.data && custResult.value.data.length > 0) {
+      if (custResult.status === 'fulfilled' && Array.isArray(custResult.value.data)) {
         useCustomerStore.getState().setCustomers(custResult.value.data);
       }
 
       // 3. Process Dues
-      if (duesResult.status === 'fulfilled' && duesResult.value.data && duesResult.value.data.length > 0) {
+      if (duesResult.status === 'fulfilled' && Array.isArray(duesResult.value.data)) {
         useCustomerStore.getState().setDues(duesResult.value.data);
       }
 
       // 4. Process Cards
-      if (cardResult.status === 'fulfilled' && cardResult.value.data && cardResult.value.data.length > 0) {
+      if (cardResult.status === 'fulfilled' && Array.isArray(cardResult.value.data)) {
         useCardStore.getState().setCards(cardResult.value.data);
       }
 
       // 5. Process Ledger Entries
-      if (ledgerResult.status === 'fulfilled' && ledgerResult.value.data && ledgerResult.value.data.length > 0) {
+      if (ledgerResult.status === 'fulfilled' && Array.isArray(ledgerResult.value.data)) {
         useLedgerStore.getState().setEntries(ledgerResult.value.data);
       }
 
       // 6. Process Notes
-      if (noteResult.status === 'fulfilled' && noteResult.value.data && noteResult.value.data.length > 0) {
+      if (noteResult.status === 'fulfilled' && Array.isArray(noteResult.value.data)) {
         useNoteStore.getState().setNotes(noteResult.value.data);
       }
 
       // 7. Process Sheets
-      if (sheetResult.status === 'fulfilled' && sheetResult.value.data) {
+      if (sheetResult.status === 'fulfilled' && Array.isArray(sheetResult.value.data)) {
         useSheetStore.getState().setSheets(sheetResult.value.data);
       }
       useSheetStore.getState().syncPendingLocalSheets(workspaceId);
 
       // 8. Process Vault Items
-      if (vaultResult.status === 'fulfilled' && vaultResult.value.data && vaultResult.value.data.length > 0) {
+      if (vaultResult.status === 'fulfilled' && Array.isArray(vaultResult.value.data)) {
         useVaultStore.getState().setVaultItems(vaultResult.value.data);
       }
 
@@ -352,6 +379,12 @@ class SyncEngine {
           console.log('[SyncEngine] Realtime customer update received:', payload.eventType);
           if (payload.eventType === 'INSERT') {
             useCustomerStore.getState().addCustomerOptimistic(payload.new as Customer);
+          } else if (payload.eventType === 'UPDATE') {
+            useCustomerStore.getState().updateCustomerOptimistic(payload.new.id, payload.new as Partial<Customer>);
+          } else if (payload.eventType === 'DELETE') {
+            if (payload.old && (payload.old as any).id) {
+              useCustomerStore.getState().deleteCustomerOptimistic((payload.old as any).id);
+            }
           }
         }
       )
@@ -364,7 +397,11 @@ class SyncEngine {
           if (payload.eventType === 'INSERT') {
             useCustomerStore.getState().addDueOptimistic(payload.new as PeopleDue);
           } else if (payload.eventType === 'UPDATE') {
-            useCustomerStore.getState().updateDueStatusOptimistic(payload.new.id, payload.new.status);
+            useCustomerStore.getState().updateDueOptimistic(payload.new.id, payload.new as Partial<PeopleDue>);
+          } else if (payload.eventType === 'DELETE') {
+            if (payload.old && (payload.old as any).id) {
+              useCustomerStore.getState().deleteDueOptimistic((payload.old as any).id);
+            }
           }
         }
       )
@@ -443,6 +480,23 @@ class SyncEngine {
           } else if (payload.eventType === 'DELETE') {
             if (payload.old && (payload.old as any).id) {
               useSheetStore.getState().deleteSheet((payload.old as any).id);
+            }
+          }
+        }
+      )
+      // Vault Items (Server-Side Filtered)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vault_items', filter: `workspace_id=eq.${workspaceId}` },
+        (payload) => {
+          console.log('[SyncEngine] Realtime vault update received:', payload.eventType);
+          if (payload.eventType === 'INSERT') {
+            useVaultStore.getState().addVaultItemOptimistic(payload.new as VaultItem);
+          } else if (payload.eventType === 'UPDATE') {
+            useVaultStore.getState().updateVaultItemOptimistic(payload.new.id, payload.new as Partial<VaultItem>);
+          } else if (payload.eventType === 'DELETE') {
+            if (payload.old && (payload.old as any).id) {
+              useVaultStore.getState().deleteVaultItemOptimistic((payload.old as any).id);
             }
           }
         }
@@ -1258,6 +1312,82 @@ class SyncEngine {
       useSessionStore.getState().setSyncStatus('offline');
       useSessionStore.getState().setLastSyncError(err?.message || 'Sheet delete queued offline');
       this.enqueue('sheets', 'delete', { id });
+    }
+  }
+
+  // Vault Items
+  public async pushVaultItem(item: VaultItem) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
+    useVaultStore.getState().addVaultItemOptimistic(item);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
+    const clean = sanitizeVaultPayload(item);
+    try {
+      const { error } = await supabase.from('vault_items').upsert(clean);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Vault item queued offline');
+      this.enqueue('vault_items', 'upsert', clean);
+    }
+  }
+
+  public async updateVaultItem(id: string, updates: Partial<VaultItem>) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
+    useVaultStore.getState().updateVaultItemOptimistic(id, updates);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
+    const clean = sanitizeVaultPayload(updates);
+    if (Object.keys(clean).length === 0) return;
+    try {
+      const { error } = await supabase
+        .from('vault_items')
+        .update({ ...clean, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Vault update queued offline');
+      this.enqueue('vault_items', 'upsert', { id, ...clean });
+    }
+  }
+
+  public async deleteVaultItem(id: string) {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) throw new Error(perm.error);
+
+    useVaultStore.getState().deleteVaultItemOptimistic(id);
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('vault_items').delete().eq('id', id);
+      if (error) throw error;
+      useSessionStore.getState().setSyncStatus('synced');
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+    } catch (err: any) {
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Vault delete queued offline');
+      this.enqueue('vault_items', 'delete', { id });
     }
   }
 

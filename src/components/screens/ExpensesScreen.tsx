@@ -238,7 +238,6 @@ export function ExpensesScreen({
   // Handle Delete Expense
   const handleDeleteExpense = (id: string, note?: string | null) => {
     if (confirm(`Delete expense "${note || 'Transaction'}"?`)) {
-      removeEntryOptimistic(id);
       syncEngine.deleteLedgerEntry(id);
     }
   };

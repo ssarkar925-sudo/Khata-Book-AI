@@ -311,17 +311,13 @@ export function CardsScreen() {
       type: 'bill_payment',
       amount: paise,
       card_id: payCardId,
+      cash_location_id: selectedAccount?.id,
+      scope: selectedCard?.scope || 'business',
       mode: selectedAccount ? 'bank' : 'cash',
       note: `${paymentLabel} - ${selectedCard?.name || 'Card'} (${payNote.trim() || selectedAccount?.name || 'Direct Bank Settlement'})`,
       entry_date: new Date().toISOString(),
       created_by: user?.id || 'owner',
     };
-
-    if (selectedAccount) {
-      const newBal = Math.max(0, selectedAccount.balance - paise);
-      updateAccountBalance(selectedAccount.id, newBal);
-      syncEngine.updateAccountBalance(selectedAccount.id, newBal);
-    }
 
     syncEngine.pushLedgerEntry(entry);
     setShowPayBillModal(false);
