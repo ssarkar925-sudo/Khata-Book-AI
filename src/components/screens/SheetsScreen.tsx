@@ -43,6 +43,7 @@ import {
   Type,
   Lock,
   Unlock,
+  RefreshCw,
 } from 'lucide-react';
 import { useSheetStore } from '@/stores/useSheetStore';
 import { useSessionStore } from '@/stores/useSessionStore';
@@ -216,8 +217,26 @@ export function SheetsScreen() {
     insertColumnAt,
   } = useSheetStore();
 
-  const { theme } = useSessionStore();
+  const { theme, activeWorkspaceId } = useSessionStore();
   const isLight = theme === 'light';
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Auto-pull sheets from Supabase on screen mount & workspace switch
+  useEffect(() => {
+    const wsId = activeWorkspaceId || useSessionStore.getState().activeWorkspaceId;
+    if (wsId) {
+      syncEngine.pullAll(wsId);
+    }
+  }, [activeWorkspaceId]);
+
+  const handleManualSync = async () => {
+    setIsRefreshing(true);
+    const wsId = activeWorkspaceId || useSessionStore.getState().activeWorkspaceId;
+    if (wsId) {
+      await syncEngine.pullAll(wsId);
+    }
+    setIsRefreshing(false);
+  };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
@@ -905,6 +924,16 @@ export function SheetsScreen() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleManualSync}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-slate-50 dark:hover:bg-white/10 font-bold text-slate-700 dark:text-slate-200 text-xs shadow-sm transition-all hover-lift touch-press"
+            title="Refresh & Pull Latest Cloud Sheets"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-indigo-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'Syncing...' : 'Sync'}</span>
+          </button>
+
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-white text-xs shadow-md shadow-emerald-500/25 transition-all hover-lift touch-press"
@@ -1844,7 +1873,15 @@ export function SheetsScreen() {
           <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-6">
             Create custom spreadsheets, financial registers, or import existing .xlsx files directly into your workspace.
           </p>
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={handleManualSync}
+              disabled={isRefreshing}
+              className="px-5 py-2.5 rounded-2xl border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 font-semibold text-sm transition-all flex items-center gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 text-indigo-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>{isRefreshing ? 'Syncing...' : 'Sync From Cloud'}</span>
+            </button>
             <button
               onClick={() => setShowNewSheetModal(true)}
               className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md transition-all flex items-center gap-2"

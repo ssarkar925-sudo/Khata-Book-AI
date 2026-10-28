@@ -173,7 +173,7 @@ class SyncEngine {
       return false;
     }
 
-    if (this.isSyncing) return false;
+    if (this.isSyncing && this.currentWorkspaceId === workspaceId) return false;
     this.isSyncing = true;
     this.currentWorkspaceId = workspaceId;
     useSessionStore.getState().setSyncStatus('syncing');

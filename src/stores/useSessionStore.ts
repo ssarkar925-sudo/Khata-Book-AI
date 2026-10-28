@@ -272,8 +272,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       if (error) throw error;
 
       if (session?.user) {
-        set({ user: session.user });
         await get().refreshWorkspacesAndRole(session.user);
+        set({ user: session.user });
       } else {
         const localWs = getOrCreateLocalWorkspace();
         set({

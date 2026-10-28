@@ -80,6 +80,31 @@ export function AppShell() {
     };
   }, [user, activeWorkspaceId]);
 
+  // Pull latest updates when user returns to app from phone background or switches tabs
+  useEffect(() => {
+    const handleForeground = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && user && activeWorkspaceId) {
+        syncEngine.pullAll(activeWorkspaceId);
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleForeground);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleForeground);
+    }
+
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleForeground);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleForeground);
+      }
+    };
+  }, [user, activeWorkspaceId]);
+
   // Synchronize documentElement theme class with current session state
   useEffect(() => {
     if (typeof window !== 'undefined') {
