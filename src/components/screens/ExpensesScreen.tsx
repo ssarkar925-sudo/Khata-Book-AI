@@ -291,85 +291,89 @@ export function ExpensesScreen({
         </div>
 
         {/* Global Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {onOpenScanner && (
-            <button
-              onClick={onOpenScanner}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-500/25 transition-all hover-lift touch-press"
-              title="Scan bill or receipt with camera"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <span>Scan Bill</span>
-            </button>
-          )}
-
-          {onOpenVoice && (
-            <button
-              onClick={onOpenVoice}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-500/25 transition-all hover-lift touch-press"
-              title="Speak expense in Hindi or English"
-            >
-              <Mic className="w-3.5 h-3.5" />
-              <span>Voice</span>
-            </button>
-          )}
-
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          {/* Primary Action Button: Full width on mobile */}
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 font-bold text-white text-xs shadow-lg shadow-rose-500/25 transition-all hover-lift touch-press"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 py-3.5 sm:py-2.5 px-4 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 font-bold text-white text-xs shadow-md shadow-rose-500/25 active:scale-[0.98] transition-all min-h-[48px] sm:min-h-0 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>+ Add Expense</span>
           </button>
+
+          {/* Quick Tools Row: 50/50 Dual Split on Mobile */}
+          <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
+            {onOpenScanner && (
+              <button
+                onClick={onOpenScanner}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-3 sm:py-2 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm shadow-emerald-500/25 active:scale-[0.98] transition-all min-h-[44px] sm:min-h-0 cursor-pointer"
+                title="Scan bill or receipt with camera"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Scan Bill</span>
+              </button>
+            )}
+
+            {onOpenVoice && (
+              <button
+                onClick={onOpenVoice}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-3 sm:py-2 px-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm shadow-indigo-500/25 active:scale-[0.98] transition-all min-h-[44px] sm:min-h-0 cursor-pointer"
+                title="Speak expense in Hindi or English"
+              >
+                <Mic className="w-4 h-4" />
+                <span>Voice</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* 4-Pill Sphere Lens Switcher */}
-      <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
-        <div className="inline-flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
+      <div className="flex items-center justify-between pb-1 flex-wrap gap-2 w-full">
+        <div className="w-full sm:w-auto grid grid-cols-4 sm:flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
           <button
             onClick={() => setSelectedScope('all')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'all'
                 ? 'bg-white dark:bg-rose-600 text-rose-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Globe className="w-3.5 h-3.5" />
-            <span>All Spheres</span>
+            <Globe className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">All</span>
           </button>
           <button
             onClick={() => setSelectedScope('business')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'business'
                 ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300" />
-            <span>🏢 Business</span>
+            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300 shrink-0" />
+            <span className="truncate">Biz</span>
           </button>
           <button
             onClick={() => setSelectedScope('personal')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'personal'
                 ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300" />
-            <span>👤 Personal</span>
+            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300 shrink-0" />
+            <span className="truncate">Personal</span>
           </button>
           <button
             onClick={() => setSelectedScope('family')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'family'
                 ? 'bg-white dark:bg-amber-600 text-amber-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300" />
-            <span>👨‍👩‍👧‍👦 Family</span>
+            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 shrink-0" />
+            <span className="truncate">Family</span>
           </button>
         </div>
       </div>

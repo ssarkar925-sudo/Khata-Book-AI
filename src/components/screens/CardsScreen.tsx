@@ -356,87 +356,89 @@ export function CardsScreen() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          {/* Primary Action Button: Full width on mobile */}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 py-3.5 sm:py-2.5 px-4 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 font-bold text-white text-xs shadow-md shadow-purple-500/25 active:scale-[0.98] transition-all min-h-[48px] sm:min-h-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>+ Add Credit Card</span>
+          </button>
+
+          {/* Quick Tools Row: 50/50 Dual Split on Mobile */}
           {cards.length > 0 && (
-            <>
+            <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => {
                   setSpendCardId(cards[0].id);
-                  setSpendBillingOption('auto'); // Auto by default
+                  setSpendBillingOption('auto');
                   setShowSpendModal(true);
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-rose-500 hover:bg-rose-600 font-bold text-white text-xs shadow-md shadow-rose-500/25 transition-all hover-lift touch-press"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-3 sm:py-2.5 px-3 rounded-2xl bg-rose-500 hover:bg-rose-600 font-bold text-white text-xs shadow-sm shadow-rose-500/25 active:scale-[0.98] transition-all min-h-[44px] sm:min-h-0 cursor-pointer"
               >
                 <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-                <span>Swipe (Spend)</span>
+                <span className="truncate">Swipe (Spend)</span>
               </button>
 
               <button
                 onClick={() => openPayModalForCard(cards[0].id)}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 font-bold text-white text-xs shadow-md shadow-emerald-500/25 transition-all hover-lift touch-press"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-3 sm:py-2.5 px-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 font-bold text-white text-xs shadow-sm shadow-emerald-500/25 active:scale-[0.98] transition-all min-h-[44px] sm:min-h-0 cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Pay Bill</span>
+                <span className="truncate">Pay Bill</span>
               </button>
-            </>
+            </div>
           )}
-
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 font-bold text-white text-xs shadow-lg shadow-purple-500/25 transition-all hover-lift touch-press"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Card</span>
-          </button>
         </div>
       </div>
 
       {/* 4-Pill Sphere Lens Switcher */}
-      <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
-        <div className="inline-flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
+      <div className="flex items-center justify-between pb-1 flex-wrap gap-2 w-full">
+        <div className="w-full sm:w-auto grid grid-cols-4 sm:flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
           <button
             onClick={() => setSelectedScope('all')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'all'
                 ? 'bg-white dark:bg-purple-600 text-purple-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Globe className="w-3.5 h-3.5" />
-            <span>All Spheres</span>
+            <Globe className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">All</span>
           </button>
           <button
             onClick={() => setSelectedScope('business')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'business'
                 ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300" />
-            <span>🏢 Business</span>
+            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300 shrink-0" />
+            <span className="truncate">Biz</span>
           </button>
           <button
             onClick={() => setSelectedScope('personal')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'personal'
                 ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300" />
-            <span>👤 Personal</span>
+            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300 shrink-0" />
+            <span className="truncate">Personal</span>
           </button>
           <button
             onClick={() => setSelectedScope('family')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'family'
                 ? 'bg-white dark:bg-amber-600 text-amber-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300" />
-            <span>👨‍👩‍👧‍👦 Family</span>
+            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 shrink-0" />
+            <span className="truncate">Family</span>
           </button>
         </div>
       </div>

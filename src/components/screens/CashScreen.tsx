@@ -325,88 +325,91 @@ export function CashScreen() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Note Counting / Cash Denomination Calculator Button */}
-          <button
-            onClick={() => {
-              const defaultDrawer = accounts.find((a) => a.account_type === 'cash_counter') || accounts[0];
-              setDenominationTargetAccount(defaultDrawer || null);
-              setShowDenominationModal(true);
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border border-amber-500/30 bg-amber-50 dark:bg-amber-950/30 font-bold text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all hover-lift touch-press"
-          >
-            <Calculator className="w-4 h-4 text-amber-500" />
-            <span>Count Cash (Till/Notes)</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setFromAccId(accounts[0]?.id || '');
-              setToAccId(accounts[1]?.id || '');
-              setShowTransferModal(true);
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/30 font-bold text-xs text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all hover-lift touch-press"
-          >
-            <ArrowRightLeft className="w-4 h-4 text-indigo-500" />
-            <span>Transfer Funds</span>
-          </button>
-
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          {/* Primary Action Button: Full width on mobile */}
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-white text-xs shadow-lg shadow-emerald-500/25 transition-all hover-lift touch-press"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 py-3.5 sm:py-2.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-white text-xs sm:text-xs shadow-md shadow-emerald-500/25 active:scale-[0.98] transition-all min-h-[48px] sm:min-h-0 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>Add Bank / Cash</span>
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>+ Add Bank / Cash Account</span>
           </button>
+
+          {/* Quick Tools Row: 50/50 Dual Split on Mobile */}
+          <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                const defaultDrawer = accounts.find((a) => a.account_type === 'cash_counter') || accounts[0];
+                setDenominationTargetAccount(defaultDrawer || null);
+                setShowDenominationModal(true);
+              }}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-3 sm:py-2.5 px-3 rounded-2xl border border-amber-500/30 bg-amber-50 dark:bg-amber-950/30 font-bold text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-100 active:scale-[0.98] transition-all cursor-pointer min-h-[44px] sm:min-h-0"
+            >
+              <Calculator className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="truncate">Count Cash</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setFromAccId(accounts[0]?.id || '');
+                setToAccId(accounts[1]?.id || '');
+                setShowTransferModal(true);
+              }}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-3 sm:py-2.5 px-3 rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/30 font-bold text-xs text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 active:scale-[0.98] transition-all cursor-pointer min-h-[44px] sm:min-h-0"
+            >
+              <ArrowRightLeft className="w-4 h-4 text-indigo-500 shrink-0" />
+              <span className="truncate">Transfer</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* 4-Pill Sphere Lens Switcher */}
-      <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
-        <div className="inline-flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
+      <div className="flex items-center justify-between pb-1 flex-wrap gap-2 w-full">
+        <div className="w-full sm:w-auto grid grid-cols-4 sm:flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
           <button
             onClick={() => setSelectedScope('all')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'all'
                 ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Globe className="w-3.5 h-3.5" />
-            <span>All Spheres</span>
+            <Globe className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">All</span>
           </button>
           <button
             onClick={() => setSelectedScope('business')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'business'
                 ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300" />
-            <span>🏢 Business</span>
+            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300 shrink-0" />
+            <span className="truncate">Biz</span>
           </button>
           <button
             onClick={() => setSelectedScope('personal')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'personal'
                 ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300" />
-            <span>👤 Personal</span>
+            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300 shrink-0" />
+            <span className="truncate">Personal</span>
           </button>
           <button
             onClick={() => setSelectedScope('family')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'family'
                 ? 'bg-white dark:bg-amber-600 text-amber-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300" />
-            <span>👨‍👩‍👧‍👦 Family</span>
+            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 shrink-0" />
+            <span className="truncate">Family</span>
           </button>
         </div>
       </div>

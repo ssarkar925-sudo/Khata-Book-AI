@@ -364,53 +364,53 @@ export function DashboardScreen({
         </div>
 
         {/* 4-Pill Scope Switcher */}
-        <div className="inline-flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
+        <div className="w-full sm:w-auto grid grid-cols-4 sm:flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
           <button
             onClick={() => setSelectedScope('all')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'all'
                 ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Globe className="w-3.5 h-3.5" />
-            <span>Combined</span>
+            <Globe className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">All</span>
           </button>
 
           <button
             onClick={() => setSelectedScope('business')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'business'
                 ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300" />
-            <span>Business</span>
+            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300 shrink-0" />
+            <span className="truncate">Biz</span>
           </button>
 
           <button
             onClick={() => setSelectedScope('personal')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'personal'
                 ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300" />
-            <span>Personal</span>
+            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300 shrink-0" />
+            <span className="truncate">Personal</span>
           </button>
 
           <button
             onClick={() => setSelectedScope('family')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'family'
                 ? 'bg-white dark:bg-amber-600 text-amber-700 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300" />
-            <span>Family</span>
+            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 shrink-0" />
+            <span className="truncate">Family</span>
           </button>
         </div>
       </div>
@@ -467,24 +467,24 @@ export function DashboardScreen({
             </div>
 
             {/* 3-Sphere Interactive Balance Chips (Clickable) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-black/25 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
+            <div className="grid grid-cols-3 gap-2 bg-black/30 p-2 sm:p-3 rounded-2xl border border-white/10 backdrop-blur-md w-full">
               {/* Business Sphere Chip */}
               <div
                 onClick={() => setSelectedScope('business')}
-                className={`p-3 rounded-xl cursor-pointer transition-all ${
+                className={`p-2 sm:p-3 rounded-xl cursor-pointer transition-all ${
                   selectedScope === 'business'
                     ? 'bg-indigo-600/50 border border-indigo-400/50 shadow-md'
                     : 'bg-white/5 hover:bg-white/10 border border-transparent'
                 }`}
               >
-                <div className="flex items-center gap-1.5 text-xs text-indigo-300 font-bold mb-1">
-                  <Building2 className="w-3.5 h-3.5" />
-                  <span>🏢 Business</span>
+                <div className="flex items-center gap-1 text-[11px] sm:text-xs text-indigo-300 font-bold mb-0.5 sm:mb-1 truncate">
+                  <Building2 className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Biz</span>
                 </div>
-                <div className="text-base font-black tabular-nums text-white">
+                <div className="text-xs sm:text-base font-black tabular-nums text-white truncate">
                   {formatPaise(sphereStats.business.net)}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
+                <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate hidden xs:block">
                   Cash: {formatPaise(sphereStats.business.cash)}
                 </div>
               </div>
@@ -492,20 +492,20 @@ export function DashboardScreen({
               {/* Personal Sphere Chip */}
               <div
                 onClick={() => setSelectedScope('personal')}
-                className={`p-3 rounded-xl cursor-pointer transition-all ${
+                className={`p-2 sm:p-3 rounded-xl cursor-pointer transition-all ${
                   selectedScope === 'personal'
                     ? 'bg-emerald-600/50 border border-emerald-400/50 shadow-md'
                     : 'bg-white/5 hover:bg-white/10 border border-transparent'
                 }`}
               >
-                <div className="flex items-center gap-1.5 text-xs text-emerald-300 font-bold mb-1">
-                  <User className="w-3.5 h-3.5" />
-                  <span>👤 Personal</span>
+                <div className="flex items-center gap-1 text-[11px] sm:text-xs text-emerald-300 font-bold mb-0.5 sm:mb-1 truncate">
+                  <User className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Personal</span>
                 </div>
-                <div className="text-base font-black tabular-nums text-white">
+                <div className="text-xs sm:text-base font-black tabular-nums text-white truncate">
                   {formatPaise(sphereStats.personal.net)}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
+                <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate hidden xs:block">
                   Cash: {formatPaise(sphereStats.personal.cash)}
                 </div>
               </div>
@@ -513,20 +513,20 @@ export function DashboardScreen({
               {/* Family Sphere Chip */}
               <div
                 onClick={() => setSelectedScope('family')}
-                className={`p-3 rounded-xl cursor-pointer transition-all ${
+                className={`p-2 sm:p-3 rounded-xl cursor-pointer transition-all ${
                   selectedScope === 'family'
                     ? 'bg-amber-600/50 border border-amber-400/50 shadow-md'
                     : 'bg-white/5 hover:bg-white/10 border border-transparent'
                 }`}
               >
-                <div className="flex items-center gap-1.5 text-xs text-amber-300 font-bold mb-1">
-                  <Users2 className="w-3.5 h-3.5" />
-                  <span>👨‍👩‍👧‍👦 Family</span>
+                <div className="flex items-center gap-1 text-[11px] sm:text-xs text-amber-300 font-bold mb-0.5 sm:mb-1 truncate">
+                  <Users2 className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Family</span>
                 </div>
-                <div className="text-base font-black tabular-nums text-white">
+                <div className="text-xs sm:text-base font-black tabular-nums text-white truncate">
                   {formatPaise(sphereStats.family.net)}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
+                <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate hidden xs:block">
                   Pool: {formatPaise(sphereStats.family.cash)}
                 </div>
               </div>
@@ -561,20 +561,19 @@ export function DashboardScreen({
       </div>
 
       {/* ========================================================= */}
-      {/* MODERN EXECUTIVE ACTION DOCK                              */}
-      {/* Primary: Inflow & Expense | Overflow: Tools & Transfer    */}
+      {/* NATIVE ANDROID ACTION HUB (MOBILE-FIRST FULL WIDTH)       */}
       {/* ========================================================= */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 sm:p-3.5 rounded-3xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs backdrop-blur-md">
-        {/* Core Primary Financial Actions */}
-        <div className="flex items-center gap-2 flex-1">
+      <div className="w-full rounded-3xl p-3 sm:p-4 bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-sm backdrop-blur-md space-y-3">
+        {/* Core Primary Financial Actions: Full Width Mobile Dual Split */}
+        <div className="grid grid-cols-2 gap-2.5 w-full">
           <button
             onClick={isViewer ? undefined : onQuickCashIn}
             disabled={isViewer}
             title={isViewer ? 'Read-only access: Viewer role cannot add transactions' : undefined}
-            className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all ${
+            className={`w-full py-3.5 sm:py-3 px-3 sm:px-4 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all min-h-[50px] ${
               isViewer
                 ? 'bg-slate-400 text-white cursor-not-allowed opacity-60'
-                : 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-emerald-600/25 hover-lift touch-press cursor-pointer'
+                : 'bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white shadow-emerald-600/25 cursor-pointer'
             }`}
           >
             <ArrowDownLeft className="w-4 h-4 stroke-[3]" />
@@ -585,10 +584,10 @@ export function DashboardScreen({
             onClick={isViewer ? undefined : onQuickCashOut}
             disabled={isViewer}
             title={isViewer ? 'Read-only access: Viewer role cannot add transactions' : undefined}
-            className={`flex-1 py-3 px-4 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all ${
+            className={`w-full py-3.5 sm:py-3 px-3 sm:px-4 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all min-h-[50px] ${
               isViewer
                 ? 'bg-slate-400 text-white cursor-not-allowed opacity-60'
-                : 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white shadow-rose-600/25 hover-lift touch-press cursor-pointer'
+                : 'bg-rose-600 hover:bg-rose-500 active:scale-[0.98] text-white shadow-rose-600/25 cursor-pointer'
             }`}
           >
             <ArrowUpRight className="w-4 h-4 stroke-[3]" />
@@ -596,78 +595,63 @@ export function DashboardScreen({
           </button>
         </div>
 
-        {/* Secondary Contextual & Overflow Actions */}
-        <div className="flex items-center gap-2">
+        {/* 4-Column Android Quick Actions Grid (Spanning Full Mobile Width) */}
+        <div className="grid grid-cols-4 gap-2 w-full pt-0.5">
           <button
             onClick={() => onNavigateTab('dues')}
-            className="flex-1 sm:flex-initial py-3 px-3.5 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center p-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shadow-xs active:scale-95 transition-all cursor-pointer"
           >
-            <Users className="w-4 h-4 text-cyan-500" />
-            <span>+ Udhar</span>
+            <div className="w-9 h-9 rounded-full bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mb-1">
+              <Users className="w-4 h-4 stroke-[2.5]" />
+            </div>
+            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Udhar</span>
           </button>
 
           <button
             onClick={() => setIsTransferModalOpen(true)}
-            className="flex-1 sm:flex-initial py-3 px-3.5 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center p-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shadow-xs active:scale-95 transition-all cursor-pointer"
           >
-            <Repeat className="w-4 h-4 text-indigo-500" />
-            <span>Transfer</span>
+            <div className="w-9 h-9 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-1">
+              <Repeat className="w-4 h-4 stroke-[2.5]" />
+            </div>
+            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Transfer</span>
           </button>
 
           <button
             onClick={isViewer ? undefined : () => setIsSpendModalOpen(true)}
             disabled={isViewer}
-            title={isViewer ? 'Read-only access: Viewer role cannot record card spends' : undefined}
-            className={`flex-1 sm:flex-initial py-3 px-3.5 rounded-2xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+            className={`flex flex-col items-center justify-center p-2 rounded-2xl border shadow-xs transition-all ${
               isViewer
-                ? 'border-slate-200 dark:border-white/10 text-slate-400 cursor-not-allowed opacity-60'
-                : 'border-purple-200 dark:border-purple-500/30 bg-purple-50/80 dark:bg-purple-950/30 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 hover-lift touch-press'
+                ? 'border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-400 opacity-60 cursor-not-allowed'
+                : 'border-purple-200 dark:border-purple-500/30 bg-purple-50/60 dark:bg-purple-950/20 active:scale-95 cursor-pointer'
             }`}
           >
-            <CreditCard className="w-4 h-4 text-purple-600 dark:text-purple-400 stroke-[2.5]" />
-            <span>Spend (Swipe)</span>
+            <div className="w-9 h-9 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-1">
+              <CreditCard className="w-4 h-4 stroke-[2.5]" />
+            </div>
+            <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300">Card</span>
           </button>
 
-          {/* Overflow Menu for AI Tools */}
-          {(onOpenScanner || onOpenVoice) && (
-            <div className="relative">
-              <button
-                onClick={() => setShowMoreActions(!showMoreActions)}
-                className="py-3 px-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center transition-all cursor-pointer"
-                title="More Actions"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
-
-              {showMoreActions && (
-                <div className="absolute right-0 bottom-full mb-2 w-48 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95">
-                  {onOpenScanner && (
-                    <button
-                      onClick={() => {
-                        setShowMoreActions(false);
-                        onOpenScanner();
-                      }}
-                      className="w-full px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <Camera className="w-4 h-4 text-teal-500" />
-                      <span>Scan Receipt (OCR)</span>
-                    </button>
-                  )}
-                  {onOpenVoice && (
-                    <button
-                      onClick={() => {
-                        setShowMoreActions(false);
-                        onOpenVoice();
-                      }}
-                      className="w-full px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <Mic className="w-4 h-4 text-violet-500" />
-                      <span>Voice Assistant</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+          {onOpenScanner ? (
+            <button
+              onClick={onOpenScanner}
+              className="flex flex-col items-center justify-center p-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shadow-xs active:scale-95 transition-all cursor-pointer"
+            >
+              <div className="w-9 h-9 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center mb-1">
+                <Camera className="w-4 h-4 stroke-[2.5]" />
+              </div>
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Scan Bill</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => onNavigateTab('expenses')}
+              className="flex flex-col items-center justify-center p-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shadow-xs active:scale-95 transition-all cursor-pointer"
+            >
+              <div className="w-9 h-9 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-1">
+                <TrendingDown className="w-4 h-4 stroke-[2.5]" />
+              </div>
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Spends</span>
+            </button>
           )}
         </div>
       </div>

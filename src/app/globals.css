@@ -139,3 +139,83 @@ body {
 .dark ::-webkit-scrollbar-thumb {
   background: rgba(71, 85, 105, 0.6);
 }
+
+/* ============================================================ */
+/* NATIVE ANDROID MOBILE APP ERGONOMICS & MATERIAL 3 STYLING    */
+/* ============================================================ */
+
+/* Native Mobile Touch & App Feel */
+html, body {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: pan-x pan-y;
+  overscroll-behavior-y: contain;
+}
+
+/* Allow text selection only in form inputs & textareas */
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+/* Android Safe Area Inset Support */
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+/* Native Android Mobile Card & Button Width Rules */
+@media (max-width: 768px) {
+  /* Cards take full mobile width with standard mobile padding */
+  .mobile-card-full {
+    width: 100% !important;
+    border-radius: 1.25rem !important;
+  }
+
+  /* Action buttons take full mobile width with ergonomic 48px+ touch targets */
+  .mobile-btn-full {
+    width: 100% !important;
+    min-height: 48px !important;
+    border-radius: 1rem !important;
+    font-weight: 700 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .mobile-btn-half {
+    flex: 1 1 0% !important;
+    min-height: 48px !important;
+    border-radius: 1rem !important;
+    font-weight: 700 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+
+/* Android Material 3 Navigation Pill Active Indicator */
+.m3-active-pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 2rem;
+  border-radius: 9999px;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Native Android Ripple / Press Feedback */
+.android-ripple {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.12s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.12s ease;
+}
+.android-ripple:active {
+  transform: scale(0.98);
+  opacity: 0.92;
+}

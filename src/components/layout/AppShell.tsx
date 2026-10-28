@@ -143,7 +143,7 @@ export function AppShell() {
           onOpenBackupRestore={() => setIsBackupModalOpen(true)}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 md:pb-8 max-w-7xl mx-auto w-full">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 pb-28 md:pb-8 max-w-7xl mx-auto w-full">
           {activeTab === 'dashboard' && (
             <DashboardScreen
               onNavigateTab={(tab) => setActiveTab(tab)}
@@ -212,107 +212,131 @@ export function AppShell() {
         />
       )}
 
-      {/* Mobile More Sheet */}
+      {/* Mobile More Sheet - Android Material 3 Bottom Sheet */}
       {isMobileMoreOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-xs lg:hidden animate-fade-in"
           onClick={() => setIsMobileMoreOpen(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full rounded-t-2xl border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 space-y-4 shadow-xl"
+            className="w-full rounded-t-3xl border-t border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-2xl animate-in slide-in-from-bottom duration-250"
+            style={{
+              paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
+            }}
           >
-            <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto" />
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto" />
             <div className="flex justify-between items-center">
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                More Tools
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                All Modules & Tools
               </span>
               <button
                 onClick={() => setIsMobileMoreOpen(false)}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => {
-                  setIsMobileMoreOpen(false);
-                  setIsScannerOpen(true);
-                }}
-                className="p-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-center font-bold text-xs text-emerald-600 dark:text-emerald-400"
-              >
-                📸 Scan Bill
-              </button>
-              <button
-                onClick={() => {
-                  setIsMobileMoreOpen(false);
-                  setIsVoiceOpen(true);
-                }}
-                className="p-3 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 text-center font-bold text-xs text-indigo-600 dark:text-indigo-400"
-              >
-                🎙️ Voice Entry
-              </button>
+            <div className="grid grid-cols-3 gap-2.5">
               <button
                 onClick={() => {
                   setActiveTab('expenses');
                   setIsMobileMoreOpen(false);
                 }}
-                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all ${
+                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all flex flex-col items-center gap-1.5 ${
                   activeTab === 'expenses'
                     ? 'border-rose-500 bg-rose-500/25 text-rose-600 dark:text-rose-300 ring-2 ring-rose-500'
                     : 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20'
                 }`}
               >
-                📉 Expenses
+                <span className="text-xl">📉</span>
+                <span>Expenses</span>
               </button>
               <button
                 onClick={() => {
                   setActiveTab('sheets');
                   setIsMobileMoreOpen(false);
                 }}
-                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all ${
+                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all flex flex-col items-center gap-1.5 ${
                   activeTab === 'sheets'
                     ? 'border-blue-500 bg-blue-500/25 text-blue-600 dark:text-blue-300 ring-2 ring-blue-500'
                     : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10'
                 }`}
               >
-                📊 Sheets
+                <span className="text-xl">📊</span>
+                <span>Registers</span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('notes');
+                  setIsMobileMoreOpen(false);
+                }}
+                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all flex flex-col items-center gap-1.5 ${
+                  activeTab === 'notes'
+                    ? 'border-amber-500 bg-amber-500/25 text-amber-600 dark:text-amber-300 ring-2 ring-amber-500'
+                    : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10'
+                }`}
+              >
+                <span className="text-xl">📝</span>
+                <span>Notes</span>
               </button>
               <button
                 onClick={() => {
                   setActiveTab('vault');
                   setIsMobileMoreOpen(false);
                 }}
-                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all ${
+                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all flex flex-col items-center gap-1.5 ${
                   activeTab === 'vault'
                     ? 'border-violet-500 bg-violet-500/25 text-violet-600 dark:text-violet-300 ring-2 ring-violet-500'
                     : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10'
                 }`}
               >
-                🔐 Vault
+                <span className="text-xl">🔐</span>
+                <span>Vault</span>
               </button>
               <button
                 onClick={() => {
                   setActiveTab('reports');
                   setIsMobileMoreOpen(false);
                 }}
-                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all ${
+                className={`p-3 rounded-2xl border text-center font-bold text-xs transition-all flex flex-col items-center gap-1.5 ${
                   activeTab === 'reports'
                     ? 'border-indigo-500 bg-indigo-500/25 text-indigo-600 dark:text-indigo-300 ring-2 ring-indigo-500'
                     : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10'
                 }`}
               >
-                📈 Reports
+                <span className="text-xl">📈</span>
+                <span>Reports</span>
+              </button>
+              <button
+                onClick={() => {
+                  setIsMobileMoreOpen(false);
+                  setIsScannerOpen(true);
+                }}
+                className="p-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-center font-bold text-xs text-emerald-600 dark:text-emerald-400 flex flex-col items-center gap-1.5"
+              >
+                <span className="text-xl">📸</span>
+                <span>Scan Bill</span>
+              </button>
+              <button
+                onClick={() => {
+                  setIsMobileMoreOpen(false);
+                  setIsVoiceOpen(true);
+                }}
+                className="p-3 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 text-center font-bold text-xs text-indigo-600 dark:text-indigo-400 flex flex-col items-center gap-1.5"
+              >
+                <span className="text-xl">🎙️</span>
+                <span>Voice</span>
               </button>
               <button
                 onClick={() => {
                   setIsMobileMoreOpen(false);
                   setIsBackupModalOpen(true);
                 }}
-                className="p-3 rounded-2xl border border-blue-500/20 bg-blue-500/10 text-center font-bold text-xs text-blue-600 dark:text-blue-400"
+                className="p-3 rounded-2xl border border-blue-500/20 bg-blue-500/10 text-center font-bold text-xs text-blue-600 dark:text-blue-400 flex flex-col items-center gap-1.5 col-span-2"
               >
-                🛡️ Backup & Lock
+                <span className="text-xl">🛡️</span>
+                <span>Backup, Restore & App Lock</span>
               </button>
             </div>
           </div>

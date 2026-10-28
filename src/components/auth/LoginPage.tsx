@@ -215,7 +215,12 @@ export function LoginPage() {
       </div>
 
       {/* Header Bar */}
-      <header className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between">
+      <header
+        className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between"
+        style={{
+          paddingTop: 'max(0.65rem, env(safe-area-inset-top, 0px))',
+        }}
+      >
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-teal-400 flex items-center justify-center font-black text-xs text-white shadow-lg shadow-indigo-600/30">
             RB

@@ -57,11 +57,14 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
 
   return (
     <header
-      className={`sticky top-0 z-40 w-full border-b transition-colors px-3 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between glass-panel ${
+      className={`sticky top-0 z-40 w-full border-b transition-colors px-3 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between glass-panel shadow-sm ${
         isLight
-          ? 'bg-white/80 border-slate-200/80 shadow-xs text-slate-800'
-          : 'bg-[#0f172a]/80 border-white/10 shadow-lg shadow-black/20 text-white'
+          ? 'bg-white/95 border-slate-200/90 text-slate-800'
+          : 'bg-[#0f172a]/95 border-white/10 shadow-lg shadow-black/30 text-white'
       }`}
+      style={{
+        paddingTop: 'max(0.55rem, env(safe-area-inset-top, 0px))',
+      }}
     >
       {/* Brand & Workspace Switcher */}
       <div className="flex items-center gap-2 sm:gap-3">
@@ -150,10 +153,10 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
         <button
           onClick={onOpenAskAI}
           title="Open Ask AI Accountant"
-          className="group flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-teal-500 hover:from-violet-500 hover:to-teal-400 text-white font-bold text-xs shadow-md shadow-indigo-500/30 transition-all hover-lift touch-press"
+          className="group flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-teal-500 hover:from-violet-500 hover:to-teal-400 text-white font-bold text-xs shadow-md shadow-indigo-500/30 transition-all hover-lift touch-press cursor-pointer"
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-300 group-hover:rotate-12 transition-transform" />
-          <span className="hidden xs:inline">Ask AI</span>
+          <Sparkles className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-300 group-hover:rotate-12 transition-transform shrink-0" />
+          <span className="hidden sm:inline">Ask AI</span>
         </button>
 
         {/* Sync Status Badge */}
