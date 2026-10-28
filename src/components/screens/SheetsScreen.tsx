@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { useSheetStore } from '@/stores/useSheetStore';
 import { useSessionStore } from '@/stores/useSessionStore';
+import { syncEngine } from '@/lib/syncEngine';
 import { SheetColumn, SheetColumnType, SheetRow } from '@/types';
 
 const SHEET_COLORS = [
@@ -632,10 +633,15 @@ export function SheetsScreen() {
     setShowEditSheetModal(false);
   };
 
-  const handleCreateSheet = (e: React.FormEvent) => {
+  const handleCreateSheet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSheetTitle.trim()) return;
-    createSheet(newSheetTitle.trim(), newSheetCategory, newSheetColor);
+    const newSheet = createSheet(newSheetTitle.trim(), newSheetCategory, newSheetColor);
+    try {
+      await syncEngine.pushSheet(newSheet);
+    } catch (err) {
+      console.warn('[Sheets] Cloud push queued for new sheet:', err);
+    }
     setShowNewSheetModal(false);
     setNewSheetTitle('');
   };
@@ -788,15 +794,20 @@ export function SheetsScreen() {
     reader.readAsArrayBuffer(file);
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = async () => {
     if (!pendingImport) return;
-    createSheet(
+    const newSheet = createSheet(
       pendingImport.title,
       pendingImport.category,
       pendingImport.color,
       pendingImport.columns,
       pendingImport.rows
     );
+    try {
+      await syncEngine.pushSheet(newSheet);
+    } catch (err) {
+      console.warn('[Sheets] Cloud push queued for imported sheet:', err);
+    }
     setShowImportModal(false);
     setPendingImport(null);
     scrollToRow1();
@@ -2186,6 +2197,21 @@ export function SheetsScreen() {
               </div>
 
               <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (confirm(`Are you sure you want to delete sheet "${activeSheet.title}"?`)) {
+                      deleteSheet(activeSheet.id);
+                      try {
+                        await syncEngine.deleteSheet(activeSheet.id);
+                      } catch {}
+                      setShowEditSheetModal(false);
+                    }
+                  }}
+                  className="px-3 py-2.5 rounded-xl border border-rose-500/20 text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-colors"
+                >
+                  Delete
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowEditSheetModal(false)}

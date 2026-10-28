@@ -1,9 +1,17 @@
 import { create } from 'zustand';
 import { RecordSheet, SheetRow, SheetColumn } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { useSessionStore } from '@/stores/useSessionStore';
 
 let saveTimer: any = null;
 let cloudTimer: any = null;
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const LEGACY_MOCK_WORKSPACE_ID = '00000000-0000-0000-0000-000000000010';
+
+function isValidUuid(id?: string | null): boolean {
+  return typeof id === 'string' && UUID_REGEX.test(id) && id !== LEGACY_MOCK_WORKSPACE_ID;
+}
 
 function debouncedSaveToLocalStorage(sheets: RecordSheet[]) {
   if (typeof window === 'undefined') return;
@@ -19,28 +27,69 @@ function debouncedSyncSheetToCloud(sheet: RecordSheet) {
   if (cloudTimer) clearTimeout(cloudTimer);
   cloudTimer = setTimeout(() => {
     syncSheetToCloud(sheet);
-  }, 1200);
+  }, 800);
 }
 
-function syncSheetToCloud(sheet: RecordSheet) {
+async function syncSheetToCloud(sheet: RecordSheet) {
   try {
-    supabase.from('sheets').upsert({
+    const sessionState = typeof useSessionStore !== 'undefined' ? useSessionStore.getState() : null;
+    const activeWs = sessionState?.activeWorkspaceId;
+
+    const wsId = isValidUuid(sheet.workspace_id)
+      ? sheet.workspace_id
+      : (isValidUuid(activeWs) ? activeWs : null);
+
+    if (!wsId) {
+      console.warn('[SheetStore] Sheet waiting for active workspace UUID to sync:', sheet.title);
+      return;
+    }
+
+    const payload = {
       id: sheet.id,
-      workspace_id: sheet.workspace_id || '00000000-0000-0000-0000-000000000010',
-      title: sheet.title,
-      category: sheet.category,
-      color: sheet.color,
-      columns: sheet.columns,
-      rows: sheet.rows,
+      workspace_id: wsId,
+      title: sheet.title || 'Untitled Sheet',
+      category: sheet.category || 'General',
+      color: sheet.color || '#6366F1',
+      scope: (sheet as any).scope || 'business',
+      columns: Array.isArray(sheet.columns) ? sheet.columns : [],
+      rows: Array.isArray(sheet.rows) ? sheet.rows : [],
+      frozen_row_count: Number((sheet as any).frozen_row_count ?? (sheet as any).frozenRowCount ?? 0),
+      row_height: (sheet as any).row_height || (sheet as any).rowHeight || 'normal',
+      show_gridlines: (sheet as any).show_gridlines !== undefined ? Boolean((sheet as any).show_gridlines) : true,
       updated_at: new Date().toISOString(),
-    }).then();
-  } catch {}
+    };
+
+    const { error } = await supabase.from('sheets').upsert(payload);
+    if (error) {
+      console.error('[SheetStore] Cloud sync failed for sheet:', error.message, error);
+      if (sessionState?.setSyncStatus) {
+        sessionState.setSyncStatus('error');
+        sessionState.setLastSyncError(error.message);
+      }
+    } else {
+      console.log('[SheetStore] Sheet successfully synced to cloud:', sheet.title, 'for workspace:', wsId);
+      if (sessionState?.setSyncStatus) {
+        sessionState.setSyncStatus('synced');
+        sessionState.setLastSyncTime(new Date().toISOString());
+        sessionState.setLastSyncError(null);
+      }
+    }
+  } catch (err: any) {
+    console.error('[SheetStore] Exception syncing sheet to cloud:', err);
+  }
 }
 
-function deleteSheetFromCloud(sheetId: string) {
+async function deleteSheetFromCloud(sheetId: string) {
   try {
-    supabase.from('sheets').delete().eq('id', sheetId).then();
-  } catch {}
+    const { error } = await supabase.from('sheets').delete().eq('id', sheetId);
+    if (error) {
+      console.error('[SheetStore] Failed to delete sheet from cloud:', error.message);
+    } else {
+      console.log('[SheetStore] Sheet deleted from cloud:', sheetId);
+    }
+  } catch (err) {
+    console.error('[SheetStore] Exception deleting sheet from cloud:', err);
+  }
 }
 
 interface SheetState {
@@ -49,6 +98,7 @@ interface SheetState {
 
   setSheets: (sheets: RecordSheet[]) => void;
   setActiveSheetId: (id: string) => void;
+  syncPendingLocalSheets: (workspaceId: string) => void;
   createSheet: (
     title: string,
     category?: string,
@@ -82,7 +132,6 @@ interface SheetState {
 }
 
 const DEFAULT_SHEETS: RecordSheet[] = [];
-const LEGACY_MOCK_WORKSPACE_ID = '00000000-0000-0000-0000-000000000010';
 
 export const useSheetStore = create<SheetState>((set) => ({
   sheets: (() => {
@@ -96,13 +145,9 @@ export const useSheetStore = create<SheetState>((set) => ({
               (s: any) =>
                 s &&
                 s.workspace_id !== LEGACY_MOCK_WORKSPACE_ID &&
-                s.workspace_id !== 'default' &&
                 s.id !== 'sheet-pan-register' &&
                 s.id !== 'sheet-utility-bills'
             );
-            if (clean.length !== parsed.length) {
-              localStorage.setItem('rb_saved_sheets', JSON.stringify(clean));
-            }
             return clean;
           }
         }
@@ -112,19 +157,64 @@ export const useSheetStore = create<SheetState>((set) => ({
   })(),
   activeSheetId: null,
 
-  setSheets: (sheets) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('rb_saved_sheets', JSON.stringify(sheets));
-    }
-    set({ sheets });
+  setSheets: (cloudSheets) => {
+    set((state) => {
+      const sheetsMap = new Map<string, RecordSheet>();
+      // First insert cloud sheets
+      for (const s of cloudSheets) {
+        if (s && s.id) sheetsMap.set(s.id, s);
+      }
+      // Preserve any local sheets not yet in cloud
+      for (const s of state.sheets) {
+        if (s && s.id && !sheetsMap.has(s.id)) {
+          sheetsMap.set(s.id, s);
+        }
+      }
+      const merged = Array.from(sheetsMap.values());
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(merged));
+      }
+      return {
+        sheets: merged,
+        activeSheetId: state.activeSheetId && sheetsMap.has(state.activeSheetId)
+          ? state.activeSheetId
+          : (merged[0]?.id || null),
+      };
+    });
   },
 
   setActiveSheetId: (activeSheetId) => set({ activeSheetId }),
 
+  syncPendingLocalSheets: (workspaceId: string) => {
+    if (!workspaceId || workspaceId === LEGACY_MOCK_WORKSPACE_ID) return;
+    if (!isValidUuid(workspaceId)) return;
+
+    set((state) => {
+      let changed = false;
+      const updated = state.sheets.map((s) => {
+        if (!s.workspace_id || s.workspace_id === 'default' || s.workspace_id === LEGACY_MOCK_WORKSPACE_ID) {
+          changed = true;
+          const repaired = { ...s, workspace_id: workspaceId };
+          syncSheetToCloud(repaired);
+          return repaired;
+        } else {
+          // Push to cloud to ensure multi-device synchronization
+          syncSheetToCloud(s);
+          return s;
+        }
+      });
+      if (changed && typeof window !== 'undefined') {
+        localStorage.setItem('rb_saved_sheets', JSON.stringify(updated));
+      }
+      return { sheets: updated };
+    });
+  },
+
   createSheet: (title, category = 'General', color = '#6366F1', columns, rows = []) => {
+    const activeWs = typeof useSessionStore !== 'undefined' ? useSessionStore.getState().activeWorkspaceId : '';
     const newSheet: RecordSheet = {
       id: crypto.randomUUID(),
-      workspace_id: 'default',
+      workspace_id: activeWs || '',
       title: title.trim() || 'Untitled Sheet',
       category,
       color,
@@ -172,7 +262,7 @@ export const useSheetStore = create<SheetState>((set) => ({
       deleteSheetFromCloud(id);
       return {
         sheets: updated,
-        activeSheetId: updated[0]?.id || null,
+        activeSheetId: state.activeSheetId === id ? updated[0]?.id || null : state.activeSheetId,
       };
     }),
 

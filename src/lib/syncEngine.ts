@@ -254,9 +254,10 @@ class SyncEngine {
       }
 
       // 7. Process Sheets
-      if (sheetResult.status === 'fulfilled' && sheetResult.value.data && sheetResult.value.data.length > 0) {
+      if (sheetResult.status === 'fulfilled' && sheetResult.value.data) {
         useSheetStore.getState().setSheets(sheetResult.value.data);
       }
+      useSheetStore.getState().syncPendingLocalSheets(workspaceId);
 
       // 8. Process Vault Items
       if (vaultResult.status === 'fulfilled' && vaultResult.value.data && vaultResult.value.data.length > 0) {
@@ -1169,18 +1170,30 @@ class SyncEngine {
       return;
     }
 
+    const isValidUuid = (id?: string | null) =>
+      typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) && id !== '00000000-0000-0000-0000-000000000010';
+
+    const wsId = isValidUuid(sheet.workspace_id)
+      ? sheet.workspace_id
+      : (isValidUuid(this.currentWorkspaceId) ? this.currentWorkspaceId : (typeof useSessionStore !== 'undefined' ? useSessionStore.getState().activeWorkspaceId : ''));
+
+    if (!wsId || !isValidUuid(wsId)) {
+      console.warn('[SyncEngine] Invalid workspace ID for sheet push:', wsId);
+      return;
+    }
+
     const payload = {
       id: sheet.id,
-      workspace_id: sheet.workspace_id || this.currentWorkspaceId,
-      title: sheet.title,
-      category: sheet.category,
-      color: sheet.color,
-      scope: sheet.scope || 'business',
-      columns: sheet.columns,
-      rows: sheet.rows,
-      frozen_row_count: sheet.frozenRowCount || 0,
-      row_height: sheet.rowHeight || 'normal',
-      show_gridlines: sheet.showGridlines ?? true,
+      workspace_id: wsId,
+      title: sheet.title || 'Untitled Sheet',
+      category: sheet.category || 'General',
+      color: sheet.color || '#6366F1',
+      scope: (sheet as any).scope || 'business',
+      columns: Array.isArray(sheet.columns) ? sheet.columns : [],
+      rows: Array.isArray(sheet.rows) ? sheet.rows : [],
+      frozen_row_count: Number((sheet as any).frozen_row_count ?? (sheet as any).frozenRowCount ?? 0),
+      row_height: (sheet as any).row_height || (sheet as any).rowHeight || 'normal',
+      show_gridlines: (sheet as any).show_gridlines !== undefined ? Boolean((sheet as any).show_gridlines) : true,
       updated_at: new Date().toISOString(),
     };
     try {
