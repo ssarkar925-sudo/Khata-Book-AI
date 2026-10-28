@@ -204,4 +204,57 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
     assert.strictEqual(clean.encrypted_payload, 'encrypted-secret-bytes');
     assert.strictEqual((clean as any).unencrypted_password, undefined, 'Plaintext passwords must never be in payload');
   });
+
+  // ==========================================================================
+  // 7. EXCEL SHEET DATE RECOVERY & ROBUST NORMALIZATION
+  // ==========================================================================
+  test('Excel Sheets: Date normalization converts Indian DD/MM/YYYY, numeric serials, and timestamps to ISO YYYY-MM-DD', async () => {
+    const { convertExcelSerialToDate, normalizeSheet } = await import('../src/stores/useSheetStore');
+
+    // Test individual date inputs
+    assert.strictEqual(convertExcelSerialToDate('24/05/1998'), '1998-05-24', 'Indian DD/MM/YYYY format');
+    assert.strictEqual(convertExcelSerialToDate('24-05-1998'), '1998-05-24', 'Indian DD-MM-YYYY format');
+    assert.strictEqual(convertExcelSerialToDate('24.05.1998'), '1998-05-24', 'Dotted DD.MM.YYYY format');
+    assert.strictEqual(convertExcelSerialToDate('5/8/1990'), '1990-08-05', 'Single digit D/M/YYYY format');
+    assert.strictEqual(convertExcelSerialToDate('1998-05-24'), '1998-05-24', 'Standard ISO YYYY-MM-DD');
+    assert.strictEqual(convertExcelSerialToDate('1998/05/24'), '1998-05-24', 'Slash YYYY/MM/DD');
+    assert.strictEqual(convertExcelSerialToDate('15/08/90'), '1990-08-15', '2-digit year 90');
+    assert.strictEqual(convertExcelSerialToDate('15/08/24'), '2024-08-15', '2-digit year 24');
+    assert.strictEqual(convertExcelSerialToDate(35939), '1998-05-24', 'Excel numeric serial number');
+    assert.strictEqual(convertExcelSerialToDate('35939'), '1998-05-24', 'Excel numeric serial string');
+    assert.strictEqual(convertExcelSerialToDate('1998-05-24T00:00:00.000Z'), '1998-05-24', 'ISO UTC timestamp string');
+    assert.strictEqual(convertExcelSerialToDate(new Date(1998, 4, 24)), '1998-05-24', 'JavaScript Date object');
+    assert.strictEqual(convertExcelSerialToDate('Pending'), 'Pending', 'Non-date text preserved');
+    assert.strictEqual(convertExcelSerialToDate(''), '', 'Empty string returns empty');
+    assert.strictEqual(convertExcelSerialToDate(null), '', 'Null returns empty');
+    assert.strictEqual(convertExcelSerialToDate(undefined), '', 'Undefined returns empty');
+
+    // Test full sheet normalization with date columns
+    const rawSheet = {
+      id: 'sheet-pan-data',
+      title: 'PAN Card Data',
+      columns: [
+        { id: 'col-1', name: 'NAME', type: 'text' },
+        { id: 'col-2', name: 'DATE OF BIRTH', type: 'date' },
+        { id: 'col-3', name: 'APPLICATION RECEIVE DATE', type: 'date' },
+        { id: 'col-4', name: 'APPLICATION COMPLETE DATE', type: 'date' },
+      ],
+      rows: [
+        {
+          id: 'row-1',
+          data: {
+            'col-1': 'Rahul Kumar',
+            'col-2': '24/05/1998',
+            'col-3': '15-08-2023',
+            'col-4': 45230, // Serial for 2023-10-31
+          },
+        },
+      ],
+    };
+
+    const normalized = normalizeSheet(rawSheet);
+    assert.strictEqual(normalized.rows[0].data['col-2'], '1998-05-24', 'DOB normalized to YYYY-MM-DD');
+    assert.strictEqual(normalized.rows[0].data['col-3'], '2023-08-15', 'Receive date normalized to YYYY-MM-DD');
+    assert.strictEqual(normalized.rows[0].data['col-4'], '2023-10-31', 'Excel serial normalized to YYYY-MM-DD');
+  });
 });

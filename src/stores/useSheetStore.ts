@@ -9,6 +9,79 @@ let cloudTimer: any = null;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LEGACY_MOCK_WORKSPACE_ID = '00000000-0000-0000-0000-000000000010';
 
+export function convertExcelSerialToDate(val: any): string {
+  if (val === null || val === undefined || val === '') return '';
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return '';
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  const str = String(val).trim();
+  if (!str) return '';
+
+  // 1. ISO YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+
+  // 2. YYYY/MM/DD or YYYY.MM.DD
+  const ymdMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (ymdMatch) {
+    const y = ymdMatch[1];
+    const m = ymdMatch[2].padStart(2, '0');
+    const d = ymdMatch[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 3. DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (dmyMatch) {
+    const d = dmyMatch[1].padStart(2, '0');
+    const m = dmyMatch[2].padStart(2, '0');
+    const y = dmyMatch[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // 4. DD-MM-YY or DD/MM/YY
+  const dmyShortMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2})$/);
+  if (dmyShortMatch) {
+    const d = dmyShortMatch[1].padStart(2, '0');
+    const m = dmyShortMatch[2].padStart(2, '0');
+    let y = parseInt(dmyShortMatch[3], 10);
+    y = y > 50 ? 1900 + y : 2000 + y;
+    return `${y}-${m}-${d}`;
+  }
+
+  // 5. Excel serial numbers (e.g. 44561 or 35939)
+  const num = parseFloat(str);
+  if (!isNaN(num) && num > 1000 && num < 75000 && !str.includes('-') && !str.includes('/') && !str.includes('.')) {
+    const date = new Date(Math.round((num - 25569) * 86400 * 1000));
+    if (!isNaN(date.getTime()) && date.getUTCFullYear() >= 1900 && date.getUTCFullYear() <= 2100) {
+      const y = date.getUTCFullYear();
+      const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(date.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  // 6. Handle standard Date string parsing (e.g. ISO timestamp or "15 Aug 1998")
+  const parsed = Date.parse(str);
+  if (!isNaN(parsed)) {
+    const dt = new Date(parsed);
+    const isUtc = str.includes('T') || str.includes('Z');
+    const y = isUtc ? dt.getUTCFullYear() : dt.getFullYear();
+    if (y >= 1900 && y <= 2100) {
+      const m = String((isUtc ? dt.getUTCMonth() : dt.getMonth()) + 1).padStart(2, '0');
+      const d = String(isUtc ? dt.getUTCDate() : dt.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  return str;
+}
+
 export function normalizeSheet(s: any): RecordSheet {
   if (!s || typeof s !== 'object') {
     return {
@@ -54,11 +127,28 @@ export function normalizeSheet(s: any): RecordSheet {
   }
   if (!Array.isArray(rows)) rows = [];
 
-  rows = rows.map((row: any, idx: number) => ({
-    id: row?.id || `row-${idx}`,
-    data: (row && typeof row.data === 'object' && row.data !== null) ? row.data : {},
-    formats: (row && typeof row.formats === 'object' && row.formats !== null) ? row.formats : {},
-  }));
+  // Identify date column IDs to normalize existing dates (e.g. DD/MM/YYYY or serials)
+  const dateColIds = new Set<string>(
+    columns
+      .filter((col: any) => col.type === 'date' || /birth|dob|date|expiry|joining/i.test(col.name || ''))
+      .map((col: any) => String(col.id))
+  );
+
+  rows = rows.map((row: any, idx: number) => {
+    const rawData = (row && typeof row.data === 'object' && row.data !== null) ? { ...row.data } : {};
+    if (dateColIds.size > 0) {
+      for (const colId of dateColIds) {
+        if (rawData[colId] !== undefined && rawData[colId] !== null && rawData[colId] !== '') {
+          rawData[colId] = convertExcelSerialToDate(rawData[colId]);
+        }
+      }
+    }
+    return {
+      id: row?.id || `row-${idx}`,
+      data: rawData,
+      formats: (row && typeof row.formats === 'object' && row.formats !== null) ? row.formats : {},
+    };
+  });
 
   return {
     id: String(s.id || ''),
@@ -385,8 +475,11 @@ export const useSheetStore = create<SheetState>((set) => ({
       let targetSheet: RecordSheet | undefined;
       const updated = state.sheets.map((s) => {
         if (s.id !== sheetId) return s;
+        const targetCol = s.columns.find((c) => c.id === colId);
+        const isDateCol = targetCol?.type === 'date' || (targetCol?.name && /birth|dob|date|expiry|joining/i.test(targetCol.name));
+        const valToSave = isDateCol ? convertExcelSerialToDate(value) : value;
         const rows = s.rows.map((r) =>
-          r.id === rowId ? { ...r, data: { ...r.data, [colId]: value } } : r
+          r.id === rowId ? { ...r, data: { ...r.data, [colId]: valToSave } } : r
         );
         targetSheet = { ...s, rows };
         return targetSheet;

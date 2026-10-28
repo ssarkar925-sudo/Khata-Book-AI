@@ -45,7 +45,7 @@ import {
   Unlock,
   RefreshCw,
 } from 'lucide-react';
-import { useSheetStore } from '@/stores/useSheetStore';
+import { useSheetStore, convertExcelSerialToDate } from '@/stores/useSheetStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { SheetColumn, SheetColumnType, SheetRow } from '@/types';
@@ -81,31 +81,6 @@ const TEXT_COLORS = [
   { id: '#9333ea', label: 'Purple', color: '#9333ea' },
 ];
 
-// Helper to convert Excel date serials to clean YYYY-MM-DD
-function convertExcelSerialToDate(val: any): string {
-  if (val === null || val === undefined || val === '') return '';
-  if (val instanceof Date) {
-    const y = val.getFullYear();
-    const m = String(val.getMonth() + 1).padStart(2, '0');
-    const d = String(val.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-  const str = String(val).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str) || /^\d{2}[-/]\d{2}[-/]\d{4}$/.test(str)) {
-    return str;
-  }
-  const num = parseFloat(str);
-  if (!isNaN(num) && num > 1000 && num < 65000 && !str.includes('-') && !str.includes('/')) {
-    const date = new Date(Math.round((num - 25569) * 86400 * 1000));
-    if (!isNaN(date.getTime()) && date.getFullYear() >= 1900 && date.getFullYear() <= 2099) {
-      const y = date.getUTCFullYear();
-      const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-      const d = String(date.getUTCDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    }
-  }
-  return str;
-}
 
 // Convert 0-based column index to Excel column letter (0 -> A, 1 -> B, 26 -> AA)
 function getColumnLetter(colIndex: number): string {
@@ -1692,8 +1667,9 @@ export function SheetsScreen() {
                           const isSelectedCell =
                             selectedCell?.rowId === row.id && selectedCell?.colId === col.id;
 
+                          const isDateType = col.type === 'date' || /birth|dob|date|expiry|joining/i.test(col.name);
                           const displayVal =
-                            col.type === 'date' ? convertExcelSerialToDate(cellVal) : cellVal;
+                            isDateType ? convertExcelSerialToDate(cellVal) : cellVal;
 
                           // Cell Sticky Coordinates:
                           // If both row and column are frozen: sticky on both top and left (z-35)
@@ -1781,27 +1757,44 @@ export function SheetsScreen() {
                                     ))}
                                   </select>
                                 </div>
-                              ) : col.type === 'date' ? (
+                              ) : isDateType ? (
                                 /* CASE 2: DATE PICKER */
                                 <div className="relative flex items-center">
-                                  <input
-                                    type="date"
-                                    value={displayVal}
-                                    onChange={(e) =>
-                                      updateCell(activeSheet.id, row.id, col.id, e.target.value)
-                                    }
-                                    style={{
-                                      fontWeight: isBold ? 'bold' : 'normal',
-                                      fontStyle: isItalic ? 'italic' : 'normal',
-                                      textAlign: align,
-                                      color: textColor || (cellColor && cellColor !== 'none' ? '#0f172a' : undefined),
-                                    }}
-                                    className={`w-full bg-transparent px-1 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 font-mono ${
-                                      cellColor && cellColor !== 'none'
-                                        ? 'text-slate-950 font-semibold'
-                                        : 'text-slate-800 dark:text-slate-200'
-                                    }`}
-                                  />
+                                  {/^\d{4}-\d{2}-\d{2}$/.test(displayVal) || !displayVal ? (
+                                    <input
+                                      type="date"
+                                      value={displayVal || ''}
+                                      onChange={(e) =>
+                                        updateCell(activeSheet.id, row.id, col.id, e.target.value)
+                                      }
+                                      style={{
+                                        fontWeight: isBold ? 'bold' : 'normal',
+                                        fontStyle: isItalic ? 'italic' : 'normal',
+                                        textAlign: align,
+                                        color: textColor || (cellColor && cellColor !== 'none' ? '#0f172a' : undefined),
+                                      }}
+                                      className={`w-full bg-transparent px-1 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 font-mono ${
+                                        cellColor && cellColor !== 'none'
+                                          ? 'text-slate-950 font-semibold'
+                                          : 'text-slate-800 dark:text-slate-200'
+                                      }`}
+                                    />
+                                  ) : (
+                                    <SheetCellInput
+                                      value={String(displayVal ?? '')}
+                                      type="text"
+                                      isBold={isBold}
+                                      isItalic={isItalic}
+                                      align={align}
+                                      textColor={textColor}
+                                      cellColor={cellColor}
+                                      wrapText={wrapText}
+                                      onChange={(val) => updateCell(activeSheet.id, row.id, col.id, val)}
+                                      onEnterAtLastRow={
+                                        rowIdx === filteredRows.length - 1 ? handleQuickAddRow : undefined
+                                      }
+                                    />
+                                  )}
                                 </div>
                               ) : (
                                 /* CASE 3: FAST TEXT / AMOUNT / NUMBER CELL */
