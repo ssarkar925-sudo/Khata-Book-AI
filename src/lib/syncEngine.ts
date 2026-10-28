@@ -30,8 +30,22 @@ class SyncEngine {
   constructor() {
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => {
-        console.log('[SyncEngine] Device back online. Flushing queue...');
-        this.flushQueue();
+        console.log('[SyncEngine] Device back online. Flushing queue and refreshing data...');
+        this.flushQueue().then(() => {
+          const wsId = this.currentWorkspaceId || (typeof useSessionStore !== 'undefined' ? useSessionStore.getState().activeWorkspaceId : '');
+          if (wsId) {
+            this.pullAll(wsId);
+          }
+        });
+      });
+
+      window.addEventListener('offline', () => {
+        console.log('[SyncEngine] Device went offline.');
+        try {
+          if (typeof useSessionStore !== 'undefined' && useSessionStore?.getState) {
+            useSessionStore.getState().setSyncStatus('offline');
+          }
+        } catch {}
       });
 
       // Defer store access until next tick to avoid circular import TDZ

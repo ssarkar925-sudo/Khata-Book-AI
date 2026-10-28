@@ -8,6 +8,7 @@ const config: CapacitorConfig = {
     url: 'https://aikhata.vercel.app',
     cleartext: false,
     androidScheme: 'https',
+    errorPath: 'offline.html',
   },
 };
 

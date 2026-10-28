@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
+import { NetworkStatusNotifier } from '@/components/common/NetworkStatusNotifier';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -50,6 +51,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col antialiased selection:bg-indigo-500 selection:text-white" suppressHydrationWarning>
+        <NetworkStatusNotifier />
         {children}
         <Script
           id="sw-register"

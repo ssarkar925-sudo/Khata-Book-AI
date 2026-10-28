@@ -1,6 +1,7 @@
-const CACHE_NAME = 'record-book-v3';
+const CACHE_NAME = 'record-book-v4';
 const STATIC_ASSETS = [
   '/',
+  '/offline.html',
   '/manifest.json',
   '/icon-192.svg',
   '/icon-512.svg',
@@ -58,7 +59,13 @@ self.addEventListener('fetch', (event) => {
       })
       .catch(() => {
         return caches.match(event.request).then((cached) => {
-          return cached || (event.request.mode === 'navigate' ? caches.match('/') : undefined);
+          if (cached) return cached;
+          if (event.request.mode === 'navigate') {
+            return caches.match('/offline.html').then((offlinePage) => {
+              return offlinePage || caches.match('/');
+            });
+          }
+          return undefined;
         });
       })
   );
