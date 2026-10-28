@@ -323,11 +323,34 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   signIn: async (email, password) => {
     try {
       const cleanEmail = email.trim().toLowerCase();
-      const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+      const trimmedPass = password.trim();
+
+      // Clear any stale local auth session from WebView before signing in
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+
+      let { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: trimmedPass,
+      });
+
+      // If trimmed password fails and raw password had whitespace, fallback to raw password
+      if (error && password !== trimmedPass) {
+        const retry = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password,
+        });
+        if (!retry.error) {
+          data = retry.data;
+          error = null;
+        }
+      }
+
       if (error) {
         return { success: false, error: error.message };
       }
-      if (data.user && data.session) {
+      if (data?.user && data?.session) {
         get().setUser(data.user);
         await get().refreshWorkspacesAndRole(data.user);
         return { success: true };

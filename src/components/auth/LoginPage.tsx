@@ -65,14 +65,20 @@ export function LoginPage() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
     if (!cleanEmail || !password) {
       setErrorMsg('Please enter both email and password.');
       return;
     }
 
     setIsSubmitting(true);
-    const res = await signIn(cleanEmail, password);
+    let res = await signIn(cleanEmail, cleanPassword);
+
+    // If trimmed password fails and raw password had whitespace, fallback to raw password
+    if (!res.success && password !== cleanPassword) {
+      res = await signIn(cleanEmail, password);
+    }
     setIsSubmitting(false);
 
     if (!res.success) {
@@ -472,10 +478,18 @@ export function LoginPage() {
                         type="email"
                         required
                         autoComplete="email"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         placeholder="you@company.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
+                        style={{
+                          color: isLight ? '#0f172a' : '#f8fafc',
+                          WebkitTextFillColor: isLight ? '#0f172a' : '#f8fafc',
+                          caretColor: '#4f46e5',
+                        }}
+                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
                       />
                     </div>
                   </div>
@@ -503,15 +517,24 @@ export function LoginPage() {
                         type={showPassword ? 'text' : 'password'}
                         required
                         autoComplete="current-password"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
+                        style={{
+                          color: isLight ? '#0f172a' : '#f8fafc',
+                          WebkitTextFillColor: isLight ? '#0f172a' : '#f8fafc',
+                          caretColor: '#4f46e5',
+                        }}
+                        className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+                        title={showPassword ? 'Hide password' : 'Show password'}
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -549,10 +572,18 @@ export function LoginPage() {
                       <input
                         type="text"
                         required
+                        autoCapitalize="words"
+                        autoCorrect="off"
+                        spellCheck={false}
                         placeholder="e.g. Rahul Sharma"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
+                        style={{
+                          color: isLight ? '#0f172a' : '#f8fafc',
+                          WebkitTextFillColor: isLight ? '#0f172a' : '#f8fafc',
+                          caretColor: '#4f46e5',
+                        }}
+                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
                       />
                     </div>
                   </div>
@@ -567,10 +598,18 @@ export function LoginPage() {
                         type="email"
                         required
                         autoComplete="email"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         placeholder="you@company.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
+                        style={{
+                          color: isLight ? '#0f172a' : '#f8fafc',
+                          WebkitTextFillColor: isLight ? '#0f172a' : '#f8fafc',
+                          caretColor: '#4f46e5',
+                        }}
+                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
                       />
                     </div>
                   </div>
@@ -584,15 +623,24 @@ export function LoginPage() {
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
+                        style={{
+                          color: isLight ? '#0f172a' : '#f8fafc',
+                          WebkitTextFillColor: isLight ? '#0f172a' : '#f8fafc',
+                          caretColor: '#4f46e5',
+                        }}
+                        className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+                        title={showPassword ? 'Hide password' : 'Show password'}
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -608,10 +656,18 @@ export function LoginPage() {
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         placeholder="••••••••"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
+                        style={{
+                          color: isLight ? '#0f172a' : '#f8fafc',
+                          WebkitTextFillColor: isLight ? '#0f172a' : '#f8fafc',
+                          caretColor: '#4f46e5',
+                        }}
+                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
                       />
                     </div>
                   </div>
@@ -647,10 +703,19 @@ export function LoginPage() {
                       <input
                         type="email"
                         required
+                        autoComplete="email"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         placeholder="you@company.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
+                        style={{
+                          color: isLight ? '#0f172a' : '#f8fafc',
+                          WebkitTextFillColor: isLight ? '#0f172a' : '#f8fafc',
+                          caretColor: '#4f46e5',
+                        }}
+                        className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
                       />
                     </div>
                   </div>

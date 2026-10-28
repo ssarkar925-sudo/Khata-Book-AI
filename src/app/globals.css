@@ -18,14 +18,24 @@
   }
 }
 
-/* Universal Form Elements & High Contrast Dropdown Fixes */
-select {
+/* Universal Form Elements & High Contrast Input / Dropdown Fixes */
+input, textarea, select {
   color-scheme: light;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #4f46e5 !important;
 }
 
+.dark input,
+.dark textarea,
 .dark select,
+html.dark input,
+html.dark textarea,
 html.dark select {
   color-scheme: dark;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #818cf8 !important;
 }
 
 select option {
@@ -41,12 +51,15 @@ html.dark select option {
 
 /* Ensure placeholder text contrast across light and dark modes */
 ::placeholder {
-  opacity: 0.65;
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  opacity: 0.8 !important;
 }
 
 .dark ::placeholder {
-  color: #94a3b8;
-  opacity: 0.75;
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+  opacity: 0.8 !important;
 }
 
 /* Date input calendar icon inversion for dark mode */

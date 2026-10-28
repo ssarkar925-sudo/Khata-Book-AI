@@ -357,10 +357,18 @@ export function AuthModal() {
                   <input
                     type="text"
                     required
+                    autoCapitalize="words"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="e.g. Alex Morgan"
-                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-medium border outline-hidden transition-all ${
+                    style={{
+                      color: isLight ? '#0f172a' : '#f8fafc',
+                      WebkitTextFillColor: isLight ? '#0f172a' : '#f8fafc',
+                      caretColor: '#4f46e5',
+                    }}
+                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-medium border outline-hidden transition-all text-slate-900 dark:text-white ${
                       isLight
                         ? 'bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500'
                         : 'bg-white/5 border-white/10 focus:bg-white/10 focus:border-indigo-400'
@@ -379,10 +387,19 @@ export function AuthModal() {
                 <input
                   type="email"
                   required
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-medium border outline-hidden transition-all ${
+                  style={{
+                    color: isLight ? '#0f172a' : '#f8fafc',
+                    WebkitTextFillColor: isLight ? '#0f172a' : '#f8fafc',
+                    caretColor: '#4f46e5',
+                  }}
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-medium border outline-hidden transition-all text-slate-900 dark:text-white ${
                     isLight
                       ? 'bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500'
                       : 'bg-white/5 border-white/10 focus:bg-white/10 focus:border-indigo-400'
@@ -400,10 +417,19 @@ export function AuthModal() {
                 <input
                   type="password"
                   required
+                  autoComplete="current-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-medium border outline-hidden transition-all ${
+                  style={{
+                    color: isLight ? '#0f172a' : '#f8fafc',
+                    WebkitTextFillColor: isLight ? '#0f172a' : '#f8fafc',
+                    caretColor: '#4f46e5',
+                  }}
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-medium border outline-hidden transition-all text-slate-900 dark:text-white ${
                     isLight
                       ? 'bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500'
                       : 'bg-white/5 border-white/10 focus:bg-white/10 focus:border-indigo-400'
@@ -422,10 +448,18 @@ export function AuthModal() {
                   <input
                     type="password"
                     required
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
-                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-medium border outline-hidden transition-all ${
+                    style={{
+                      color: isLight ? '#0f172a' : '#f8fafc',
+                      WebkitTextFillColor: isLight ? '#0f172a' : '#f8fafc',
+                      caretColor: '#4f46e5',
+                    }}
+                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-medium border outline-hidden transition-all text-slate-900 dark:text-white ${
                       isLight
                         ? 'bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500'
                         : 'bg-white/5 border-white/10 focus:bg-white/10 focus:border-indigo-400'
