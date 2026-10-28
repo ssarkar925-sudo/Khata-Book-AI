@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
     --bg-app: #f8fafc;
@@ -207,6 +209,11 @@ input, textarea, [contenteditable="true"] {
   height: 2rem;
   border-radius: 9999px;
   transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Explicit 5-column grid utility */
+.grid-cols-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
 }
 
 /* Native Android Ripple / Press Feedback */

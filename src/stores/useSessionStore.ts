@@ -175,7 +175,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   lastSyncError: null,
   theme: (() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('rb_theme') as 'light' | 'dark') || 'light';
+      const saved = localStorage.getItem('rb_theme') as 'light' | 'dark' | null;
+      if (saved === 'light' || saved === 'dark') return saved;
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return 'dark';
+      }
+      return 'light';
     }
     return 'light';
   })(),

@@ -74,17 +74,23 @@ export function MobileNav({ activeTab, setActiveTab, onOpenMore }: MobileNavProp
 
   return (
     <nav
-      className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 transition-colors border-t shadow-lg ${
+      className={`lg:hidden fixed bottom-0 left-0 right-0 z-50 transition-colors border-t shadow-2xl ${
         isLight
-          ? 'bg-white/95 border-slate-200/90 text-slate-600 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]'
-          : 'bg-[#0b101b]/95 border-white/10 text-slate-300 shadow-[0_-4px_25px_rgba(0,0,0,0.6)]'
+          ? 'bg-white/95 border-slate-200 text-slate-700 shadow-[0_-4px_25px_rgba(0,0,0,0.08)]'
+          : 'bg-[#0f172a]/95 border-white/10 text-slate-200 shadow-[0_-4px_30px_rgba(0,0,0,0.6)]'
       }`}
       style={{
-        paddingBottom: 'max(0.55rem, env(safe-area-inset-bottom, 0px))',
-        paddingTop: '0.4rem',
+        paddingBottom: 'max(0.45rem, env(safe-area-inset-bottom, 0px))',
+        paddingTop: '0.35rem',
       }}
     >
-      <div className="grid grid-cols-5 items-center px-2">
+      <div
+        className="w-full items-center px-1"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+        }}
+      >
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;

@@ -67,12 +67,12 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
       }}
     >
       {/* Brand & Workspace Switcher */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-500 to-teal-400 flex items-center justify-center font-extrabold text-xs text-white shadow-md shadow-indigo-500/25 shrink-0">
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-500 to-teal-400 flex items-center justify-center font-extrabold text-xs text-white shadow-md shadow-indigo-500/25 shrink-0">
             RB
           </div>
-          <div>
+          <div className="hidden sm:block">
             <span className="font-extrabold text-sm sm:text-base tracking-tight bg-gradient-to-r from-indigo-600 via-violet-600 to-teal-500 dark:from-indigo-400 dark:via-violet-300 dark:to-teal-300 bg-clip-text text-transparent">
               Record Book
             </span>
@@ -90,12 +90,12 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
             }}
             className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all touch-press ${
               isLight
-                ? 'bg-slate-100/80 hover:bg-slate-200/80 border-slate-200 text-slate-700'
+                ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-800'
                 : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200'
             }`}
           >
             <Building className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-            <span className="max-w-[90px] sm:max-w-[150px] truncate">
+            <span className="max-w-[110px] sm:max-w-[150px] truncate">
               {activeWs?.name || 'Record Book'}
             </span>
             <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
@@ -148,15 +148,14 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
       </div>
 
       {/* Right Controls: User Profile / Auth, Ask AI, Sync Badge, Theme */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5">
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         {/* RADIANT MULTICOLOR ASK AI BUTTON */}
         <button
           onClick={onOpenAskAI}
           title="Open Ask AI Accountant"
-          className="group flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-teal-500 hover:from-violet-500 hover:to-teal-400 text-white font-bold text-xs shadow-md shadow-indigo-500/30 transition-all hover-lift touch-press cursor-pointer"
+          className="group flex items-center justify-center p-2 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-teal-500 hover:from-violet-500 hover:to-teal-400 text-white font-bold text-xs shadow-md shadow-indigo-500/30 transition-all hover-lift touch-press cursor-pointer shrink-0"
         >
-          <Sparkles className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-300 group-hover:rotate-12 transition-transform shrink-0" />
-          <span className="hidden sm:inline">Ask AI</span>
+          <Sparkles className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform shrink-0" />
         </button>
 
         {/* Sync Status Badge */}
@@ -164,10 +163,10 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
           <button
             onClick={() => setAuthModalOpen(true)}
             title="Local-only mode active. Tap to sign in and enable cloud sync."
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all touch-press bg-slate-200/60 dark:bg-slate-800/80 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-indigo-400"
+            className="flex items-center gap-1 p-2 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border transition-all touch-press bg-slate-200/60 dark:bg-slate-800/80 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-indigo-400 shrink-0"
           >
-            <CloudOff className="w-3 h-3 text-amber-500 shrink-0" />
-            <span className="hidden sm:inline">Local-only</span>
+            <CloudOff className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span className="hidden md:inline">Local-only</span>
           </button>
         ) : (
           <button
@@ -179,7 +178,7 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
                 ? `${pendingSyncCount} changes queued offline. Tap to sync.`
                 : `Status: ${syncStatus}. ${formattedSyncTime ? 'Last synced at ' + formattedSyncTime : ''}`
             }
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all touch-press ${
+            className={`flex items-center gap-1.5 p-2 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold border transition-all touch-press shrink-0 ${
               syncStatus === 'error'
                 ? 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400'
                 : syncStatus === 'syncing'
@@ -192,21 +191,21 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
             }`}
           >
             {syncStatus === 'syncing' ? (
-              <RefreshCw className="w-3 h-3 animate-spin text-amber-500 shrink-0" />
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500 shrink-0" />
             ) : syncStatus === 'error' ? (
-              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 animate-pulse" />
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 animate-pulse" />
             ) : pendingSyncCount > 0 ? (
-              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
             ) : syncStatus === 'synced' ? (
-              <span className="relative flex h-2 w-2">
+              <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
               </span>
             ) : (
-              <span className="h-2 w-2 rounded-full bg-slate-400" />
+              <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
             )}
 
-            <span className="hidden sm:inline">
+            <span className="hidden md:inline">
               {syncStatus === 'syncing'
                 ? 'Syncing...'
                 : syncStatus === 'error'
@@ -219,7 +218,6 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
                   : 'Cloud Synced'
                 : 'Offline Mode'}
             </span>
-            <RefreshCw className="w-3 h-3 hover:rotate-180 transition-transform duration-500 hidden sm:inline" />
           </button>
         )}
 

@@ -346,31 +346,48 @@ export function DashboardScreen({
   return (
     <div className="space-y-6">
       {/* ========================================================= */}
-      {/* TOP HEADER & 3-SPHERE LENS SWITCHER                       */}
-      {/* ========================================================= */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* TOP HEADER & 3-SPHERE LENS SWITCHER */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+            <h1
+              className="text-xl sm:text-2xl font-black tracking-tight"
+              style={{ color: isLight ? '#0f172a' : '#f8fafc' }}
+            >
               Financial Command Center
             </h1>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
               Live Lens
             </span>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p
+            className="text-xs mt-0.5 font-medium"
+            style={{ color: isLight ? '#475569' : '#94a3b8' }}
+          >
             Switch perspectives to isolate Business, Personal, and Family finances
           </p>
         </div>
 
         {/* 4-Pill Scope Switcher */}
-        <div className="w-full sm:w-auto grid grid-cols-4 sm:flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-xs">
+        <div
+          className={`w-full sm:w-auto p-1 rounded-2xl border shadow-xs transition-colors ${
+            isLight ? 'bg-slate-200/90 border-slate-300' : 'bg-slate-900/90 border-white/10'
+          }`}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          }}
+        >
           <button
             onClick={() => setSelectedScope('all')}
-            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs transition-all ${
               selectedScope === 'all'
-                ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                ? isLight
+                  ? 'bg-white text-indigo-700 shadow-sm border border-slate-300/80 font-black'
+                  : 'bg-indigo-600 text-white shadow-sm font-black'
+                : isLight
+                ? 'text-slate-700 hover:text-slate-900 font-bold'
+                : 'text-slate-400 hover:text-white font-bold'
             }`}
           >
             <Globe className="w-3.5 h-3.5 shrink-0" />
@@ -379,37 +396,49 @@ export function DashboardScreen({
 
           <button
             onClick={() => setSelectedScope('business')}
-            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs transition-all ${
               selectedScope === 'business'
-                ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                ? isLight
+                  ? 'bg-white text-indigo-700 shadow-sm border border-slate-300/80 font-black'
+                  : 'bg-indigo-600 text-white shadow-sm font-black'
+                : isLight
+                ? 'text-slate-700 hover:text-slate-900 font-bold'
+                : 'text-slate-400 hover:text-white font-bold'
             }`}
           >
-            <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300 shrink-0" />
+            <Building2 className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
             <span className="truncate">Biz</span>
           </button>
 
           <button
             onClick={() => setSelectedScope('personal')}
-            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs transition-all ${
               selectedScope === 'personal'
-                ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                ? isLight
+                  ? 'bg-white text-emerald-700 shadow-sm border border-slate-300/80 font-black'
+                  : 'bg-emerald-600 text-white shadow-sm font-black'
+                : isLight
+                ? 'text-slate-700 hover:text-slate-900 font-bold'
+                : 'text-slate-400 hover:text-white font-bold'
             }`}
           >
-            <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300 shrink-0" />
+            <User className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
             <span className="truncate">Personal</span>
           </button>
 
           <button
             onClick={() => setSelectedScope('family')}
-            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs transition-all ${
               selectedScope === 'family'
-                ? 'bg-white dark:bg-amber-600 text-amber-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                ? isLight
+                  ? 'bg-white text-amber-700 shadow-sm border border-slate-300/80 font-black'
+                  : 'bg-amber-600 text-white shadow-sm font-black'
+                : isLight
+                ? 'text-slate-700 hover:text-slate-900 font-bold'
+                : 'text-slate-400 hover:text-white font-bold'
             }`}
           >
-            <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 shrink-0" />
+            <Users2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span className="truncate">Family</span>
           </button>
         </div>
@@ -563,17 +592,29 @@ export function DashboardScreen({
       {/* ========================================================= */}
       {/* NATIVE ANDROID ACTION HUB (MOBILE-FIRST FULL WIDTH)       */}
       {/* ========================================================= */}
-      <div className="w-full rounded-3xl p-3 sm:p-4 bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-white/10 shadow-sm backdrop-blur-md space-y-3">
+      <div
+        className={`w-full rounded-3xl p-3.5 sm:p-4 border shadow-sm backdrop-blur-md space-y-3 transition-colors ${
+          isLight
+            ? 'bg-white border-slate-200/90 shadow-md shadow-slate-200/50'
+            : 'bg-slate-900/90 border-white/10 shadow-lg'
+        }`}
+      >
         {/* Core Primary Financial Actions: Full Width Mobile Dual Split */}
-        <div className="grid grid-cols-2 gap-2.5 w-full">
+        <div
+          className="w-full gap-2.5"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          }}
+        >
           <button
             onClick={isViewer ? undefined : onQuickCashIn}
             disabled={isViewer}
             title={isViewer ? 'Read-only access: Viewer role cannot add transactions' : undefined}
-            className={`w-full py-3.5 sm:py-3 px-3 sm:px-4 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all min-h-[50px] ${
+            className={`w-full py-3.5 px-3 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all min-h-[50px] ${
               isViewer
                 ? 'bg-slate-400 text-white cursor-not-allowed opacity-60'
-                : 'bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white shadow-emerald-600/25 cursor-pointer'
+                : 'bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white shadow-emerald-600/30 cursor-pointer'
             }`}
           >
             <ArrowDownLeft className="w-4 h-4 stroke-[3]" />
@@ -584,10 +625,10 @@ export function DashboardScreen({
             onClick={isViewer ? undefined : onQuickCashOut}
             disabled={isViewer}
             title={isViewer ? 'Read-only access: Viewer role cannot add transactions' : undefined}
-            className={`w-full py-3.5 sm:py-3 px-3 sm:px-4 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all min-h-[50px] ${
+            className={`w-full py-3.5 px-3 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all min-h-[50px] ${
               isViewer
                 ? 'bg-slate-400 text-white cursor-not-allowed opacity-60'
-                : 'bg-rose-600 hover:bg-rose-500 active:scale-[0.98] text-white shadow-rose-600/25 cursor-pointer'
+                : 'bg-rose-600 hover:bg-rose-500 active:scale-[0.98] text-white shadow-rose-600/30 cursor-pointer'
             }`}
           >
             <ArrowUpRight className="w-4 h-4 stroke-[3]" />
@@ -596,25 +637,49 @@ export function DashboardScreen({
         </div>
 
         {/* 4-Column Android Quick Actions Grid (Spanning Full Mobile Width) */}
-        <div className="grid grid-cols-4 gap-2 w-full pt-0.5">
+        <div
+          className="w-full gap-2 pt-0.5"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          }}
+        >
           <button
             onClick={() => onNavigateTab('dues')}
-            className="flex flex-col items-center justify-center p-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shadow-xs active:scale-95 transition-all cursor-pointer"
+            className={`flex flex-col items-center justify-center p-2 rounded-2xl border shadow-xs active:scale-95 transition-all cursor-pointer ${
+              isLight
+                ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+                : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200'
+            }`}
           >
             <div className="w-9 h-9 rounded-full bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mb-1">
               <Users className="w-4 h-4 stroke-[2.5]" />
             </div>
-            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Udhar</span>
+            <span
+              className="text-[11px] font-bold"
+              style={{ color: isLight ? '#1e293b' : '#f1f5f9' }}
+            >
+              Udhar
+            </span>
           </button>
 
           <button
             onClick={() => setIsTransferModalOpen(true)}
-            className="flex flex-col items-center justify-center p-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shadow-xs active:scale-95 transition-all cursor-pointer"
+            className={`flex flex-col items-center justify-center p-2 rounded-2xl border shadow-xs active:scale-95 transition-all cursor-pointer ${
+              isLight
+                ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+                : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200'
+            }`}
           >
             <div className="w-9 h-9 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-1">
               <Repeat className="w-4 h-4 stroke-[2.5]" />
             </div>
-            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Transfer</span>
+            <span
+              className="text-[11px] font-bold"
+              style={{ color: isLight ? '#1e293b' : '#f1f5f9' }}
+            >
+              Transfer
+            </span>
           </button>
 
           <button
@@ -623,34 +688,59 @@ export function DashboardScreen({
             className={`flex flex-col items-center justify-center p-2 rounded-2xl border shadow-xs transition-all ${
               isViewer
                 ? 'border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-400 opacity-60 cursor-not-allowed'
-                : 'border-purple-200 dark:border-purple-500/30 bg-purple-50/60 dark:bg-purple-950/20 active:scale-95 cursor-pointer'
+                : isLight
+                ? 'border-purple-200 bg-purple-50/70 hover:bg-purple-100 text-purple-800 active:scale-95 cursor-pointer'
+                : 'border-purple-500/30 bg-purple-950/20 hover:bg-purple-900/30 text-purple-300 active:scale-95 cursor-pointer'
             }`}
           >
             <div className="w-9 h-9 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-1">
               <CreditCard className="w-4 h-4 stroke-[2.5]" />
             </div>
-            <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300">Card</span>
+            <span
+              className="text-[11px] font-bold"
+              style={{ color: isLight ? '#581c87' : '#d8b4fe' }}
+            >
+              Cards
+            </span>
           </button>
 
           {onOpenScanner ? (
             <button
               onClick={onOpenScanner}
-              className="flex flex-col items-center justify-center p-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shadow-xs active:scale-95 transition-all cursor-pointer"
+              className={`flex flex-col items-center justify-center p-2 rounded-2xl border shadow-xs active:scale-95 transition-all cursor-pointer ${
+                isLight
+                  ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+                  : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200'
+              }`}
             >
               <div className="w-9 h-9 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center mb-1">
                 <Camera className="w-4 h-4 stroke-[2.5]" />
               </div>
-              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Scan Bill</span>
+              <span
+                className="text-[11px] font-bold"
+                style={{ color: isLight ? '#1e293b' : '#f1f5f9' }}
+              >
+                Scan Bill
+              </span>
             </button>
           ) : (
             <button
               onClick={() => onNavigateTab('expenses')}
-              className="flex flex-col items-center justify-center p-2 rounded-2xl bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shadow-xs active:scale-95 transition-all cursor-pointer"
+              className={`flex flex-col items-center justify-center p-2 rounded-2xl border shadow-xs active:scale-95 transition-all cursor-pointer ${
+                isLight
+                  ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+                  : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200'
+              }`}
             >
               <div className="w-9 h-9 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-1">
                 <TrendingDown className="w-4 h-4 stroke-[2.5]" />
               </div>
-              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Spends</span>
+              <span
+                className="text-[11px] font-bold"
+                style={{ color: isLight ? '#1e293b' : '#f1f5f9' }}
+              >
+                Spends
+              </span>
             </button>
           )}
         </div>
