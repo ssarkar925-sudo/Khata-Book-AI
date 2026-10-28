@@ -9,6 +9,74 @@ let cloudTimer: any = null;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LEGACY_MOCK_WORKSPACE_ID = '00000000-0000-0000-0000-000000000010';
 
+export function normalizeSheet(s: any): RecordSheet {
+  if (!s || typeof s !== 'object') {
+    return {
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+      workspace_id: '',
+      title: 'Untitled Sheet',
+      category: 'General',
+      color: '#6366F1',
+      scope: 'business',
+      columns: [],
+      rows: [],
+      frozenRowCount: 0,
+      rowHeight: 'normal',
+      showGridlines: true,
+    };
+  }
+
+  let columns = s.columns;
+  if (typeof columns === 'string') {
+    try {
+      columns = JSON.parse(columns);
+    } catch {
+      columns = [];
+    }
+  }
+  if (!Array.isArray(columns)) columns = [];
+
+  columns = columns.map((col: any, idx: number) => ({
+    id: col?.id || `col-${idx}`,
+    name: col?.name || `Column ${idx + 1}`,
+    type: col?.type || 'text',
+    width: typeof col?.width === 'number' ? col.width : 150,
+    isPinned: Boolean(col?.isPinned),
+  }));
+
+  let rows = s.rows;
+  if (typeof rows === 'string') {
+    try {
+      rows = JSON.parse(rows);
+    } catch {
+      rows = [];
+    }
+  }
+  if (!Array.isArray(rows)) rows = [];
+
+  rows = rows.map((row: any, idx: number) => ({
+    id: row?.id || `row-${idx}`,
+    data: (row && typeof row.data === 'object' && row.data !== null) ? row.data : {},
+    formats: (row && typeof row.formats === 'object' && row.formats !== null) ? row.formats : {},
+  }));
+
+  return {
+    id: String(s.id || ''),
+    workspace_id: String(s.workspace_id || ''),
+    title: String(s.title || 'Untitled Sheet'),
+    category: String(s.category || 'General'),
+    color: String(s.color || '#6366F1'),
+    scope: (s.scope === 'personal' || s.scope === 'family') ? s.scope : 'business',
+    columns,
+    rows,
+    frozenRowCount: Number(s.frozenRowCount ?? s.frozen_row_count ?? 0),
+    rowHeight: (s.rowHeight === 'compact' || s.rowHeight === 'relaxed' || s.row_height === 'compact' || s.row_height === 'relaxed') ? (s.rowHeight || s.row_height) : 'normal',
+    showGridlines: s.showGridlines !== undefined ? Boolean(s.showGridlines) : (s.show_gridlines !== undefined ? Boolean(s.show_gridlines) : true),
+    created_at: s.created_at || new Date().toISOString(),
+    updated_at: s.updated_at || new Date().toISOString(),
+  };
+}
+
 function isValidUuid(id?: string | null): boolean {
   return typeof id === 'string' && UUID_REGEX.test(id) && id !== LEGACY_MOCK_WORKSPACE_ID;
 }
@@ -141,13 +209,15 @@ export const useSheetStore = create<SheetState>((set) => ({
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed)) {
-            const clean = parsed.filter(
-              (s: any) =>
-                s &&
-                s.workspace_id !== LEGACY_MOCK_WORKSPACE_ID &&
-                s.id !== 'sheet-pan-register' &&
-                s.id !== 'sheet-utility-bills'
-            );
+            const clean = parsed
+              .filter(
+                (s: any) =>
+                  s &&
+                  s.workspace_id !== LEGACY_MOCK_WORKSPACE_ID &&
+                  s.id !== 'sheet-pan-register' &&
+                  s.id !== 'sheet-utility-bills'
+              )
+              .map(normalizeSheet);
             return clean;
           }
         }
@@ -160,14 +230,19 @@ export const useSheetStore = create<SheetState>((set) => ({
   setSheets: (cloudSheets) => {
     set((state) => {
       const sheetsMap = new Map<string, RecordSheet>();
-      // First insert cloud sheets
-      for (const s of cloudSheets) {
-        if (s && s.id) sheetsMap.set(s.id, s);
+      // First insert cloud sheets, properly normalized
+      if (Array.isArray(cloudSheets)) {
+        for (const raw of cloudSheets) {
+          if (raw && raw.id) {
+            const normalized = normalizeSheet(raw);
+            sheetsMap.set(normalized.id, normalized);
+          }
+        }
       }
       // Preserve any local sheets not yet in cloud
       for (const s of state.sheets) {
         if (s && s.id && !sheetsMap.has(s.id)) {
-          sheetsMap.set(s.id, s);
+          sheetsMap.set(s.id, normalizeSheet(s));
         }
       }
       const merged = Array.from(sheetsMap.values());
@@ -192,15 +267,16 @@ export const useSheetStore = create<SheetState>((set) => ({
     set((state) => {
       let changed = false;
       const updated = state.sheets.map((s) => {
-        if (!s.workspace_id || s.workspace_id === 'default' || s.workspace_id === LEGACY_MOCK_WORKSPACE_ID) {
+        const norm = normalizeSheet(s);
+        if (!norm.workspace_id || norm.workspace_id === 'default' || norm.workspace_id === LEGACY_MOCK_WORKSPACE_ID) {
           changed = true;
-          const repaired = { ...s, workspace_id: workspaceId };
+          const repaired = { ...norm, workspace_id: workspaceId };
           syncSheetToCloud(repaired);
           return repaired;
         } else {
           // Push to cloud to ensure multi-device synchronization
-          syncSheetToCloud(s);
-          return s;
+          syncSheetToCloud(norm);
+          return norm;
         }
       });
       if (changed && typeof window !== 'undefined') {

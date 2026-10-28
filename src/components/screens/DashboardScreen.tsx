@@ -1185,7 +1185,7 @@ export function DashboardScreen({
               {sheets.length} Sheets
             </div>
             <div className="flex items-center justify-between mt-3 pt-2 border-t border-blue-100 dark:border-blue-500/15 text-xs text-slate-500 dark:text-slate-400 font-medium">
-              <span>{sheets.reduce((sum, s) => sum + s.rows.length, 0)} Total Rows</span>
+              <span>{sheets.reduce((sum, s) => sum + (Array.isArray(s?.rows) ? s.rows.length : 0), 0)} Total Rows</span>
               <span className="font-bold text-blue-600 dark:text-blue-400 text-[11px]">Open Grid →</span>
             </div>
           </div>

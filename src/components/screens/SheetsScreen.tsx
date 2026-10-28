@@ -985,7 +985,7 @@ export function SheetsScreen() {
                   isActive ? 'bg-black/20 text-white' : 'bg-slate-100 dark:bg-white/10 text-slate-500'
                 }`}
               >
-                {sheet.rows.length}
+                {(sheet.rows || []).length}
               </span>
             </button>
           );
@@ -1010,7 +1010,7 @@ export function SheetsScreen() {
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                   <input
                     type="text"
-                    placeholder={`Search ${activeSheet.rows.length} records...`}
+                    placeholder={`Search ${(activeSheet.rows || []).length} records...`}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1814,7 +1814,7 @@ export function SheetsScreen() {
               <span className="text-slate-400">|</span>
 
               <span className="text-[11px] font-mono">
-                {activeSheet.rows.length} rows, {activeSheet.columns.length} columns
+                {(activeSheet.rows || []).length} rows, {(activeSheet.columns || []).length} columns
               </span>
 
               {frozenRowCount > 0 && (
