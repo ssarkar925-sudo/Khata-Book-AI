@@ -230,11 +230,23 @@ export const useSheetStore = create<SheetState>((set) => ({
   setSheets: (cloudSheets) => {
     set((state) => {
       const sheetsMap = new Map<string, RecordSheet>();
-      // First insert cloud sheets, properly normalized
+      // First insert cloud sheets, properly normalized & safeguarding local rows/cols
       if (Array.isArray(cloudSheets)) {
         for (const raw of cloudSheets) {
           if (raw && raw.id) {
-            const normalized = normalizeSheet(raw);
+            const existing = state.sheets.find((s) => s.id === raw.id);
+            const rawCols = Array.isArray(raw.columns) ? raw.columns : [];
+            const rawRows = Array.isArray(raw.rows) ? raw.rows : [];
+
+            // If local sheet already has columns/rows and cloud record came back empty/null, preserve local!
+            const cols = (rawCols.length > 0) ? rawCols : (existing?.columns || []);
+            const rows = (rawRows.length > 0) ? rawRows : (existing?.rows || []);
+
+            const normalized = normalizeSheet({
+              ...raw,
+              columns: cols,
+              rows: rows,
+            });
             sheetsMap.set(normalized.id, normalized);
           }
         }

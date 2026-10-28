@@ -5,7 +5,7 @@ import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useCustomerStore } from '@/stores/useCustomerStore';
 import { useCardStore } from '@/stores/useCardStore';
 import { useNoteStore } from '@/stores/useNoteStore';
-import { useSheetStore } from '@/stores/useSheetStore';
+import { useSheetStore, normalizeSheet } from '@/stores/useSheetStore';
 import { useVaultStore } from '@/stores/useVaultStore';
 import { CashLocation, Customer, PeopleDue, Card, LedgerEntry, NoteItem, RecordSheet, VaultItem, DueStatus, PaymentMode } from '@/types';
 
@@ -405,16 +405,45 @@ class SyncEngine {
         (payload) => {
           console.log('[SyncEngine] Realtime sheet update received:', payload.eventType);
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const raw = payload.new as any;
+            if (!raw || !raw.id) return;
+
             const currentSheets = useSheetStore.getState().sheets;
-            const exists = currentSheets.some((s) => s.id === payload.new.id);
-            if (exists) {
-              const updated = currentSheets.map((s) => (s.id === payload.new.id ? (payload.new as RecordSheet) : s));
+            const existing = currentSheets.find((s) => s.id === raw.id);
+
+            // CRITICAL: Supabase Realtime WebSocket payloads often strip, omit, or nullify large JSONB columns (rows/columns)
+            // If the incoming Realtime payload has empty/null columns or rows, NEVER overwrite our local rich data!
+            let rawCols: any[] = [];
+            if (Array.isArray(raw.columns)) rawCols = raw.columns;
+            else if (typeof raw.columns === 'string') {
+              try { rawCols = JSON.parse(raw.columns); } catch {}
+            }
+
+            let rawRows: any[] = [];
+            if (Array.isArray(raw.rows)) rawRows = raw.rows;
+            else if (typeof raw.rows === 'string') {
+              try { rawRows = JSON.parse(raw.rows); } catch {}
+            }
+
+            const preservedCols = rawCols.length > 0 ? rawCols : (existing?.columns || []);
+            const preservedRows = rawRows.length > 0 ? rawRows : (existing?.rows || []);
+
+            const normalized = normalizeSheet({
+              ...raw,
+              columns: preservedCols,
+              rows: preservedRows,
+            });
+
+            if (existing) {
+              const updated = currentSheets.map((s) => (s.id === raw.id ? normalized : s));
               useSheetStore.getState().setSheets(updated);
             } else {
-              useSheetStore.getState().setSheets([...currentSheets, payload.new as RecordSheet]);
+              useSheetStore.getState().setSheets([...currentSheets, normalized]);
             }
           } else if (payload.eventType === 'DELETE') {
-            useSheetStore.getState().deleteSheet(payload.old.id);
+            if (payload.old && (payload.old as any).id) {
+              useSheetStore.getState().deleteSheet((payload.old as any).id);
+            }
           }
         }
       )

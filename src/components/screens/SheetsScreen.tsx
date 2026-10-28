@@ -238,6 +238,21 @@ export function SheetsScreen() {
     setIsRefreshing(false);
   };
 
+  const handleDeleteSheet = async (sheetId: string, sheetTitle: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    if (window.confirm(`Are you sure you want to delete sheet "${sheetTitle}"? This will permanently delete all data in this sheet.`)) {
+      deleteSheet(sheetId);
+      try {
+        await syncEngine.deleteSheet(sheetId);
+      } catch (err) {
+        console.warn('[Sheets] Cloud delete notice:', err);
+      }
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -780,7 +795,7 @@ export function SheetsScreen() {
 
           if (hasContent) {
             parsedRows.push({
-              id: crypto.randomUUID(),
+              id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2) + r),
               data: rowData,
               created_at: new Date().toISOString(),
             });
@@ -959,13 +974,13 @@ export function SheetsScreen() {
           const sheetColor = sheet.color || '#6366F1';
 
           return (
-            <button
+            <div
               key={sheet.id}
               onClick={() => {
                 setActiveSheetId(sheet.id);
                 scrollToRow1();
               }}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all touch-press ${
+              className={`group flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer touch-press select-none ${
                 isActive
                   ? 'text-white shadow-md'
                   : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
@@ -987,7 +1002,21 @@ export function SheetsScreen() {
               >
                 {(sheet.rows || []).length}
               </span>
-            </button>
+
+              {/* One-click Sheet Delete */}
+              <button
+                type="button"
+                onClick={(e) => handleDeleteSheet(sheet.id, sheet.title, e)}
+                className={`p-1 rounded-md transition-all ${
+                  isActive
+                    ? 'hover:bg-black/25 text-white/80 hover:text-white'
+                    : 'hover:bg-rose-500/10 text-slate-400 hover:text-rose-500'
+                }`}
+                title={`Delete sheet "${sheet.title}"`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           );
         })}
       </div>
@@ -1158,6 +1187,16 @@ export function SheetsScreen() {
                   title="Export Excel .xlsx"
                 >
                   .XLSX
+                </button>
+
+                {/* Delete Entire Sheet */}
+                <button
+                  onClick={(e) => handleDeleteSheet(activeSheet.id, activeSheet.title, e)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-xl border border-rose-500/30 bg-rose-50/70 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 font-bold text-[11px] hover:bg-rose-500/20 transition-all touch-press"
+                  title="Delete this entire sheet"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
                 </button>
               </div>
             </div>
