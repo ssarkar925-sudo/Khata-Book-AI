@@ -67,19 +67,18 @@ export function AccountDetailModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successToast, setSuccessToast] = useState('');
 
+  // Live account reference to guarantee up-to-date balance and properties
+  const liveAccount = account ? (accounts.find((a) => a.id === account.id) || account) : null;
+
   useEffect(() => {
     if (initialOpenAddRecord) {
       setShowAddForm(true);
     }
   }, [initialOpenAddRecord]);
 
-  if (!account) return null;
-
-  // Live account reference to guarantee up-to-date balance and properties
-  const liveAccount = accounts.find((a) => a.id === account.id) || account;
-
   // Sync default entry payment mode with account type
   useEffect(() => {
+    if (!liveAccount) return;
     if (liveAccount.account_type === 'cash_counter') {
       setEntryMode('cash');
     } else if (liveAccount.account_type === 'wallet') {
@@ -87,7 +86,9 @@ export function AccountDetailModal({
     } else {
       setEntryMode('upi'); // Bank default: UPI is linked to bank account
     }
-  }, [liveAccount.account_type]);
+  }, [liveAccount?.account_type]);
+
+  if (!account || !liveAccount) return null;
 
   // Filter ledger entries for this account
   const accountEntries = ledger

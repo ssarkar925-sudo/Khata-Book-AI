@@ -842,24 +842,26 @@ export function CashScreen() {
       )}
 
       {/* POPUP: Account Passbook Detail */}
-      <AccountDetailModal
-        account={selectedAccForDetail}
-        initialOpenAddRecord={openDetailWithAddRecord}
-        onClose={() => {
-          setSelectedAccForDetail(null);
-          setOpenDetailWithAddRecord(false);
-        }}
-        onTransfer={() => {
-          if (selectedAccForDetail) setFromAccId(selectedAccForDetail.id);
-          setShowTransferModal(true);
-        }}
-        onEdit={(acc) => handleOpenEdit(acc as BankAccountItem)}
-        onDelete={(id) => handleDeleteAccount(id)}
-        onCountCash={(acc) => {
-          setDenominationTargetAccount(acc);
-          setShowDenominationModal(true);
-        }}
-      />
+      {selectedAccForDetail && (
+        <AccountDetailModal
+          account={selectedAccForDetail}
+          initialOpenAddRecord={openDetailWithAddRecord}
+          onClose={() => {
+            setSelectedAccForDetail(null);
+            setOpenDetailWithAddRecord(false);
+          }}
+          onTransfer={() => {
+            if (selectedAccForDetail) setFromAccId(selectedAccForDetail.id);
+            setShowTransferModal(true);
+          }}
+          onEdit={(acc) => handleOpenEdit(acc as BankAccountItem)}
+          onDelete={(id) => handleDeleteAccount(id)}
+          onCountCash={(acc) => {
+            setDenominationTargetAccount(acc);
+            setShowDenominationModal(true);
+          }}
+        />
+      )}
 
       {/* MODAL: Physical Cash Denomination Counter */}
       <CashDenominationModal
