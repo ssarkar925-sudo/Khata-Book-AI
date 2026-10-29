@@ -4,7 +4,6 @@
 -- ============================================================================
 
 -- 1. Helper with row_security = off to check membership without triggering workspace_members RLS
-DROP FUNCTION IF EXISTS public.check_user_is_member(UUID);
 CREATE OR REPLACE FUNCTION public.check_user_is_member(ws_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
