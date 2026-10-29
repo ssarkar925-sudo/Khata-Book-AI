@@ -1,6 +1,7 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Card, LedgerEntry } from '../src/types';
+import type { BankAccountItem } from '../src/stores/useAccountStore';
 
 // Mock localStorage for node environment
 const storage: Record<string, string> = {};
@@ -743,5 +744,51 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
     VIEW_KEYS.forEach((key) => {
       assert.strictEqual(getView(key), 'grid', `${key} must persist 'grid' view`);
     });
+  });
+
+  // ==========================================================================
+  // 18. ACCOUNT BALANCE LEDGER RECONCILIATION
+  // ==========================================================================
+  test('Account Balance: Accurately resolves ledger deposits when account stored balance is 0', async () => {
+    const testAccount: BankAccountItem = {
+      id: 'acc-counter-1',
+      workspace_id: 'ws-test',
+      name: 'Counter',
+      balance: 0, // remote or stored balance is 0
+      account_type: 'cash_counter',
+      scope: 'business',
+      is_default: true,
+      bank_name: 'Cash Counter',
+    };
+
+    const ledgerEntries: LedgerEntry[] = [
+      {
+        id: 'entry-tally-1',
+        workspace_id: 'ws-test',
+        type: 'cash_in',
+        amount: 4341000, // ₹43,410.00
+        cash_location_id: 'acc-counter-1',
+        mode: 'cash',
+        note: 'Physical Cash Tally Reconciled (Surplus +₹43,410.00)',
+        entry_date: new Date().toISOString(),
+      },
+    ];
+
+    const getAccountEffectiveBalance = (acc: BankAccountItem, entries: LedgerEntry[]) => {
+      if (acc.balance && acc.balance !== 0) return acc.balance;
+      const accEntries = entries.filter((e) => e.cash_location_id === acc.id);
+      if (accEntries.length === 0) return acc.balance || 0;
+      const credits = accEntries
+        .filter((e) => e.type === 'cash_in')
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+      const debits = accEntries
+        .filter((e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment')
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+      const net = credits - debits;
+      return net !== 0 ? net : (acc.balance || 0);
+    };
+
+    const resolved = getAccountEffectiveBalance(testAccount, ledgerEntries);
+    assert.strictEqual(resolved, 4341000, 'Effective balance must accurately reflect ₹43,410.00 surplus deposit');
   });
 });

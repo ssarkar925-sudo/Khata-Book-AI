@@ -258,6 +258,8 @@ export function CashDenominationModal({
         }`,
         entry_date: new Date().toISOString(),
       });
+      // Explicitly lock account balance to the counted physical cash total
+      syncEngine.updateAccountBalance(currentAccount.id, totalCountedPaise);
     } else {
       // If exactly matched, update account verified balance directly
       syncEngine.updateAccountBalance(currentAccount.id, totalCountedPaise);

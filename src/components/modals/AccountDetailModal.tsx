@@ -88,6 +88,36 @@ export function AccountDetailModal({
     }
   }, [liveAccount?.account_type]);
 
+  // Reconcile and calculate ledger metrics
+  const totalCredits = liveAccount
+    ? ledger
+        .filter((e) => e.cash_location_id === liveAccount.id && e.type === 'cash_in')
+        .reduce((sum, e) => sum + Number(e.amount), 0)
+    : 0;
+
+  const totalDebits = liveAccount
+    ? ledger
+        .filter(
+          (e) =>
+            e.cash_location_id === liveAccount.id &&
+            (e.type === 'cash_out' ||
+              e.type === 'expense' ||
+              e.type === 'bill_payment')
+        )
+        .reduce((sum, e) => sum + Number(e.amount), 0)
+    : 0;
+
+  const netLedgerFlow = totalCredits - totalDebits;
+  const effectiveBalance =
+    liveAccount && liveAccount.balance !== 0 ? liveAccount.balance : netLedgerFlow;
+
+  // Auto-heal account balance if zero but active ledger transactions exist
+  useEffect(() => {
+    if (liveAccount && liveAccount.balance === 0 && netLedgerFlow !== 0) {
+      syncEngine.updateAccountBalance(liveAccount.id, netLedgerFlow);
+    }
+  }, [liveAccount?.id, liveAccount?.balance, netLedgerFlow]);
+
   if (!account || !liveAccount) return null;
 
   // Filter ledger entries for this account
@@ -109,20 +139,6 @@ export function AccountDetailModal({
         new Date(b.entry_date || b.created_at || 0).getTime() -
         new Date(a.entry_date || a.created_at || 0).getTime()
     );
-
-  const totalCredits = ledger
-    .filter((e) => e.cash_location_id === liveAccount.id && e.type === 'cash_in')
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-
-  const totalDebits = ledger
-    .filter(
-      (e) =>
-        e.cash_location_id === liveAccount.id &&
-        (e.type === 'cash_out' ||
-          e.type === 'expense' ||
-          e.type === 'bill_payment')
-    )
-    .reduce((sum, e) => sum + Number(e.amount), 0);
 
   const getAccountTypeLabel = (type?: string) => {
     switch (type) {
@@ -148,7 +164,7 @@ export function AccountDetailModal({
       msg += `A/C Ending: •••• ${liveAccount.account_number_last4}\n`;
     msg += `Type: ${getAccountTypeLabel(liveAccount.account_type)}\n`;
     msg += `------------------------------\n`;
-    msg += `💰 *Current Balance:* ${formatPaise(liveAccount.balance)}\n`;
+    msg += `💰 *Current Balance:* ${formatPaise(effectiveBalance)}\n`;
     msg += `🟢 *Total Credits:* ${formatPaise(totalCredits)}\n`;
     msg += `🔴 *Total Debits:* ${formatPaise(totalDebits)}\n`;
     msg += `------------------------------\n`;
@@ -316,7 +332,7 @@ export function AccountDetailModal({
             </div>
 
             <div className="text-3xl font-black tracking-tight text-white tabular-nums">
-              {formatPaise(liveAccount.balance)}
+              {formatPaise(effectiveBalance)}
             </div>
 
             {/* Micro in/out counters */}

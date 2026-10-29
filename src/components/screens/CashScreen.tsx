@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Wallet,
   Plus,
@@ -27,6 +27,7 @@ import { CashLocation, AccountType, EntityScope } from '@/types';
 import { formatPaise, parseToPaise, paiseToRupees } from '@/lib/money';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { useAccountStore, BankAccountItem } from '@/stores/useAccountStore';
+import { useLedgerStore } from '@/stores/useLedgerStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { AccountDetailModal } from '@/components/modals/AccountDetailModal';
 import { CashDenominationModal } from '@/components/modals/CashDenominationModal';
@@ -119,6 +120,7 @@ const COLOR_THEMES = [
 export function CashScreen() {
   const { activeWorkspaceId, theme } = useSessionStore();
   const { accounts } = useAccountStore();
+  const { entries: ledger } = useLedgerStore();
   const isLight = theme === 'light';
 
   // Filter state: 'all' | 'bank' | 'cash' | 'wallet'
@@ -206,7 +208,37 @@ export function CashScreen() {
     return true;
   });
 
-  const totalBalance = filteredAccounts.reduce((sum, a) => sum + a.balance, 0);
+  // Derive effective balance per account taking ledger entries into account if stored balance is 0
+  const getAccountEffectiveBalance = (acc: BankAccountItem): number => {
+    if (acc.balance && acc.balance !== 0) return acc.balance;
+    const entries = ledger.filter((e) => e.cash_location_id === acc.id);
+    if (entries.length === 0) return acc.balance || 0;
+    const credits = entries
+      .filter((e) => e.type === 'cash_in')
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+    const debits = entries
+      .filter((e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment')
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+    const net = credits - debits;
+    return net !== 0 ? net : (acc.balance || 0);
+  };
+
+  const totalBalance = filteredAccounts.reduce(
+    (sum, a) => sum + getAccountEffectiveBalance(a),
+    0
+  );
+
+  // Auto-heal account balances in the background if stored balance is 0 but active ledger entries exist
+  useEffect(() => {
+    accounts.forEach((acc) => {
+      if (acc.balance === 0) {
+        const eff = getAccountEffectiveBalance(acc);
+        if (eff !== 0) {
+          syncEngine.updateAccountBalance(acc.id, eff);
+        }
+      }
+    });
+  }, [accounts, ledger]);
 
   // Handle Add Account
   const handleAddAccount = (e: React.FormEvent) => {
@@ -675,7 +707,7 @@ export function CashScreen() {
 
                 {/* Balance Amount */}
                 <div className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">
-                  {formatPaise(acc.balance)}
+                  {formatPaise(getAccountEffectiveBalance(acc))}
                 </div>
               </div>
 
@@ -775,7 +807,7 @@ export function CashScreen() {
               >
                 <div className="text-left sm:text-right">
                   <div className="text-base sm:text-lg font-black text-slate-900 dark:text-white tabular-nums">
-                    {formatPaise(acc.balance)}
+                    {formatPaise(getAccountEffectiveBalance(acc))}
                   </div>
                   <span className="text-[10px] text-slate-400 font-medium">Available balance</span>
                 </div>
@@ -1512,7 +1544,7 @@ export function CashScreen() {
                 >
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id} className="dark:bg-slate-900">
-                      {a.name} ({formatPaise(a.balance)})
+                      {a.name} ({formatPaise(getAccountEffectiveBalance(a))})
                     </option>
                   ))}
                 </select>
@@ -1527,7 +1559,7 @@ export function CashScreen() {
                 >
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id} className="dark:bg-slate-900">
-                      {a.name} ({formatPaise(a.balance)})
+                      {a.name} ({formatPaise(getAccountEffectiveBalance(a))})
                     </option>
                   ))}
                 </select>

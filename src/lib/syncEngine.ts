@@ -250,9 +250,43 @@ class SyncEngine {
         supabase.from('vault_items').select('*').eq('workspace_id', workspaceId),
       ]);
 
-      // 1. Process Bank Accounts
+      // 1. Process Bank Accounts with Ledger Reconciliation
       if (accResult.status === 'fulfilled' && Array.isArray(accResult.value.data)) {
-        useAccountStore.getState().setAccounts(accResult.value.data);
+        const remoteAccounts = accResult.value.data;
+        const remoteLedger =
+          ledgerResult.status === 'fulfilled' && Array.isArray(ledgerResult.value.data)
+            ? ledgerResult.value.data
+            : useLedgerStore.getState().entries;
+
+        const reconciledAccounts = remoteAccounts.map((acc: any) => {
+          const accLedger = remoteLedger.filter((e: any) => e.cash_location_id === acc.id);
+          if (accLedger.length === 0) return acc;
+
+          const credits = accLedger
+            .filter((e: any) => e.type === 'cash_in')
+            .reduce((s: number, e: any) => s + Number(e.amount), 0);
+          const debits = accLedger
+            .filter(
+              (e: any) =>
+                e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment'
+            )
+            .reduce((s: number, e: any) => s + Number(e.amount), 0);
+          const net = credits - debits;
+
+          // If remote balance is 0 or does not reflect recorded transactions, restore true ledger balance
+          if (acc.balance === 0 && net !== 0) {
+            Promise.resolve(
+              supabase
+                .from('cash_locations')
+                .update({ balance: net, updated_at: new Date().toISOString() })
+                .eq('id', acc.id)
+            ).catch(() => {});
+            return { ...acc, balance: net };
+          }
+          return acc;
+        });
+
+        useAccountStore.getState().setAccounts(reconciledAccounts);
       }
 
       // 2. Process Customers
@@ -546,6 +580,7 @@ class SyncEngine {
     useLedgerStore.getState().addEntryOptimistic(entryWithMeta);
 
     // Auto-update linked bank account or cash counter balance optimistically
+    let targetNewBalance: number | null = null;
     if (entryWithMeta.cash_location_id) {
       const acc = useAccountStore.getState().accounts.find((a) => a.id === entryWithMeta.cash_location_id);
       if (acc) {
@@ -559,6 +594,7 @@ class SyncEngine {
         ) {
           newBalance -= entryWithMeta.amount;
         }
+        targetNewBalance = newBalance;
         useAccountStore.getState().updateAccountBalance(entryWithMeta.cash_location_id, newBalance);
       }
     }
@@ -582,6 +618,14 @@ class SyncEngine {
         if (error.code === 'PGRST202' || error.message?.includes('function') || error.code === '42883') {
           const { error: upsertErr } = await supabase.from('ledger_entries').upsert(cleanEntry);
           if (upsertErr) throw upsertErr;
+
+          // Also update cash_locations balance directly in Supabase
+          if (cleanEntry.cash_location_id && targetNewBalance !== null) {
+            await supabase
+              .from('cash_locations')
+              .update({ balance: targetNewBalance, updated_at: new Date().toISOString() })
+              .eq('id', cleanEntry.cash_location_id);
+          }
         } else {
           throw error;
         }
@@ -631,8 +675,11 @@ class SyncEngine {
     if (!perm.allowed) throw new Error(perm.error);
 
     // Reverse linked bank account balance if entry was linked
+    let restoredBalanceTarget: number | null = null;
+    let targetCashLocationId: string | null = null;
     const existing = useLedgerStore.getState().entries.find((e) => e.id === id);
     if (existing && existing.cash_location_id) {
+      targetCashLocationId = existing.cash_location_id;
       const acc = useAccountStore.getState().accounts.find((a) => a.id === existing.cash_location_id);
       if (acc) {
         let restoredBalance = acc.balance;
@@ -645,6 +692,7 @@ class SyncEngine {
         ) {
           restoredBalance += existing.amount;
         }
+        restoredBalanceTarget = restoredBalance;
         useAccountStore.getState().updateAccountBalance(existing.cash_location_id, restoredBalance);
       }
     }
@@ -658,6 +706,13 @@ class SyncEngine {
     try {
       const { error } = await supabase.from('ledger_entries').delete().eq('id', id);
       if (error) throw error;
+
+      if (targetCashLocationId && restoredBalanceTarget !== null) {
+        await supabase
+          .from('cash_locations')
+          .update({ balance: restoredBalanceTarget, updated_at: new Date().toISOString() })
+          .eq('id', targetCashLocationId);
+      }
       useSessionStore.getState().setSyncStatus('synced');
       useSessionStore.getState().setLastSyncTime(new Date().toISOString());
       useSessionStore.getState().setLastSyncError(null);
