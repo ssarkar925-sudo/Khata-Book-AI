@@ -42,7 +42,19 @@ const BANK_OPTIONS = [
   'Canara Bank',
   'Union Bank of India',
   'IndusInd Bank',
+  'Bank of India',
+  'Central Bank of India',
+  'IDBI Bank',
+  'IDFC FIRST Bank',
+  'Yes Bank',
+  'Federal Bank',
+  'Bandhan Bank',
+  'Indian Bank',
+  'UCO Bank',
+  'Indian Overseas Bank',
   'Paytm Payments Bank',
+  'Airtel Payments Bank',
+  'IPPB (India Post Payments Bank)',
   'Cash Counter',
   'Other Bank',
 ];
@@ -115,6 +127,7 @@ export function CashScreen() {
   const [newAccScope, setNewAccScope] = useState<EntityScope>('business');
   const [newAccName, setNewAccName] = useState('');
   const [newAccBank, setNewAccBank] = useState('State Bank of India');
+  const [newAccCustomBank, setNewAccCustomBank] = useState('');
   const [newAccType, setNewAccType] = useState<AccountType>('savings');
   const [newAccLast4, setNewAccLast4] = useState('');
   const [newAccBalanceRupees, setNewAccBalanceRupees] = useState('');
@@ -124,6 +137,7 @@ export function CashScreen() {
   const [editScope, setEditScope] = useState<EntityScope>('business');
   const [editName, setEditName] = useState('');
   const [editBank, setEditBank] = useState('');
+  const [editCustomBank, setEditCustomBank] = useState('');
   const [editType, setEditType] = useState<AccountType>('savings');
   const [editLast4, setEditLast4] = useState('');
   const [editBalanceRupees, setEditBalanceRupees] = useState('');
@@ -167,6 +181,13 @@ export function CashScreen() {
     const balancePaise = parseToPaise(newAccBalanceRupees);
     const themeDef = COLOR_THEMES.find((c) => c.id === newAccColor) || COLOR_THEMES[0];
 
+    const resolvedBankName =
+      newAccType === 'cash_counter'
+        ? 'Cash Counter'
+        : newAccBank === 'Other Bank'
+        ? (newAccCustomBank.trim() || 'Other Bank')
+        : newAccBank;
+
     const newAcc: BankAccountItem = {
       id: crypto.randomUUID(),
       workspace_id: activeWorkspaceId,
@@ -175,7 +196,7 @@ export function CashScreen() {
       scope: newAccScope,
       is_default: accounts.length === 0,
       account_type: newAccType,
-      bank_name: newAccType === 'cash_counter' ? 'Cash Counter' : newAccBank,
+      bank_name: resolvedBankName,
       account_number_last4: newAccLast4.trim() || undefined,
       color_theme: newAccColor,
       gradient: themeDef.gradient,
@@ -186,6 +207,8 @@ export function CashScreen() {
     syncEngine.pushAccount(newAcc);
     setShowAddModal(false);
     setNewAccName('');
+    setNewAccBank('State Bank of India');
+    setNewAccCustomBank('');
     setNewAccLast4('');
     setNewAccBalanceRupees('');
     setNewAccType('savings');
@@ -197,7 +220,13 @@ export function CashScreen() {
     setAccountToEdit(acc);
     setEditName(acc.name);
     setEditScope(acc.scope || 'business');
-    setEditBank(acc.bank_name || 'State Bank of India');
+    if (BANK_OPTIONS.includes(acc.bank_name || '')) {
+      setEditBank(acc.bank_name || 'State Bank of India');
+      setEditCustomBank('');
+    } else {
+      setEditBank('Other Bank');
+      setEditCustomBank(acc.bank_name || '');
+    }
     setEditType(acc.account_type || 'savings');
     setEditLast4(acc.account_number_last4 || '');
     setEditBalanceRupees(acc.balance ? paiseToRupees(acc.balance).toString() : '0');
@@ -212,9 +241,16 @@ export function CashScreen() {
     const themeDef = COLOR_THEMES.find((c) => c.id === editColor) || COLOR_THEMES[0];
     const newBalance = parseToPaise(editBalanceRupees);
 
+    const resolvedBankName =
+      editType === 'cash_counter'
+        ? 'Cash Counter'
+        : editBank === 'Other Bank'
+        ? (editCustomBank.trim() || 'Other Bank')
+        : editBank;
+
     const updates: Partial<BankAccountItem> = {
       name: editName.trim(),
-      bank_name: editType === 'cash_counter' ? 'Cash Counter' : editBank,
+      bank_name: resolvedBankName,
       account_type: editType,
       scope: editScope,
       account_number_last4: editLast4.trim() || undefined,
@@ -738,21 +774,70 @@ export function CashScreen() {
 
               {/* Bank Name (only if not cash counter) */}
               {newAccType !== 'cash_counter' && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Bank Issuer / Provider
-                  </label>
-                  <select
-                    value={newAccBank}
-                    onChange={(e) => setNewAccBank(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
-                  >
-                    {BANK_OPTIONS.map((b) => (
-                      <option key={b} value={b} className="dark:bg-slate-900">
-                        {b}
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Bank Issuer / Provider
+                    </label>
+                    <select
+                      value={newAccBank}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewAccBank(val);
+                        if (val !== 'Other Bank' && (!newAccName.trim() || newAccName.includes('Bank') || newAccName.includes('Account'))) {
+                          setNewAccName(`${val} Account`);
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
+                    >
+                      {BANK_OPTIONS.map((b) => (
+                        <option key={b} value={b} className="dark:bg-slate-900">
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* If Other Bank selected: Show Custom Bank Name Input */}
+                  {newAccBank === 'Other Bank' && (
+                    <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-2 animate-in fade-in duration-200">
+                      <label className="block text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                        Enter Bank Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        autoFocus
+                        placeholder="e.g. Yes Bank, IDFC FIRST Bank, Federal Bank, Bandhan Bank"
+                        value={newAccCustomBank}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewAccCustomBank(val);
+                          if (!newAccName.trim() || newAccName.includes('Bank') || newAccName.includes('Account')) {
+                            setNewAccName(`${val.trim()} Account`.trim());
+                          }
+                        }}
+                        className="w-full px-4 py-2 rounded-xl border border-emerald-300 dark:border-emerald-500/30 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <div className="flex gap-1.5 flex-wrap">
+                        {['Yes Bank', 'IDFC FIRST', 'Federal Bank', 'Bandhan Bank', 'Bank of India', 'Central Bank'].map((b) => (
+                          <button
+                            key={b}
+                            type="button"
+                            onClick={() => {
+                              setNewAccCustomBank(b);
+                              if (!newAccName.trim() || newAccName.includes('Bank') || newAccName.includes('Account')) {
+                                setNewAccName(`${b} Account`);
+                              }
+                            }}
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white dark:bg-white/10 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-white/15 transition-colors cursor-pointer"
+                          >
+                            {b}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -908,21 +993,52 @@ export function CashScreen() {
               </div>
 
               {editType !== 'cash_counter' && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Bank Issuer
-                  </label>
-                  <select
-                    value={editBank}
-                    onChange={(e) => setEditBank(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
-                  >
-                    {BANK_OPTIONS.map((b) => (
-                      <option key={b} value={b} className="dark:bg-slate-900">
-                        {b}
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Bank Issuer
+                    </label>
+                    <select
+                      value={editBank}
+                      onChange={(e) => setEditBank(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                    >
+                      {BANK_OPTIONS.map((b) => (
+                        <option key={b} value={b} className="dark:bg-slate-900">
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {editBank === 'Other Bank' && (
+                    <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 space-y-2 animate-in fade-in duration-200">
+                      <label className="block text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">
+                        Enter Bank Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        autoFocus
+                        placeholder="e.g. Yes Bank, IDFC FIRST Bank, Federal Bank, Bandhan Bank"
+                        value={editCustomBank}
+                        onChange={(e) => setEditCustomBank(e.target.value)}
+                        className="w-full px-4 py-2 rounded-xl border border-indigo-300 dark:border-indigo-500/30 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <div className="flex gap-1.5 flex-wrap">
+                        {['Yes Bank', 'IDFC FIRST', 'Federal Bank', 'Bandhan Bank', 'Bank of India', 'Central Bank'].map((b) => (
+                          <button
+                            key={b}
+                            type="button"
+                            onClick={() => setEditCustomBank(b)}
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white dark:bg-white/10 border border-indigo-200 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-white/15 transition-colors cursor-pointer"
+                          >
+                            {b}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

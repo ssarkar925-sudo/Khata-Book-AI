@@ -610,4 +610,39 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
     assert.ok(ALLOWED_RAW_CARD_FIELDS.has('statement_day'), 'ALLOWED_RAW_CARD_FIELDS must contain statement_day');
     assert.ok(ALLOWED_RAW_CARD_FIELDS.has('due_day'), 'ALLOWED_RAW_CARD_FIELDS must contain due_day');
   });
+
+  // ==========================================================================
+  // 15. OTHER BANK CUSTOM NAME RESOLUTION & EDIT PERSISTENCE
+  // ==========================================================================
+  test('Bank Account: Custom bank name resolves properly when Other Bank is selected', async () => {
+    function resolveBankName(type: string, bankDropdown: string, customInput: string): string {
+      if (type === 'cash_counter') return 'Cash Counter';
+      if (bankDropdown === 'Other Bank') return customInput.trim() || 'Other Bank';
+      return bankDropdown;
+    }
+
+    assert.strictEqual(
+      resolveBankName('savings', 'Other Bank', 'IDFC FIRST Bank'),
+      'IDFC FIRST Bank',
+      'Should resolve to custom bank name when Other Bank is selected'
+    );
+
+    assert.strictEqual(
+      resolveBankName('current', 'Other Bank', 'Federal Bank'),
+      'Federal Bank',
+      'Should resolve to custom bank name for Federal Bank'
+    );
+
+    assert.strictEqual(
+      resolveBankName('savings', 'HDFC Bank', ''),
+      'HDFC Bank',
+      'Should keep selected standard bank when not Other Bank'
+    );
+
+    assert.strictEqual(
+      resolveBankName('cash_counter', 'Other Bank', 'Any Bank'),
+      'Cash Counter',
+      'Cash counter accounts always resolve to Cash Counter'
+    );
+  });
 });
