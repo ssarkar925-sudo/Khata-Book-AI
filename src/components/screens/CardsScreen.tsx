@@ -47,6 +47,31 @@ import {
   CardBillingSummary,
 } from '@/lib/cardBilling';
 
+const CARD_NETWORKS = [
+  { id: 'visa', label: 'Visa' },
+  { id: 'mastercard', label: 'Mastercard' },
+  { id: 'rupay', label: 'RuPay' },
+  { id: 'amex', label: 'Amex' },
+  { id: 'diners', label: 'Diners' },
+];
+
+const POPULAR_VARIANTS = [
+  'Pinnacle World',
+  'Regalia Gold',
+  'Infinia',
+  'Millennia',
+  'Coral',
+  'Sapphiro',
+  'SimplyCLICK',
+  'SimplySAVE',
+  'Amazon Pay',
+  'Flipkart',
+  'Magnus',
+  'OneCard',
+  'Platinum',
+  'Signature',
+];
+
 export function CardsScreen() {
   const rawCards = useCardStore((s) => s.cards);
   // Strictly deduplicate cards by ID to prevent any double entry
@@ -73,10 +98,16 @@ export function CardsScreen() {
   const [editCardScope, setEditCardScope] = useState<EntityScope>('business');
   const [editCardName, setEditCardName] = useState('');
   const [editCardBank, setEditCardBank] = useState('');
+  const [editCardVariant, setEditCardVariant] = useState('');
+  const [editCardNetwork, setEditCardNetwork] = useState('visa');
   const [editLast4, setEditLast4] = useState('');
   const [editLimitRupees, setEditLimitRupees] = useState('');
   const [editStatementDay, setEditStatementDay] = useState('15');
   const [editDueDay, setEditDueDay] = useState('5');
+  const [editBilledRupees, setEditBilledRupees] = useState('');
+  const [editUnbilledRupees, setEditUnbilledRupees] = useState('');
+  const [originalBilledRupees, setOriginalBilledRupees] = useState('');
+  const [originalUnbilledRupees, setOriginalUnbilledRupees] = useState('');
   const [copiedReminderId, setCopiedReminderId] = useState<string | null>(null);
 
   // Scoped Cards
@@ -92,11 +123,14 @@ export function CardsScreen() {
   const [cardScope, setCardScope] = useState<EntityScope>('business');
   const [cardName, setCardName] = useState('');
   const [cardBank, setCardBank] = useState('');
+  const [cardVariant, setCardVariant] = useState('');
+  const [cardNetwork, setCardNetwork] = useState('visa');
   const [last4, setLast4] = useState('');
   const [limitRupees, setLimitRupees] = useState('');
   const [statementDay, setStatementDay] = useState('15');
   const [dueDay, setDueDay] = useState('5');
   const [initialBilledRupees, setInitialBilledRupees] = useState('');
+  const [initialUnbilledRupees, setInitialUnbilledRupees] = useState('');
 
   // Spend State - Auto Cycle is DEFAULT as requested
   const [showSpendModal, setShowSpendModal] = useState(false);
@@ -174,10 +208,21 @@ export function CardsScreen() {
     setEditCardName(card.name);
     setEditCardScope(card.scope || 'business');
     setEditCardBank(card.bank);
+    setEditCardVariant(card.variant || '');
+    setEditCardNetwork(card.network || 'visa');
     setEditLast4(card.last4);
     setEditLimitRupees(paiseToRupees(card.credit_limit).toString());
     setEditStatementDay((card.statement_day || 15).toString());
     setEditDueDay((card.due_day || 5).toString());
+
+    // Calculate live billed due and unbilled spends
+    const summary = calculateCardBilling(card, ledger);
+    const billedVal = summary.billedDue > 0 ? (summary.billedDue / 100).toString() : '0';
+    const unbilledVal = summary.netUnbilled > 0 ? (summary.netUnbilled / 100).toString() : '0';
+    setEditBilledRupees(billedVal);
+    setEditUnbilledRupees(unbilledVal);
+    setOriginalBilledRupees(billedVal);
+    setOriginalUnbilledRupees(unbilledVal);
   };
 
   const handleSaveEditCard = (e: React.FormEvent) => {
@@ -187,12 +232,82 @@ export function CardsScreen() {
     syncEngine.updateCard(cardToEdit.id, {
       name: editCardName.trim(),
       bank: editCardBank.trim() || 'Bank',
+      variant: editCardVariant.trim() || undefined,
+      network: editCardNetwork || 'visa',
       last4: editLast4.trim(),
       scope: editCardScope,
       credit_limit: parseToPaise(editLimitRupees),
       statement_day: parseInt(editStatementDay, 10) || 15,
       due_day: parseInt(editDueDay, 10) || 5,
     });
+
+    // Reconcile Billed Statement Due if changed
+    const newBilledPaise = parseToPaise(editBilledRupees || '0');
+    const origBilledPaise = parseToPaise(originalBilledRupees || '0');
+    if (newBilledPaise !== origBilledPaise) {
+      const diff = newBilledPaise - origBilledPaise;
+      if (diff > 0) {
+        syncEngine.pushLedgerEntry({
+          id: crypto.randomUUID(),
+          workspace_id: activeWorkspaceId,
+          type: 'card_spend',
+          amount: diff,
+          card_id: cardToEdit.id,
+          mode: 'card',
+          is_billed: true,
+          note: 'Statement Billed Due Adjustment (+)',
+          entry_date: new Date().toISOString(),
+          created_by: user?.id || 'owner',
+        });
+      } else {
+        syncEngine.pushLedgerEntry({
+          id: crypto.randomUUID(),
+          workspace_id: activeWorkspaceId,
+          type: 'bill_payment',
+          amount: Math.abs(diff),
+          card_id: cardToEdit.id,
+          scope: editCardScope,
+          mode: 'card',
+          note: 'Statement Billed Due Adjustment (-)',
+          entry_date: new Date().toISOString(),
+          created_by: user?.id || 'owner',
+        });
+      }
+    }
+
+    // Reconcile Unbilled Spends if changed
+    const newUnbilledPaise = parseToPaise(editUnbilledRupees || '0');
+    const origUnbilledPaise = parseToPaise(originalUnbilledRupees || '0');
+    if (newUnbilledPaise !== origUnbilledPaise) {
+      const diff = newUnbilledPaise - origUnbilledPaise;
+      if (diff > 0) {
+        syncEngine.pushLedgerEntry({
+          id: crypto.randomUUID(),
+          workspace_id: activeWorkspaceId,
+          type: 'card_spend',
+          amount: diff,
+          card_id: cardToEdit.id,
+          mode: 'card',
+          is_billed: false,
+          note: 'Unbilled Spends Adjustment (+)',
+          entry_date: new Date().toISOString(),
+          created_by: user?.id || 'owner',
+        });
+      } else {
+        syncEngine.pushLedgerEntry({
+          id: crypto.randomUUID(),
+          workspace_id: activeWorkspaceId,
+          type: 'bill_payment',
+          amount: Math.abs(diff),
+          card_id: cardToEdit.id,
+          scope: editCardScope,
+          mode: 'card',
+          note: 'Unbilled Spends Adjustment (-)',
+          entry_date: new Date().toISOString(),
+          created_by: user?.id || 'owner',
+        });
+      }
+    }
 
     setCardToEdit(null);
   };
@@ -222,6 +337,8 @@ export function CardsScreen() {
       workspace_id: activeWorkspaceId,
       name: cardName.trim(),
       bank: cardBank.trim() || 'Bank',
+      variant: cardVariant.trim() || undefined,
+      network: cardNetwork || 'visa',
       last4: last4.trim(),
       scope: cardScope,
       credit_limit: parseToPaise(limitRupees),
@@ -232,7 +349,7 @@ export function CardsScreen() {
 
     syncEngine.pushCard(newCard);
 
-    // If user provided existing statement bill amount, record it as a billed spend
+    // 1. Initial Billed Statement Due
     if (initialBilledRupees && parseToPaise(initialBilledRupees) > 0) {
       const billedEntry: LedgerEntry = {
         id: crypto.randomUUID(),
@@ -249,14 +366,34 @@ export function CardsScreen() {
       syncEngine.pushLedgerEntry(billedEntry);
     }
 
+    // 2. Initial Unbilled Spends
+    if (initialUnbilledRupees && parseToPaise(initialUnbilledRupees) > 0) {
+      const unbilledEntry: LedgerEntry = {
+        id: crypto.randomUUID(),
+        workspace_id: activeWorkspaceId,
+        type: 'card_spend',
+        amount: parseToPaise(initialUnbilledRupees),
+        card_id: newCard.id,
+        mode: 'card',
+        is_billed: false,
+        note: 'Unbilled Spends Opening Balance',
+        entry_date: new Date().toISOString(),
+        created_by: user?.id || 'owner',
+      };
+      syncEngine.pushLedgerEntry(unbilledEntry);
+    }
+
     setShowAddModal(false);
     setCardName('');
     setCardBank('');
+    setCardVariant('');
+    setCardNetwork('visa');
     setLast4('');
     setLimitRupees('');
     setStatementDay('15');
     setDueDay('5');
     setInitialBilledRupees('');
+    setInitialUnbilledRupees('');
   };
 
   const handleRecordSpend = (e: React.FormEvent) => {
@@ -695,19 +832,31 @@ export function CardsScreen() {
                   {/* Subtle Top Metallic Reflection Arc */}
                   <div className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-white/10 via-transparent to-transparent pointer-events-none rounded-t-3xl" />
 
-                  {/* Card Top: Bank Issuer, Name, EMV Chip & NFC Wave */}
+                  {/* Card Top: Bank Issuer, Variant Badge, Name, EMV Chip & Network */}
                   <div className="relative z-10">
                     <div className="flex items-start justify-between">
                       <div>
-                        <span className="text-[11px] font-bold tracking-widest uppercase text-white/70 block">
-                          {card.bank}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] font-bold tracking-widest uppercase text-white/70 block">
+                            {card.bank}
+                          </span>
+                          {card.variant && (
+                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/20 text-white border border-white/25 shadow-xs">
+                              {card.variant}
+                            </span>
+                          )}
+                        </div>
                         <h3 className="font-black text-lg text-white tracking-tight mt-0.5">
                           {card.name}
                         </h3>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
+                        {card.network && (
+                          <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-black/40 text-white/90 border border-white/20">
+                            {card.network}
+                          </span>
+                        )}
                         <Wifi className="w-5 h-5 text-white/70 rotate-90" />
                         {/* Realistic Gold EMV Chip */}
                         <div
@@ -948,11 +1097,19 @@ export function CardsScreen() {
                       className="hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors"
                     >
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900 dark:text-white">
-                          {card.name}
+                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                          <span>{card.name}</span>
+                          {card.variant && (
+                            <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                              {card.variant}
+                            </span>
+                          )}
                         </div>
-                        <div className="text-[10px] text-slate-400">
-                          {card.bank} •••• {card.last4}
+                        <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                          <span>{card.bank} •••• {card.last4}</span>
+                          {card.network && (
+                            <span className="uppercase text-[9px] text-slate-500 font-semibold">• {card.network}</span>
+                          )}
                         </div>
                       </td>
 
@@ -1166,30 +1323,112 @@ export function CardsScreen() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Bank Issuer
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. IndusInd, HDFC, SBI"
+                    value={cardBank}
+                    onChange={(e) => {
+                      const newBank = e.target.value;
+                      setCardBank(newBank);
+                      if (!cardName || cardName === `${cardBank} ${cardVariant}`.trim() || cardName === cardBank) {
+                        setCardName(`${newBank ? newBank.toUpperCase() : ''} ${cardVariant ? cardVariant.toUpperCase() : ''}`.trim());
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Card Variant
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Pinnacle World, Regalia"
+                    value={cardVariant}
+                    onChange={(e) => {
+                      const newVar = e.target.value;
+                      setCardVariant(newVar);
+                      if (!cardName || cardName === `${cardBank} ${cardVariant}`.trim() || cardName === cardBank) {
+                        setCardName(`${cardBank ? cardBank.toUpperCase() : ''} ${newVar ? newVar.toUpperCase() : ''}`.trim());
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Variant Suggestion Chips */}
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Card Name
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  Popular Card Variants
+                </span>
+                <div className="flex gap-1.5 flex-wrap">
+                  {POPULAR_VARIANTS.map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => {
+                        setCardVariant(v);
+                        if (!cardName || cardName === `${cardBank} ${cardVariant}`.trim() || cardName === cardBank) {
+                          setCardName(`${cardBank ? cardBank.toUpperCase() : ''} ${v.toUpperCase()}`.trim());
+                        }
+                      }}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors ${
+                        cardVariant.toLowerCase() === v.toLowerCase()
+                          ? 'bg-purple-600 text-white border-transparent'
+                          : 'border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card Network Selector */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Card Network
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. HDFC Regalia, ICICI Coral, SBI SimplyClick"
-                  value={cardName}
-                  onChange={(e) => setCardName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
+                <div className="grid grid-cols-5 gap-1.5">
+                  {CARD_NETWORKS.map((net) => {
+                    const isSelected = cardNetwork === net.id;
+                    return (
+                      <button
+                        key={net.id}
+                        type="button"
+                        onClick={() => setCardNetwork(net.id)}
+                        className={`py-1.5 px-1 rounded-xl text-xs font-extrabold border transition-all text-center ${
+                          isSelected
+                            ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                            : 'border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        {net.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Bank Issuer
+                  Card Nickname
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. HDFC Bank, SBI, ICICI, Axis"
-                  value={cardBank}
-                  onChange={(e) => setCardBank(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  required
+                  placeholder="e.g. INDUSIND PINNACLE WORLD"
+                  value={cardName}
+                  onChange={(e) => setCardName(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-2 focus:ring-purple-500"
                 />
               </div>
 
@@ -1253,21 +1492,49 @@ export function CardsScreen() {
                 />
               </div>
 
-              {/* Optional: Existing Statement Bill to Pay Now */}
-              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-1">
-                <label className="block text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
-                  Current Billed Statement Due (Optional)
-                </label>
-                <input
-                  type="number"
-                  placeholder="e.g. 1000 (if a bill has already generated)"
-                  value={initialBilledRupees}
-                  onChange={(e) => setInitialBilledRupees(e.target.value)}
-                  className="w-full px-4 py-2 rounded-xl border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-bold"
-                />
-                <span className="text-[10px] text-slate-400 block">
-                  If your bank has already billed you this month, enter it here so it shows in Billed Due.
-                </span>
+              {/* Opening Balances (Billed & Unbilled at Registration) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                    Opening Balances (At Registration)
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">Optional</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                    <label className="block text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-1">
+                      🔴 Billed Statement Due (₹)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="0.00"
+                      value={initialBilledRupees}
+                      onChange={(e) => setInitialBilledRupees(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-1 focus:ring-rose-500"
+                    />
+                    <span className="text-[9px] text-slate-400 mt-1 block">
+                      Generated last bill due
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                    <label className="block text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-wider mb-1">
+                      🟣 Unbilled Spends (₹)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="0.00"
+                      value={initialUnbilledRupees}
+                      onChange={(e) => setInitialUnbilledRupees(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-500/30 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                    />
+                    <span className="text-[9px] text-slate-400 mt-1 block">
+                      Spends since cutoff
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="pt-2 flex gap-2 shrink-0">
@@ -1347,7 +1614,7 @@ export function CardsScreen() {
                   required
                   value={editCardName}
                   onChange={(e) => setEditCardName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-2 focus:ring-purple-500"
                 />
               </div>
 
@@ -1360,11 +1627,92 @@ export function CardsScreen() {
                     type="text"
                     required
                     value={editCardBank}
-                    onChange={(e) => setEditCardBank(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    onChange={(e) => {
+                      const newBank = e.target.value;
+                      setEditCardBank(newBank);
+                      if (!editCardName || editCardName === `${editCardBank} ${editCardVariant}`.trim()) {
+                        setEditCardName(`${newBank ? newBank.toUpperCase() : ''} ${editCardVariant ? editCardVariant.toUpperCase() : ''}`.trim());
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Card Variant
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Pinnacle World, Regalia"
+                    value={editCardVariant}
+                    onChange={(e) => {
+                      const newVar = e.target.value;
+                      setEditCardVariant(newVar);
+                      if (!editCardName || editCardName === `${editCardBank} ${editCardVariant}`.trim()) {
+                        setEditCardName(`${editCardBank ? editCardBank.toUpperCase() : ''} ${newVar ? newVar.toUpperCase() : ''}`.trim());
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Variant Suggestion Chips */}
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  Popular Card Variants
+                </span>
+                <div className="flex gap-1.5 flex-wrap">
+                  {POPULAR_VARIANTS.map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => {
+                        setEditCardVariant(v);
+                        if (!editCardName || editCardName === `${editCardBank} ${editCardVariant}`.trim()) {
+                          setEditCardName(`${editCardBank ? editCardBank.toUpperCase() : ''} ${v.toUpperCase()}`.trim());
+                        }
+                      }}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors ${
+                        editCardVariant.toLowerCase() === v.toLowerCase()
+                          ? 'bg-purple-600 text-white border-transparent'
+                          : 'border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card Network Selector */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Card Network
+                </label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {CARD_NETWORKS.map((net) => {
+                    const isSelected = editCardNetwork === net.id;
+                    return (
+                      <button
+                        key={net.id}
+                        type="button"
+                        onClick={() => setEditCardNetwork(net.id)}
+                        className={`py-1.5 px-1 rounded-xl text-xs font-extrabold border transition-all text-center ${
+                          isSelected
+                            ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                            : 'border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        {net.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                     Last 4 Digits
@@ -1375,15 +1723,13 @@ export function CardsScreen() {
                     required
                     value={editLast4}
                     onChange={(e) => setEditLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-mono font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-mono font-bold tracking-wider focus:outline-hidden focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Statement Day (Cutoff)
+                    Statement Day
                   </label>
                   <input
                     type="number"
@@ -1392,13 +1738,13 @@ export function CardsScreen() {
                     required
                     value={editStatementDay}
                     onChange={(e) => setEditStatementDay(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Payment Due Day
+                    Due Day
                   </label>
                   <input
                     type="number"
@@ -1407,7 +1753,7 @@ export function CardsScreen() {
                     required
                     value={editDueDay}
                     onChange={(e) => setEditDueDay(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
               </div>
@@ -1421,8 +1767,53 @@ export function CardsScreen() {
                   required
                   value={editLimitRupees}
                   onChange={(e) => setEditLimitRupees(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-2 focus:ring-purple-500"
                 />
+              </div>
+
+              {/* Current Balances Adjuster (Billed & Unbilled) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-purple-500" />
+                    Live Billed Due & Unbilled Spends
+                  </span>
+                  <span className="text-[10px] text-purple-500 font-bold">Auto-Reconciled</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                    <label className="block text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-1">
+                      🔴 Billed Statement Due (₹)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="0.00"
+                      value={editBilledRupees}
+                      onChange={(e) => setEditBilledRupees(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-1 focus:ring-rose-500"
+                    />
+                    <span className="text-[9px] text-slate-400 mt-1 block">
+                      Updates billed ledger
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                    <label className="block text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-wider mb-1">
+                      🟣 Unbilled Spends (₹)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="0.00"
+                      value={editUnbilledRupees}
+                      onChange={(e) => setEditUnbilledRupees(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-500/30 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                    />
+                    <span className="text-[9px] text-slate-400 mt-1 block">
+                      Updates unbilled ledger
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="pt-2 flex gap-2 shrink-0">

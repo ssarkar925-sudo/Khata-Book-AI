@@ -143,6 +143,8 @@ export interface Card {
   workspace_id: string;
   name: string;
   bank: string;
+  variant?: string;
+  network?: string;
   last4: string;
   credit_limit: number; // in paise
   statement_day: number;

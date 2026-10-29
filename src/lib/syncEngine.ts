@@ -1101,7 +1101,7 @@ class SyncEngine {
     }
 
     try {
-      const { error } = await supabase.from('cards').upsert({
+      const basePayload: Record<string, any> = {
         id: cardWithScope.id,
         workspace_id: cardWithScope.workspace_id,
         name: cardWithScope.name,
@@ -1112,7 +1112,17 @@ class SyncEngine {
         due_day: cardWithScope.due_day,
         is_active: cardWithScope.is_active,
         scope: cardWithScope.scope,
-      });
+      };
+      if (cardWithScope.variant) basePayload.variant = cardWithScope.variant;
+      if (cardWithScope.network) basePayload.network = cardWithScope.network;
+
+      let { error } = await supabase.from('cards').upsert(basePayload);
+      if (error && (error.message?.includes('variant') || error.message?.includes('network') || error.code === 'PGRST204')) {
+        // Fallback without variant and network if columns are not in remote Supabase table yet
+        const { variant, network, ...fallbackPayload } = basePayload;
+        const res = await supabase.from('cards').upsert(fallbackPayload);
+        error = res.error;
+      }
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
       useSessionStore.getState().setLastSyncTime(new Date().toISOString());
@@ -1135,10 +1145,18 @@ class SyncEngine {
     }
 
     try {
-      const { error } = await supabase
+      let { error } = await supabase
         .from('cards')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', cardId);
+      if (error && (error.message?.includes('variant') || error.message?.includes('network') || error.code === 'PGRST204')) {
+        const { variant, network, ...sanitized } = updates;
+        const res = await supabase
+          .from('cards')
+          .update({ ...sanitized, updated_at: new Date().toISOString() })
+          .eq('id', cardId);
+        error = res.error;
+      }
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
       useSessionStore.getState().setLastSyncTime(new Date().toISOString());

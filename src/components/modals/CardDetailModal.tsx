@@ -108,12 +108,26 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEdi
               <CreditCard className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-slate-900 dark:text-white leading-tight">
-                {card.name}
-              </h3>
-              <span className="text-xs text-slate-400 font-mono">
-                {card.bank} •••• {card.last4}
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-base text-slate-900 dark:text-white leading-tight">
+                  {card.name}
+                </h3>
+                {card.variant && (
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shadow-2xs">
+                    {card.variant}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-slate-400 font-mono">
+                  {card.bank} •••• {card.last4}
+                </span>
+                {card.network && (
+                  <span className="text-[9px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded border border-slate-200 dark:border-white/10">
+                    {card.network}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1.5">

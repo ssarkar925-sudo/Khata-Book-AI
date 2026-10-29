@@ -237,6 +237,8 @@ export const ALLOWED_RAW_CARD_FIELDS = new Set([
   'workspace_id',
   'name',
   'bank',
+  'variant',
+  'network',
   'last4',
   'credit_limit',
   'statement_day',
