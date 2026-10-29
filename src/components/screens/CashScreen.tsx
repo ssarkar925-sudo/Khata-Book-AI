@@ -55,8 +55,19 @@ const BANK_OPTIONS = [
   'Paytm Payments Bank',
   'Airtel Payments Bank',
   'IPPB (India Post Payments Bank)',
-  'Cash Counter',
   'Other Bank',
+];
+
+const WALLET_OPTIONS = [
+  'Paytm Wallet',
+  'Amazon Pay Balance',
+  'PhonePe Wallet',
+  'Mobikwik',
+  'Ola Money',
+  'Sodexo / Pluxee',
+  'Airtel Money',
+  'Freecharge',
+  'Other Wallet',
 ];
 
 const COLOR_THEMES = [
@@ -128,6 +139,8 @@ export function CashScreen() {
   const [newAccName, setNewAccName] = useState('');
   const [newAccBank, setNewAccBank] = useState('State Bank of India');
   const [newAccCustomBank, setNewAccCustomBank] = useState('');
+  const [newAccWalletProvider, setNewAccWalletProvider] = useState('Paytm Wallet');
+  const [newAccCustomWallet, setNewAccCustomWallet] = useState('');
   const [newAccType, setNewAccType] = useState<AccountType>('savings');
   const [newAccLast4, setNewAccLast4] = useState('');
   const [newAccBalanceRupees, setNewAccBalanceRupees] = useState('');
@@ -138,6 +151,8 @@ export function CashScreen() {
   const [editName, setEditName] = useState('');
   const [editBank, setEditBank] = useState('');
   const [editCustomBank, setEditCustomBank] = useState('');
+  const [editWalletProvider, setEditWalletProvider] = useState('Paytm Wallet');
+  const [editCustomWallet, setEditCustomWallet] = useState('');
   const [editType, setEditType] = useState<AccountType>('savings');
   const [editLast4, setEditLast4] = useState('');
   const [editBalanceRupees, setEditBalanceRupees] = useState('');
@@ -149,11 +164,22 @@ export function CashScreen() {
   const [transferAmountRupees, setTransferAmountRupees] = useState('');
   const [transferNote, setTransferNote] = useState('');
 
-  // Filtered accounts list respecting selected Scope
-  const filteredAccounts = accounts.filter((acc) => {
+  // Scope-filtered accounts (before accountType filter, preserving category counts)
+  const scopeFilteredAccounts = accounts.filter((acc) => {
     if (selectedScope !== 'all' && (acc.scope || 'business') !== selectedScope) {
       return false;
     }
+    return true;
+  });
+
+  const bankCount = scopeFilteredAccounts.filter(
+    (a) => a.account_type === 'savings' || a.account_type === 'current' || a.account_type === 'od_cc'
+  ).length;
+  const cashCount = scopeFilteredAccounts.filter((a) => a.account_type === 'cash_counter').length;
+  const walletCount = scopeFilteredAccounts.filter((a) => a.account_type === 'wallet').length;
+
+  // Filtered accounts list respecting both selected Scope and Account Type Filter
+  const filteredAccounts = scopeFilteredAccounts.filter((acc) => {
     if (accountFilter === 'bank') {
       return acc.account_type === 'savings' || acc.account_type === 'current' || acc.account_type === 'od_cc';
     }
@@ -168,12 +194,6 @@ export function CashScreen() {
 
   const totalBalance = filteredAccounts.reduce((sum, a) => sum + a.balance, 0);
 
-  const bankCount = filteredAccounts.filter(
-    (a) => a.account_type === 'savings' || a.account_type === 'current' || a.account_type === 'od_cc'
-  ).length;
-  const cashCount = filteredAccounts.filter((a) => a.account_type === 'cash_counter').length;
-  const walletCount = filteredAccounts.filter((a) => a.account_type === 'wallet').length;
-
   // Handle Add Account
   const handleAddAccount = (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,6 +204,8 @@ export function CashScreen() {
     const resolvedBankName =
       newAccType === 'cash_counter'
         ? 'Cash Counter'
+        : newAccType === 'wallet'
+        ? (newAccWalletProvider === 'Other Wallet' ? (newAccCustomWallet.trim() || 'Other Wallet') : newAccWalletProvider)
         : newAccBank === 'Other Bank'
         ? (newAccCustomBank.trim() || 'Other Bank')
         : newAccBank;
@@ -209,6 +231,8 @@ export function CashScreen() {
     setNewAccName('');
     setNewAccBank('State Bank of India');
     setNewAccCustomBank('');
+    setNewAccWalletProvider('Paytm Wallet');
+    setNewAccCustomWallet('');
     setNewAccLast4('');
     setNewAccBalanceRupees('');
     setNewAccType('savings');
@@ -220,12 +244,22 @@ export function CashScreen() {
     setAccountToEdit(acc);
     setEditName(acc.name);
     setEditScope(acc.scope || 'business');
-    if (BANK_OPTIONS.includes(acc.bank_name || '')) {
-      setEditBank(acc.bank_name || 'State Bank of India');
-      setEditCustomBank('');
+    if (acc.account_type === 'wallet') {
+      if (WALLET_OPTIONS.includes(acc.bank_name || '')) {
+        setEditWalletProvider(acc.bank_name || 'Paytm Wallet');
+        setEditCustomWallet('');
+      } else {
+        setEditWalletProvider('Other Wallet');
+        setEditCustomWallet(acc.bank_name || '');
+      }
     } else {
-      setEditBank('Other Bank');
-      setEditCustomBank(acc.bank_name || '');
+      if (BANK_OPTIONS.includes(acc.bank_name || '')) {
+        setEditBank(acc.bank_name || 'State Bank of India');
+        setEditCustomBank('');
+      } else {
+        setEditBank('Other Bank');
+        setEditCustomBank(acc.bank_name || '');
+      }
     }
     setEditType(acc.account_type || 'savings');
     setEditLast4(acc.account_number_last4 || '');
@@ -244,6 +278,8 @@ export function CashScreen() {
     const resolvedBankName =
       editType === 'cash_counter'
         ? 'Cash Counter'
+        : editType === 'wallet'
+        ? (editWalletProvider === 'Other Wallet' ? (editCustomWallet.trim() || 'Other Wallet') : editWalletProvider)
         : editBank === 'Other Bank'
         ? (editCustomBank.trim() || 'Other Bank')
         : editBank;
@@ -323,7 +359,7 @@ export function CashScreen() {
       case 'cash_counter':
         return <Coins className="w-4 h-4" />;
       case 'wallet':
-        return <Smartphone className="w-4 h-4" />;
+        return <Wallet className="w-4 h-4" />;
       default:
         return <Landmark className="w-4 h-4" />;
     }
@@ -332,13 +368,13 @@ export function CashScreen() {
   const getAccountTypeBadge = (type?: string) => {
     switch (type) {
       case 'savings':
-        return 'Savings A/C';
+        return 'Savings A/C (UPI)';
       case 'current':
-        return 'Current A/C';
+        return 'Current A/C (UPI)';
       case 'cash_counter':
         return 'Cash Drawer';
       case 'wallet':
-        return 'Wallet / UPI';
+        return 'Prepaid Wallet';
       case 'od_cc':
         return 'Overdraft / CC';
       default:
@@ -466,7 +502,7 @@ export function CashScreen() {
           {formatPaise(totalBalance)}
         </div>
         <p className="text-xs text-slate-300 mt-2 font-medium">
-          Aggregated across {accounts.length} active bank accounts and cash counters
+          Aggregated across {filteredAccounts.length} active bank, cash & wallet accounts
         </p>
       </div>
 
@@ -480,7 +516,7 @@ export function CashScreen() {
               : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
           }`}
         >
-          All Accounts ({accounts.length})
+          All Accounts ({scopeFilteredAccounts.length})
         </button>
         <button
           onClick={() => setAccountFilter('bank')}
@@ -491,7 +527,7 @@ export function CashScreen() {
           }`}
         >
           <Landmark className="w-3.5 h-3.5" />
-          <span>Banks ({bankCount})</span>
+          <span>Banks & UPI ({bankCount})</span>
         </button>
         <button
           onClick={() => setAccountFilter('cash')}
@@ -512,8 +548,8 @@ export function CashScreen() {
               : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
           }`}
         >
-          <Smartphone className="w-3.5 h-3.5" />
-          <span>Wallets & UPI ({walletCount})</span>
+          <Wallet className="w-3.5 h-3.5" />
+          <span>Prepaid Wallets ({walletCount})</span>
         </button>
       </div>
 
@@ -746,13 +782,23 @@ export function CashScreen() {
                 </label>
                 <select
                   value={newAccType}
-                  onChange={(e) => setNewAccType(e.target.value as AccountType)}
+                  onChange={(e) => {
+                    const val = e.target.value as AccountType;
+                    setNewAccType(val);
+                    if (val === 'wallet') {
+                      setNewAccName(newAccWalletProvider);
+                    } else if (val === 'cash_counter') {
+                      setNewAccName('Cash Counter');
+                    } else if (newAccName === 'Cash Counter' || WALLET_OPTIONS.includes(newAccName)) {
+                      setNewAccName(`${newAccBank} Account`);
+                    }
+                  }}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
                 >
-                  <option value="savings" className="dark:bg-slate-900">Savings Account (Personal/Family)</option>
-                  <option value="current" className="dark:bg-slate-900">Current Account (Business/GST)</option>
+                  <option value="savings" className="dark:bg-slate-900">Savings Account (Bank / UPI)</option>
+                  <option value="current" className="dark:bg-slate-900">Current Account (Bank / UPI / GST)</option>
                   <option value="cash_counter" className="dark:bg-slate-900">Physical Cash Drawer / Counter</option>
-                  <option value="wallet" className="dark:bg-slate-900">Digital Wallet / UPI (Paytm/PhonePe)</option>
+                  <option value="wallet" className="dark:bg-slate-900">Prepaid Wallet (Paytm Wallet, Amazon Pay, Mobikwik)</option>
                   <option value="od_cc" className="dark:bg-slate-900">Overdraft (OD) / Cash Credit (CC)</option>
                 </select>
               </div>
@@ -765,20 +811,31 @@ export function CashScreen() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. SBI Main Branch, Shop Cash Drawer"
+                  placeholder={
+                    newAccType === 'wallet'
+                      ? 'e.g. My Paytm Wallet, Amazon Pay Balance'
+                      : newAccType === 'cash_counter'
+                      ? 'e.g. Shop Cash Drawer, Main Till'
+                      : 'e.g. SBI Main Branch, Salary Account'
+                  }
                   value={newAccName}
                   onChange={(e) => setNewAccName(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
-              {/* Bank Name (only if not cash counter) */}
-              {newAccType !== 'cash_counter' && (
+              {/* Bank Issuer (only if bank account) */}
+              {newAccType !== 'cash_counter' && newAccType !== 'wallet' && (
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Bank Issuer / Provider
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Bank Issuer (UPI Linked Bank)
+                      </label>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                        ⚡ UPI Linked
+                      </span>
+                    </div>
                     <select
                       value={newAccBank}
                       onChange={(e) => {
@@ -796,6 +853,9 @@ export function CashScreen() {
                         </option>
                       ))}
                     </select>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      UPI payments (GPay, PhonePe, Paytm UPI, BHIM) debit and credit directly from this bank account.
+                    </p>
                   </div>
 
                   {/* If Other Bank selected: Show Custom Bank Name Input */}
@@ -841,16 +901,92 @@ export function CashScreen() {
                 </div>
               )}
 
-              {/* Last 4 Digits (only if bank/wallet) */}
+              {/* Wallet Provider (only if prepaid wallet) */}
+              {newAccType === 'wallet' && (
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Prepaid Wallet Provider
+                      </label>
+                      <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold">
+                        Independent Balance
+                      </span>
+                    </div>
+                    <select
+                      value={newAccWalletProvider}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewAccWalletProvider(val);
+                        if (val !== 'Other Wallet' && (!newAccName.trim() || newAccName.includes('Wallet') || newAccName.includes('Account'))) {
+                          setNewAccName(val);
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
+                    >
+                      {WALLET_OPTIONS.map((w) => (
+                        <option key={w} value={w} className="dark:bg-slate-900">
+                          {w}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Prepaid wallets maintain a standalone stored-value balance separate from bank accounts.
+                    </p>
+                  </div>
+
+                  {newAccWalletProvider === 'Other Wallet' && (
+                    <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/25 space-y-2 animate-in fade-in duration-200">
+                      <label className="block text-xs font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider">
+                        Enter Wallet Provider Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        autoFocus
+                        placeholder="e.g. JioMoney, Bajaj Pay, Uber Cash, PayZapp"
+                        value={newAccCustomWallet}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewAccCustomWallet(val);
+                          if (!newAccName.trim() || newAccName.includes('Wallet')) {
+                            setNewAccName(val.trim() ? `${val.trim()} Wallet` : 'Custom Wallet');
+                          }
+                        }}
+                        className="w-full px-4 py-2 rounded-xl border border-purple-300 dark:border-purple-500/30 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <div className="flex gap-1.5 flex-wrap">
+                        {['Bajaj Pay', 'JioMoney', 'Uber Cash', 'PayZapp'].map((w) => (
+                          <button
+                            key={w}
+                            type="button"
+                            onClick={() => {
+                              setNewAccCustomWallet(w);
+                              setNewAccName(`${w} Wallet`);
+                            }}
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white dark:bg-white/10 border border-purple-200 dark:border-purple-500/30 text-purple-800 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-white/15 transition-colors cursor-pointer"
+                          >
+                            {w}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Last 4 Digits */}
               {newAccType !== 'cash_counter' && (
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Last 4 Digits of Account No. (Optional)
+                    {newAccType === 'wallet'
+                      ? 'Registered Mobile / Wallet Last 4 Digits (Optional)'
+                      : 'Last 4 Digits of Account No. (Optional)'}
                   </label>
                   <input
                     type="text"
                     maxLength={4}
-                    placeholder="e.g. 4821"
+                    placeholder={newAccType === 'wallet' ? 'e.g. 9845' : 'e.g. 4821'}
                     value={newAccLast4}
                     onChange={(e) => setNewAccLast4(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:ring-2 focus:ring-emerald-500"
@@ -971,10 +1107,10 @@ export function CashScreen() {
                   onChange={(e) => setEditType(e.target.value as AccountType)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
                 >
-                  <option value="savings" className="dark:bg-slate-900">Savings Account</option>
-                  <option value="current" className="dark:bg-slate-900">Current Account</option>
-                  <option value="cash_counter" className="dark:bg-slate-900">Cash Drawer</option>
-                  <option value="wallet" className="dark:bg-slate-900">Digital Wallet / UPI</option>
+                  <option value="savings" className="dark:bg-slate-900">Savings Account (Bank / UPI)</option>
+                  <option value="current" className="dark:bg-slate-900">Current Account (Bank / UPI)</option>
+                  <option value="cash_counter" className="dark:bg-slate-900">Physical Cash Drawer</option>
+                  <option value="wallet" className="dark:bg-slate-900">Prepaid Wallet (Paytm/Amazon/Mobikwik)</option>
                   <option value="od_cc" className="dark:bg-slate-900">Overdraft / CC</option>
                 </select>
               </div>
@@ -992,12 +1128,18 @@ export function CashScreen() {
                 />
               </div>
 
-              {editType !== 'cash_counter' && (
+              {/* Bank Issuer (only if bank account) */}
+              {editType !== 'cash_counter' && editType !== 'wallet' && (
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Bank Issuer
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Bank Issuer (UPI Linked Bank)
+                      </label>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                        ⚡ UPI Linked
+                      </span>
+                    </div>
                     <select
                       value={editBank}
                       onChange={(e) => setEditBank(e.target.value)}
@@ -1042,10 +1184,67 @@ export function CashScreen() {
                 </div>
               )}
 
+              {/* Wallet Provider (only if prepaid wallet) */}
+              {editType === 'wallet' && (
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Prepaid Wallet Provider
+                      </label>
+                      <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold">
+                        Independent Balance
+                      </span>
+                    </div>
+                    <select
+                      value={editWalletProvider}
+                      onChange={(e) => setEditWalletProvider(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                    >
+                      {WALLET_OPTIONS.map((w) => (
+                        <option key={w} value={w} className="dark:bg-slate-900">
+                          {w}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {editWalletProvider === 'Other Wallet' && (
+                    <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 space-y-2 animate-in fade-in duration-200">
+                      <label className="block text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">
+                        Enter Wallet Provider Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        autoFocus
+                        placeholder="e.g. JioMoney, Bajaj Pay, Uber Cash, PayZapp"
+                        value={editCustomWallet}
+                        onChange={(e) => setEditCustomWallet(e.target.value)}
+                        className="w-full px-4 py-2 rounded-xl border border-indigo-300 dark:border-indigo-500/30 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <div className="flex gap-1.5 flex-wrap">
+                        {['Bajaj Pay', 'JioMoney', 'Uber Cash', 'PayZapp'].map((w) => (
+                          <button
+                            key={w}
+                            type="button"
+                            onClick={() => setEditCustomWallet(w)}
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white dark:bg-white/10 border border-indigo-200 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-white/15 transition-colors cursor-pointer"
+                          >
+                            {w}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Last 4 Digits */}
               {editType !== 'cash_counter' && (
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Last 4 Digits
+                    {editType === 'wallet' ? 'Registered Mobile Last 4 Digits (Optional)' : 'Last 4 Digits (Optional)'}
                   </label>
                   <input
                     type="text"

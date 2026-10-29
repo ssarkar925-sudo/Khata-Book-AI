@@ -19,6 +19,9 @@ import {
   Plus,
   Minus,
   Check,
+  Smartphone,
+  Landmark,
+  Coins,
 } from 'lucide-react';
 import { CashLocation, LedgerEntry, PaymentMode } from '@/types';
 import { formatPaise, parseToPaise, paiseToRupees } from '@/lib/money';
@@ -60,6 +63,7 @@ export function AccountDetailModal({
   const [entryNote, setEntryNote] = useState('');
   const [entryCategory, setEntryCategory] = useState('sales_revenue');
   const [entryDate, setEntryDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [entryMode, setEntryMode] = useState<PaymentMode>('upi');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successToast, setSuccessToast] = useState('');
 
@@ -73,6 +77,17 @@ export function AccountDetailModal({
 
   // Live account reference to guarantee up-to-date balance and properties
   const liveAccount = accounts.find((a) => a.id === account.id) || account;
+
+  // Sync default entry payment mode with account type
+  useEffect(() => {
+    if (liveAccount.account_type === 'cash_counter') {
+      setEntryMode('cash');
+    } else if (liveAccount.account_type === 'wallet') {
+      setEntryMode('upi');
+    } else {
+      setEntryMode('upi'); // Bank default: UPI is linked to bank account
+    }
+  }, [liveAccount.account_type]);
 
   // Filter ledger entries for this account
   const accountEntries = ledger
@@ -111,17 +126,17 @@ export function AccountDetailModal({
   const getAccountTypeLabel = (type?: string) => {
     switch (type) {
       case 'savings':
-        return 'Savings Account';
+        return 'Savings Account (Bank / UPI)';
       case 'current':
-        return 'Current Account';
+        return 'Current Account (Bank / UPI)';
       case 'cash_counter':
         return 'Physical Cash Drawer';
       case 'wallet':
-        return 'Digital Wallet / UPI';
+        return 'Prepaid Wallet';
       case 'od_cc':
         return 'Overdraft / CC Account';
       default:
-        return 'Bank Account';
+        return 'Bank Account (UPI)';
     }
   };
 
@@ -164,7 +179,7 @@ export function AccountDetailModal({
         ? 'cash'
         : liveAccount.account_type === 'wallet'
         ? 'upi'
-        : 'bank';
+        : entryMode;
 
     const newEntry: LedgerEntry = {
       id: crypto.randomUUID(),
@@ -407,6 +422,58 @@ export function AccountDetailModal({
                     />
                   </div>
                 </div>
+
+                {/* Payment Mode Selector for Bank accounts */}
+                {liveAccount.account_type !== 'cash_counter' && liveAccount.account_type !== 'wallet' && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Payment Mode (Fund Source: {liveAccount.bank_name || liveAccount.name})
+                      </label>
+                      <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold">
+                        ⚡ UPI draws directly from Bank
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setEntryMode('upi')}
+                        className={`py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all ${
+                          entryMode === 'upi'
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        <Smartphone className="w-3.5 h-3.5" />
+                        <span>UPI / QR</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEntryMode('bank')}
+                        className={`py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all ${
+                          entryMode === 'bank'
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        <Landmark className="w-3.5 h-3.5" />
+                        <span>Bank / NEFT</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEntryMode('card')}
+                        className={`py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all ${
+                          entryMode === 'card'
+                            ? 'bg-amber-600 text-white shadow-xs'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        <Receipt className="w-3.5 h-3.5" />
+                        <span>Debit / ATM</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Note / Description */}
                 <div className="space-y-1">

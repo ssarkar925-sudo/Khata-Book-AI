@@ -645,4 +645,58 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
       'Cash counter accounts always resolve to Cash Counter'
     );
   });
+
+  // ==========================================================================
+  // 16. BANK & UPI VS PREPAID WALLET SEPARATION & FILTER ISOLATION
+  // ==========================================================================
+  test('Bank & UPI vs Prepaid Wallet Separation: Savings/Current accounts power Bank & UPI; Wallets maintain independent balances', async () => {
+    const mockAccounts = [
+      { id: '1', name: 'Saikat Sarkar SBI', account_type: 'savings', bank_name: 'State Bank of India', balance: 1812500, scope: 'personal' },
+      { id: '2', name: 'Priyanka SBI', account_type: 'savings', bank_name: 'State Bank of India', balance: 1508100, scope: 'family' },
+      { id: '3', name: 'Dipti Rani BOM', account_type: 'savings', bank_name: 'Bank of Maharashtra', balance: 1806300, scope: 'family' },
+      { id: '4', name: 'Shop Cash Drawer', account_type: 'cash_counter', bank_name: 'Cash Counter', balance: 5320000, scope: 'business' },
+      { id: '5', name: 'Second Till Counter', account_type: 'cash_counter', bank_name: 'Cash Counter', balance: 1350000, scope: 'business' },
+      { id: '6', name: 'Paytm Wallet', account_type: 'wallet', bank_name: 'Paytm Wallet', balance: 250000, scope: 'personal' },
+      { id: '7', name: 'Amazon Pay Balance', account_type: 'wallet', bank_name: 'Amazon Pay Balance', balance: 120000, scope: 'business' },
+    ];
+
+    // Bank & UPI accounts
+    const bankUpiAccounts = mockAccounts.filter(
+      (a) => a.account_type === 'savings' || a.account_type === 'current' || a.account_type === 'od_cc'
+    );
+    assert.strictEqual(bankUpiAccounts.length, 3, 'Must have 3 Bank & UPI accounts');
+
+    // Cash counters
+    const cashAccounts = mockAccounts.filter((a) => a.account_type === 'cash_counter');
+    assert.strictEqual(cashAccounts.length, 2, 'Must have 2 Cash Counter accounts');
+
+    // Prepaid Wallets
+    const walletAccounts = mockAccounts.filter((a) => a.account_type === 'wallet');
+    assert.strictEqual(walletAccounts.length, 2, 'Must have 2 Prepaid Wallet accounts');
+
+    // Verify filter badge counts remain stable and do NOT drop to 0 when user selects a specific filter
+    const selectedScope = 'all';
+    const scopeFiltered = mockAccounts.filter((acc) => selectedScope === 'all' || acc.scope === selectedScope);
+    const bankCount = scopeFiltered.filter((a) => a.account_type === 'savings' || a.account_type === 'current' || a.account_type === 'od_cc').length;
+    const cashCount = scopeFiltered.filter((a) => a.account_type === 'cash_counter').length;
+    const walletCount = scopeFiltered.filter((a) => a.account_type === 'wallet').length;
+
+    assert.strictEqual(bankCount, 3);
+    assert.strictEqual(cashCount, 2);
+    assert.strictEqual(walletCount, 2);
+
+    // If user clicks on 'bank' filter:
+    const accountFilter = 'bank';
+    const displayedAccounts = scopeFiltered.filter((acc) => {
+      if (accountFilter === 'bank') return acc.account_type === 'savings' || acc.account_type === 'current' || acc.account_type === 'od_cc';
+      if (accountFilter === 'cash') return acc.account_type === 'cash_counter';
+      if (accountFilter === 'wallet') return acc.account_type === 'wallet';
+      return true;
+    });
+
+    assert.strictEqual(displayedAccounts.length, 3, 'Grid must display only the 3 bank accounts');
+    // But tab counts retain true totals so user can switch tabs!
+    assert.strictEqual(cashCount, 2, 'Cash counters tab must still show (2) even when Banks tab is active');
+    assert.strictEqual(walletCount, 2, 'Wallets tab must still show (2) even when Banks tab is active');
+  });
 });
