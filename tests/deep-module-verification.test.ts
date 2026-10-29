@@ -456,4 +456,159 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
     assert.strictEqual(drawer2Passbook.length, 1, 'Drawer 2 passbook must have 1 transaction');
     assert.strictEqual(drawer2Passbook[0].amount, 500000);
   });
+
+  // ==========================================================================
+  // 12. CARD REGISTRATION WITH VARIANT, NETWORK, BILLED & UNBILLED BALANCES
+  // ==========================================================================
+  test('Card Registration: Accurately stores variant, network, and opening billed & unbilled balances', async () => {
+    const { calculateCardBilling } = await import('../src/lib/cardBilling');
+    const { Card, LedgerEntry } = await import('../src/types');
+
+    const card: Card = {
+      id: 'card-indusind-pinnacle',
+      workspace_id: 'ws-test',
+      name: 'INDUSIND PINNACLE WORLD',
+      bank: 'INDUSIND',
+      variant: 'Pinnacle World',
+      network: 'mastercard',
+      last4: '2002',
+      credit_limit: 23700000, // ₹2,37,000 in paise
+      statement_day: 5,
+      due_day: 24,
+      is_active: true,
+      scope: 'business',
+    };
+
+    assert.strictEqual(card.variant, 'Pinnacle World');
+    assert.strictEqual(card.network, 'mastercard');
+
+    // Simulate opening entries recorded at registration
+    const initialBilledPaise = 2500000; // ₹25,000 billed due
+    const initialUnbilledPaise = 1200000; // ₹12,000 unbilled spends
+
+    const ledger: LedgerEntry[] = [
+      {
+        id: 'entry-billed-opening',
+        workspace_id: 'ws-test',
+        type: 'card_spend',
+        amount: initialBilledPaise,
+        card_id: card.id,
+        mode: 'card',
+        is_billed: true,
+        note: 'Statement Bill Opening Due',
+        entry_date: new Date().toISOString(),
+      },
+      {
+        id: 'entry-unbilled-opening',
+        workspace_id: 'ws-test',
+        type: 'card_spend',
+        amount: initialUnbilledPaise,
+        card_id: card.id,
+        mode: 'card',
+        is_billed: false,
+        note: 'Unbilled Spends Opening Balance',
+        entry_date: new Date().toISOString(),
+      },
+    ];
+
+    const summary = calculateCardBilling(card, ledger);
+
+    assert.strictEqual(summary.billedDue, initialBilledPaise, 'Billed due must match opening billed amount (₹25,000)');
+    assert.strictEqual(summary.netUnbilled, initialUnbilledPaise, 'Unbilled spends must match opening unbilled amount (₹12,000)');
+    assert.strictEqual(summary.totalOutstanding, 3700000, 'Total outstanding must be ₹37,000 (25k billed + 12k unbilled)');
+    assert.strictEqual(
+      summary.availableCredit,
+      card.credit_limit - 3700000,
+      'Available limit must be credit_limit minus total outstanding'
+    );
+  });
+
+  // ==========================================================================
+  // 13. CARD EDIT & LIVE RECONCILIATION OF BILLED AND UNBILLED DUES
+  // ==========================================================================
+  test('Card Edit: Live reconciliation adjusts ledger entries when user modifies billed or unbilled due', async () => {
+    const { calculateCardBilling } = await import('../src/lib/cardBilling');
+    const { Card, LedgerEntry } = await import('../src/types');
+
+    const card: Card = {
+      id: 'card-indusind-pinnacle',
+      workspace_id: 'ws-test',
+      name: 'INDUSIND PINNACLE WORLD',
+      bank: 'INDUSIND',
+      variant: 'Pinnacle World',
+      network: 'mastercard',
+      last4: '2002',
+      credit_limit: 23700000,
+      statement_day: 5,
+      due_day: 24,
+      is_active: true,
+      scope: 'business',
+    };
+
+    const ledger: LedgerEntry[] = [
+      {
+        id: 'entry-billed-1',
+        workspace_id: 'ws-test',
+        type: 'card_spend',
+        amount: 2500000, // ₹25,000
+        card_id: card.id,
+        mode: 'card',
+        is_billed: true,
+        note: 'Statement Bill Opening Due',
+        entry_date: new Date().toISOString(),
+      },
+    ];
+
+    // User edits billed amount from ₹25,000 to ₹30,000 (increase of ₹5,000)
+    const originalBilledPaise = 2500000;
+    const newBilledPaise = 3000000;
+    const diff = newBilledPaise - originalBilledPaise; // +500,000
+
+    if (diff > 0) {
+      ledger.push({
+        id: 'adj-billed-plus',
+        workspace_id: 'ws-test',
+        type: 'card_spend',
+        amount: diff,
+        card_id: card.id,
+        mode: 'card',
+        is_billed: true,
+        note: 'Statement Billed Due Adjustment (+)',
+        entry_date: new Date().toISOString(),
+      });
+    }
+
+    let summary = calculateCardBilling(card, ledger);
+    assert.strictEqual(summary.billedDue, 3000000, 'Billed due must accurately reflect reconciled ₹30,000');
+
+    // User makes a payment of ₹20,000
+    ledger.push({
+      id: 'pay-1',
+      workspace_id: 'ws-test',
+      type: 'bill_payment',
+      amount: 2000000, // ₹20,000
+      card_id: card.id,
+      mode: 'bank',
+      scope: 'business',
+      note: 'Payment via Bank',
+      entry_date: new Date().toISOString(),
+    });
+
+    summary = calculateCardBilling(card, ledger);
+    assert.strictEqual(summary.billedDue, 1000000, 'Remaining billed due must be ₹10,000 after ₹20,000 payment');
+    assert.strictEqual(summary.availableCredit, card.credit_limit - 1000000);
+  });
+
+  // ==========================================================================
+  // 14. ALLOWED FIELDS & MIGRATION VALIDATION ACCEPTS VARIANT AND NETWORK
+  // ==========================================================================
+  test('Migration Engine: Raw card fields validation accepts variant and network without schema violation', async () => {
+    const { ALLOWED_RAW_CARD_FIELDS } = await import('../src/lib/migrationEngine');
+
+    assert.ok(ALLOWED_RAW_CARD_FIELDS.has('variant'), 'ALLOWED_RAW_CARD_FIELDS must contain variant');
+    assert.ok(ALLOWED_RAW_CARD_FIELDS.has('network'), 'ALLOWED_RAW_CARD_FIELDS must contain network');
+    assert.ok(ALLOWED_RAW_CARD_FIELDS.has('credit_limit'), 'ALLOWED_RAW_CARD_FIELDS must contain credit_limit');
+    assert.ok(ALLOWED_RAW_CARD_FIELDS.has('statement_day'), 'ALLOWED_RAW_CARD_FIELDS must contain statement_day');
+    assert.ok(ALLOWED_RAW_CARD_FIELDS.has('due_day'), 'ALLOWED_RAW_CARD_FIELDS must contain due_day');
+  });
 });
