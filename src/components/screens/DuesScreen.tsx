@@ -34,6 +34,8 @@ import { SettleDueModal } from '@/components/modals/SettleDueModal';
 import { WhatsAppReminderModal } from '@/components/modals/WhatsAppReminderModal';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
+import { CardMoveButtons } from '@/components/common/CardMoveButtons';
+import { useCardOrder } from '@/lib/useCardOrder';
 
 export function DuesScreen() {
   const { customers, dues } = useCustomerStore();
@@ -59,6 +61,7 @@ export function DuesScreen() {
   };
 
   const DUE_SORT_OPTIONS: SortOption[] = [
+    { value: 'custom', label: 'Custom Order (Arrange)', shortLabel: 'Arrange' },
     { value: 'due_date_asc', label: 'Due Date (Soonest First)', shortLabel: 'Due Date' },
     { value: 'due_date_desc', label: 'Due Date (Farthest First)', shortLabel: 'Due (Far)' },
     { value: 'name_asc', label: 'Customer Name (A to Z)', shortLabel: 'A-Z' },
@@ -245,7 +248,16 @@ export function DuesScreen() {
     return true;
   });
 
+  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder(
+    'dues',
+    dues,
+    dueSort
+  );
+
   const sortedDues = React.useMemo(() => {
+    if (dueSort === 'custom') {
+      return applyCustomOrder(filteredDues);
+    }
     return [...filteredDues].sort((a, b) => {
       const custA = customers.find((c) => c.id === a.customer_id);
       const custB = customers.find((c) => c.id === b.customer_id);
@@ -279,7 +291,7 @@ export function DuesScreen() {
       }
       return 0;
     });
-  }, [filteredDues, dueSort, customers]);
+  }, [filteredDues, dueSort, customers, applyCustomOrder]);
 
   const overdueCount = pendingDues.filter(
     (d) => new Date(d.due_date).getTime() < nowTime
@@ -582,7 +594,7 @@ export function DuesScreen() {
         ) : viewMode === 'grid' ? (
           /* Grid View */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
-            {sortedDues.map((due) => {
+            {sortedDues.map((due, idx) => {
               const cust = customers.find((c) => c.id === due.customer_id);
               const isGet = due.direction === 'you_will_get';
               const nameInitial = (cust?.name || 'C').charAt(0).toUpperCase();
@@ -671,7 +683,16 @@ export function DuesScreen() {
                     className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-white/10"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <span className="text-[10px] text-slate-400">Statement</span>
+                    <div className="flex items-center gap-1.5">
+                      <CardMoveButtons
+                        onMoveUp={() => moveItem(due.id, 'up')}
+                        onMoveDown={() => moveItem(due.id, 'down')}
+                        canMoveUp={idx > 0}
+                        canMoveDown={idx < sortedDues.length - 1}
+                        isLight={isLight}
+                      />
+                      <span className="text-[10px] text-slate-400">Statement</span>
+                    </div>
                     <div className="flex items-center gap-1.5">
                       {cust && (
                         <button
@@ -699,7 +720,7 @@ export function DuesScreen() {
         ) : (
           /* List View */
           <div className="divide-y divide-slate-100 dark:divide-white/5 space-y-1">
-            {sortedDues.map((due) => {
+            {sortedDues.map((due, listIdx) => {
               const cust = customers.find((c) => c.id === due.customer_id);
               const isGet = due.direction === 'you_will_get';
               const nameInitial = (cust?.name || 'C').charAt(0).toUpperCase();
@@ -790,6 +811,13 @@ export function DuesScreen() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                      <CardMoveButtons
+                        onMoveUp={() => moveItem(due.id, 'up')}
+                        onMoveDown={() => moveItem(due.id, 'down')}
+                        canMoveUp={listIdx > 0}
+                        canMoveDown={listIdx < sortedDues.length - 1}
+                        isLight={isLight}
+                      />
                       {/* WhatsApp Reminder Button */}
                       {cust && (
                         <button

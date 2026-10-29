@@ -33,6 +33,8 @@ import { AccountDetailModal } from '@/components/modals/AccountDetailModal';
 import { CashDenominationModal } from '@/components/modals/CashDenominationModal';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
+import { CardMoveButtons } from '@/components/common/CardMoveButtons';
+import { useCardOrder } from '@/lib/useCardOrder';
 
 const BANK_OPTIONS = [
   'State Bank of India',
@@ -142,6 +144,7 @@ export function CashScreen() {
   };
 
   const ACCOUNT_SORT_OPTIONS: SortOption[] = [
+    { value: 'custom', label: 'Custom Order (Arrange)', shortLabel: 'Arrange' },
     { value: 'name_asc', label: 'Account Name (A to Z)', shortLabel: 'A-Z' },
     { value: 'name_desc', label: 'Account Name (Z to A)', shortLabel: 'Z-A' },
     { value: 'balance_desc', label: 'Balance (Highest First)', shortLabel: 'High Bal' },
@@ -256,7 +259,16 @@ export function CashScreen() {
     return bal || 0;
   };
 
+  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder(
+    'cash',
+    accounts,
+    accountSort
+  );
+
   const sortedAccounts = React.useMemo(() => {
+    if (accountSort === 'custom') {
+      return applyCustomOrder(filteredAccounts);
+    }
     return [...filteredAccounts].sort((a, b) => {
       if (accountSort === 'name_asc') {
         return a.name.localeCompare(b.name);
@@ -280,7 +292,7 @@ export function CashScreen() {
       }
       return 0;
     });
-  }, [filteredAccounts, accountSort, ledger]);
+  }, [filteredAccounts, accountSort, ledger, applyCustomOrder]);
 
   const totalBalance = filteredAccounts.reduce(
     (sum, a) => sum + getAccountEffectiveBalance(a),
@@ -667,7 +679,7 @@ export function CashScreen() {
       {/* Accounts: Grid View vs List View */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedAccounts.map((acc) => (
+          {sortedAccounts.map((acc, idx) => (
             <div
               key={acc.id}
               onClick={() => setSelectedAccForDetail(acc)}
@@ -743,6 +755,14 @@ export function CashScreen() {
                         <Calculator className="w-3.5 h-3.5" />
                       </button>
                     )}
+
+                    <CardMoveButtons
+                      onMoveUp={() => moveItem(acc.id, 'up')}
+                      onMoveDown={() => moveItem(acc.id, 'down')}
+                      canMoveUp={idx > 0}
+                      canMoveDown={idx < sortedAccounts.length - 1}
+                      isLight={isLight}
+                    />
 
                     {/* Edit Button */}
                     <button
@@ -821,7 +841,7 @@ export function CashScreen() {
       ) : (
         /* List View */
         <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 shadow-xs divide-y divide-slate-100 dark:divide-white/5 overflow-hidden">
-          {sortedAccounts.map((acc) => (
+          {sortedAccounts.map((acc, listIdx) => (
             <div
               key={acc.id}
               onClick={() => setSelectedAccForDetail(acc)}
@@ -890,6 +910,13 @@ export function CashScreen() {
                 </div>
 
                 <div className="flex items-center gap-1">
+                  <CardMoveButtons
+                    onMoveUp={() => moveItem(acc.id, 'up')}
+                    onMoveDown={() => moveItem(acc.id, 'down')}
+                    canMoveUp={listIdx > 0}
+                    canMoveDown={listIdx < sortedAccounts.length - 1}
+                    isLight={isLight}
+                  />
                   {(acc.account_type === 'cash_counter' || acc.name.toLowerCase().includes('cash')) && (
                     <button
                       type="button"

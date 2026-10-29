@@ -41,6 +41,8 @@ import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
+import { CardMoveButtons } from '@/components/common/CardMoveButtons';
+import { useCardOrder } from '@/lib/useCardOrder';
 import { useAccountStore } from '@/stores/useAccountStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { CardDetailModal } from '@/components/modals/CardDetailModal';
@@ -105,6 +107,7 @@ export function CardsScreen() {
   };
 
   const CARD_SORT_OPTIONS: SortOption[] = [
+    { value: 'custom', label: 'Custom Order (Arrange)', shortLabel: 'Arrange' },
     { value: 'bill_date_asc', label: 'Bill / Due Date (Soonest)', shortLabel: 'Due Date' },
     { value: 'bill_date_desc', label: 'Bill / Due Date (Farthest)', shortLabel: 'Due (Far)' },
     { value: 'name_asc', label: 'Card Name (A to Z)', shortLabel: 'A-Z' },
@@ -166,6 +169,12 @@ export function CardsScreen() {
   // Billing Report calculation across all deduplicated scoped cards
   const billingReport = calculateAllCardsBillingReport(scopedCards, ledger);
 
+  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder<Card>(
+    'cards',
+    scopedCards,
+    cardSort
+  );
+
   // Sorted and filtered card summaries for Grid and List views
   const sortedCardSummaries = React.useMemo(() => {
     const filtered = billingReport.cardSummaries.filter((summary) => {
@@ -173,6 +182,15 @@ export function CardsScreen() {
       if (cardFilter === 'safe') return summary.billedDue <= 0;
       return true;
     });
+
+    if (cardSort === 'custom') {
+      const cardList = filtered.map((s) => s.card);
+      const orderedCards = applyCustomOrder(cardList);
+      const summaryByCardId = new Map(filtered.map((s) => [s.card.id, s]));
+      return orderedCards
+        .map((c) => summaryByCardId.get(c.id))
+        .filter((s): s is CardBillingSummary => Boolean(s));
+    }
 
     return [...filtered].sort((a, b) => {
       if (cardSort === 'name_asc') {
@@ -198,7 +216,7 @@ export function CardsScreen() {
       }
       return 0;
     });
-  }, [billingReport.cardSummaries, cardFilter, cardSort]);
+  }, [billingReport.cardSummaries, cardFilter, cardSort, applyCustomOrder]);
 
   // New Card State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -1217,6 +1235,14 @@ export function CardsScreen() {
                       )}
                     </button>
 
+                    <CardMoveButtons
+                      onMoveUp={() => moveItem(card.id, 'up')}
+                      onMoveDown={() => moveItem(card.id, 'down')}
+                      canMoveUp={idx > 0}
+                      canMoveDown={idx < sortedCardSummaries.length - 1}
+                      isLight={false}
+                    />
+
                     {/* Edit Card Button */}
                     <button
                       onClick={(e) => {
@@ -1252,7 +1278,7 @@ export function CardsScreen() {
           {cards.length === 0 ? (
             <div className="text-center py-12 text-xs text-slate-400">No credit cards added yet.</div>
           ) : (
-            sortedCardSummaries.map((summary) => {
+            sortedCardSummaries.map((summary, listIdx) => {
                 const card = summary.card;
                 const formattedDueDate = summary.dueDate.toLocaleDateString('en-IN', {
                   day: 'numeric',
@@ -1373,6 +1399,13 @@ export function CardsScreen() {
                       </div>
 
                       <div className="flex items-center gap-1">
+                        <CardMoveButtons
+                          onMoveUp={() => moveItem(card.id, 'up')}
+                          onMoveDown={() => moveItem(card.id, 'down')}
+                          canMoveUp={listIdx > 0}
+                          canMoveDown={listIdx < sortedCardSummaries.length - 1}
+                          isLight={isLight}
+                        />
                         <button
                           type="button"
                           onClick={() => {

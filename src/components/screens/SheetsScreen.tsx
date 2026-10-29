@@ -51,6 +51,8 @@ import { syncEngine } from '@/lib/syncEngine';
 import { SheetColumn, SheetColumnType, SheetRow } from '@/types';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
+import { CardMoveButtons } from '@/components/common/CardMoveButtons';
+import { useCardOrder } from '@/lib/useCardOrder';
 
 const SHEET_COLORS = [
   { id: '#6366F1', name: 'Indigo' },
@@ -252,6 +254,7 @@ export function SheetsScreen() {
   };
 
   const SHEET_ROW_SORT_OPTIONS: SortOption[] = [
+    { value: 'custom', label: 'Custom Order (Arrange)', shortLabel: 'Arrange' },
     { value: 'original', label: 'Original Order', shortLabel: 'Default' },
     { value: 'col1_asc', label: 'First Column (A to Z)', shortLabel: 'A-Z' },
     { value: 'col1_desc', label: 'First Column (Z to A)', shortLabel: 'Z-A' },
@@ -358,6 +361,12 @@ export function SheetsScreen() {
     return activeSheet.columns.find((c) => c.id === selectedColId) || activeSheet.columns[0] || null;
   }, [activeSheet, selectedColId]);
 
+  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder<SheetRow>(
+    'sheets_' + (activeSheet?.id || 'default'),
+    activeSheet?.rows || [],
+    sheetRowSort
+  );
+
   // Filtered and sorted rows
   const filteredRows = useMemo(() => {
     const raw = (activeSheet?.rows || []).filter((r) => {
@@ -366,6 +375,9 @@ export function SheetsScreen() {
       return Object.values(r.data).some((val) => String(val).toLowerCase().includes(q));
     });
 
+    if (sheetRowSort === 'custom') {
+      return applyCustomOrder(raw);
+    }
     if (sheetRowSort === 'original') return raw;
 
     const firstColId = activeSheet?.columns?.[0]?.id;
@@ -1887,13 +1899,22 @@ export function SheetsScreen() {
 
                         {/* Delete Row Button */}
                         <td className="py-1 px-2 text-center border-slate-200 dark:border-slate-700">
-                          <button
-                            onClick={() => deleteRow(activeSheet.id, row.id)}
-                            className="p-1 rounded-lg text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-                            title="Delete Row"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <CardMoveButtons
+                              onMoveUp={() => moveItem(row.id, 'up')}
+                              onMoveDown={() => moveItem(row.id, 'down')}
+                              canMoveUp={idx > 0}
+                              canMoveDown={idx < paginatedRows.length - 1}
+                              isLight={isLight}
+                            />
+                            <button
+                              onClick={() => deleteRow(activeSheet.id, row.id)}
+                              className="p-1 rounded-lg text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                              title="Delete Row"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1942,6 +1963,13 @@ export function SheetsScreen() {
                             #{absoluteIndex}
                           </span>
                           <div className="flex items-center gap-1">
+                            <CardMoveButtons
+                              onMoveUp={() => moveItem(row.id, 'up')}
+                              onMoveDown={() => moveItem(row.id, 'down')}
+                              canMoveUp={rowIdx > 0}
+                              canMoveDown={rowIdx < paginatedRows.length - 1}
+                              isLight={isLight}
+                            />
                             <button
                               type="button"
                               onClick={() => {

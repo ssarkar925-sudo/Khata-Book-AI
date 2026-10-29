@@ -79,11 +79,35 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     return { isLockedOut: remaining > 0, remainingSec: remaining };
   },
 
-  setVaultItems: (vaultItems) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(VAULT_ITEMS_KEY, JSON.stringify(vaultItems));
-    }
-    set({ vaultItems });
+  setVaultItems: (newItems) => {
+    set((state) => {
+      // Merge with existing local items so in-memory decrypted fields, category, color and local secrets aren't wiped
+      const existingMap = new Map(state.vaultItems.map((item) => [item.id, item]));
+      const merged = newItems.map((incoming) => {
+        const local = existingMap.get(incoming.id);
+        if (!local) return incoming;
+        return {
+          ...incoming,
+          category: incoming.category || local.category,
+          color: incoming.color || local.color,
+          secrets: incoming.secrets && incoming.secrets.length > 0 ? incoming.secrets : local.secrets,
+          decrypted_password: local.decrypted_password,
+        };
+      });
+
+      // Preserve local items that haven't synced to cloud yet
+      const incomingIds = new Set(newItems.map((i) => i.id));
+      state.vaultItems.forEach((local) => {
+        if (!incomingIds.has(local.id)) {
+          merged.push(local);
+        }
+      });
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(VAULT_ITEMS_KEY, JSON.stringify(merged));
+      }
+      return { vaultItems: merged };
+    });
   },
 
   setMasterPassword: (masterPassword) => set({ masterPassword, isUnlocked: Boolean(masterPassword) }),

@@ -48,6 +48,8 @@ import { getCategoryById, EXPENSE_CATEGORIES } from '@/lib/categories';
 import { syncEngine } from '@/lib/syncEngine';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
+import { CardMoveButtons } from '@/components/common/CardMoveButtons';
+import { useCardOrder } from '@/lib/useCardOrder';
 
 interface ExpensesScreenProps {
   onNavigateTab: (tab: TabType) => void;
@@ -93,6 +95,7 @@ export function ExpensesScreen({
   };
 
   const EXPENSE_SORT_OPTIONS: SortOption[] = [
+    { value: 'custom', label: 'Custom Order (Arrange)', shortLabel: 'Arrange' },
     { value: 'date_desc', label: 'Date (Newest First)', shortLabel: 'Newest' },
     { value: 'date_asc', label: 'Date (Oldest First)', shortLabel: 'Oldest' },
     { value: 'amount_desc', label: 'Amount (Highest First)', shortLabel: 'High Amount' },
@@ -205,7 +208,16 @@ export function ExpensesScreen({
     });
   }, [dateFilteredExpenses, searchQuery, selectedCategory, selectedMode, selectedAccount]);
 
+  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder<LedgerEntry>(
+    'expenses',
+    dateFilteredExpenses,
+    expenseSort
+  );
+
   const sortedExpenses = useMemo(() => {
+    if (expenseSort === 'custom') {
+      return applyCustomOrder(filteredExpenses);
+    }
     return [...filteredExpenses].sort((a, b) => {
       if (expenseSort === 'date_desc') {
         return new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime();
@@ -227,7 +239,7 @@ export function ExpensesScreen({
       }
       return 0;
     });
-  }, [filteredExpenses, expenseSort]);
+  }, [filteredExpenses, expenseSort, applyCustomOrder]);
 
   // Analytics Metrics
   const { totalSpentPaise, dailyAveragePaise, topCategory, categoryStats } = useMemo(() => {
@@ -711,7 +723,7 @@ export function ExpensesScreen({
         ) : viewMode === 'grid' ? (
           /* Grid View */
           <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {sortedExpenses.map((expense) => {
+            {sortedExpenses.map((expense, idx) => {
               const cat = getCategoryById(expense.category_id || '');
               const acc = accounts.find((a) => a.id === expense.cash_location_id);
               const card = cards.find((c) => c.id === expense.card_id);
@@ -826,14 +838,23 @@ export function ExpensesScreen({
                     <div className="text-base font-black font-mono text-rose-600 dark:text-rose-400">
                       - {formatPaise(expense.amount)}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteExpense(expense.id, expense.note)}
+                    <div className="flex items-center gap-1">
+                      <CardMoveButtons
+                        onMoveUp={() => moveItem(expense.id, 'up')}
+                        onMoveDown={() => moveItem(expense.id, 'down')}
+                        canMoveUp={idx > 0}
+                        canMoveDown={idx < sortedExpenses.length - 1}
+                        isLight={isLight}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteExpense(expense.id, expense.note)}
                       className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
                       title="Delete expense"
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -842,7 +863,7 @@ export function ExpensesScreen({
         ) : (
           /* List View */
           <div className="divide-y divide-slate-100 dark:divide-white/5">
-            {sortedExpenses.map((expense) => {
+            {sortedExpenses.map((expense, listIdx) => {
               const cat = getCategoryById(expense.category_id || '');
               const acc = accounts.find((a) => a.id === expense.cash_location_id);
               const card = cards.find((c) => c.id === expense.card_id);
@@ -960,6 +981,13 @@ export function ExpensesScreen({
                       - {formatPaise(expense.amount)}
                     </span>
 
+                    <CardMoveButtons
+                      onMoveUp={() => moveItem(expense.id, 'up')}
+                      onMoveDown={() => moveItem(expense.id, 'down')}
+                      canMoveUp={listIdx > 0}
+                      canMoveDown={listIdx < sortedExpenses.length - 1}
+                      isLight={isLight}
+                    />
                     <button
                       onClick={() => handleDeleteExpense(expense.id, expense.note)}
                       className="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-500/10 transition-colors opacity-0 group-hover:opacity-100"

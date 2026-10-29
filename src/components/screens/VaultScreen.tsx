@@ -13,6 +13,7 @@ import {
   KeyRound,
   ShieldCheck,
   RotateCcw,
+  Loader2,
   ShieldAlert,
   Edit2,
   Palette,
@@ -30,6 +31,8 @@ import { encryptData, decryptData } from '@/lib/crypto';
 import { syncEngine } from '@/lib/syncEngine';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
+import { CardMoveButtons } from '@/components/common/CardMoveButtons';
+import { useCardOrder } from '@/lib/useCardOrder';
 
 const VAULT_COLORS = [
   { id: '#3B82F6', name: 'Blue', label: 'Banking & Finance', bg: 'bg-blue-500', text: 'text-blue-500' },
@@ -130,6 +133,7 @@ export function VaultScreen() {
   };
 
   const VAULT_SORT_OPTIONS: SortOption[] = [
+    { value: 'custom', label: 'Custom Order (Arrange)', shortLabel: 'Arrange' },
     { value: 'title_asc', label: 'Item Name (A to Z)', shortLabel: 'A-Z' },
     { value: 'title_desc', label: 'Item Name (Z to A)', shortLabel: 'Z-A' },
     { value: 'category_asc', label: 'Category', shortLabel: 'Category' },
@@ -164,6 +168,7 @@ export function VaultScreen() {
 
   // Decrypted Cache in-memory: map of itemId -> VaultSecretField[]
   const [decryptedSecretsMap, setDecryptedSecretsMap] = useState<Record<string, VaultSecretField[]>>({});
+  const [decryptingIds, setDecryptingIds] = useState<Record<string, boolean>>({});
   // Mask/Reveal individual secret field: key is `${itemId}_${secretId}`
   const [revealedFields, setRevealedFields] = useState<Record<string, boolean>>({});
   const [revealAll, setRevealAll] = useState(false);
@@ -307,18 +312,30 @@ export function VaultScreen() {
     alert('Vault has been reset. You can now configure a fresh Master PIN.');
   };
 
-  // Decrypt Item Helper
+  // Decrypt Item Helper - Instant reveals and feedback
   const ensureDecrypted = async (item: VaultItem): Promise<VaultSecretField[]> => {
     if (decryptedSecretsMap[item.id]) {
+      // Auto-reveal all secrets of this item if clicked
+      setRevealedFields((prev) => {
+        const updated = { ...prev };
+        decryptedSecretsMap[item.id].forEach((f) => {
+          updated[`${item.id}_${f.id}`] = true;
+        });
+        return updated;
+      });
       return decryptedSecretsMap[item.id];
     }
     if (!masterPassword || !item.encrypted_password || !item.iv || !item.salt) {
       if (item.decrypted_password) {
-        return [{ id: 'sec_1', label: 'Primary Password', value: item.decrypted_password }];
+        const fallback = [{ id: 'sec_1', label: 'Primary Password', value: item.decrypted_password }];
+        setDecryptedSecretsMap((prev) => ({ ...prev, [item.id]: fallback }));
+        setRevealedFields((prev) => ({ ...prev, [`${item.id}_sec_1`]: true }));
+        return fallback;
       }
       return [];
     }
 
+    setDecryptingIds((prev) => ({ ...prev, [item.id]: true }));
     try {
       const parsed = await decryptSecretsPayload(
         item.encrypted_password,
@@ -327,9 +344,19 @@ export function VaultScreen() {
         masterPassword
       );
       setDecryptedSecretsMap((prev) => ({ ...prev, [item.id]: parsed }));
+      // Reveal fields immediately so user doesn't see dots after clicking decrypt!
+      setRevealedFields((prev) => {
+        const updated = { ...prev };
+        parsed.forEach((f) => {
+          updated[`${item.id}_${f.id}`] = true;
+        });
+        return updated;
+      });
       return parsed;
     } catch {
       return [{ id: 'sec_1', label: 'Password', value: 'Decryption Error' }];
+    } finally {
+      setDecryptingIds((prev) => ({ ...prev, [item.id]: false }));
     }
   };
 
@@ -515,7 +542,16 @@ export function VaultScreen() {
     });
   }, [vaultItems, activeCategoryFilter, searchQuery]);
 
+  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder(
+    'vault',
+    vaultItems,
+    vaultSort
+  );
+
   const sortedVaultItems = useMemo(() => {
+    if (vaultSort === 'custom') {
+      return applyCustomOrder(filteredVaultItems);
+    }
     return [...filteredVaultItems].sort((a, b) => {
       if (vaultSort === 'title_asc') {
         return (a.title || '').localeCompare(b.title || '');
@@ -538,7 +574,7 @@ export function VaultScreen() {
       }
       return 0;
     });
-  }, [filteredVaultItems, vaultSort]);
+  }, [filteredVaultItems, vaultSort, applyCustomOrder]);
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -764,7 +800,7 @@ export function VaultScreen() {
                 <p className="text-[11px]">Click &quot;Add Vault Item&quot; to store bank logins, PINs, and secure credentials.</p>
               </div>
             ) : (
-              sortedVaultItems.map((item) => {
+              sortedVaultItems.map((item, idx) => {
                 const itemColor = item.color || '#3B82F6';
                 const cachedSecrets = decryptedSecretsMap[item.id] || (item.secrets && item.secrets.length > 0 ? item.secrets : null);
 
@@ -810,6 +846,13 @@ export function VaultScreen() {
 
                       {/* Card Action Controls: Edit & Delete */}
                       <div className="flex items-center gap-1">
+                        <CardMoveButtons
+                          onMoveUp={() => moveItem(item.id, 'up')}
+                          onMoveDown={() => moveItem(item.id, 'down')}
+                          canMoveUp={idx > 0}
+                          canMoveDown={idx < sortedVaultItems.length - 1}
+                          isLight={isLight}
+                        />
                         <button
                           onClick={() => openEditModal(item)}
                           className="p-1.5 rounded-xl text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
@@ -906,10 +949,19 @@ export function VaultScreen() {
                         /* Not yet decrypted in memory - Click to decrypt */
                         <div
                           onClick={() => ensureDecrypted(item)}
-                          className="cursor-pointer p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-dashed border-slate-300 dark:border-white/15 flex items-center justify-between text-xs font-mono text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                          className="cursor-pointer p-3 rounded-2xl bg-violet-500/5 hover:bg-violet-500/10 dark:bg-white/5 dark:hover:bg-white/10 border border-dashed border-violet-300 dark:border-white/20 flex items-center justify-between text-xs font-mono text-slate-500 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
                         >
-                          <span>•••••••••••• (Encrypted)</span>
-                          <span className="text-[10px] font-sans font-bold text-violet-500">Tap to Decrypt</span>
+                          <div className="flex items-center gap-2">
+                            {decryptingIds[item.id] ? (
+                              <Loader2 className="w-3.5 h-3.5 text-violet-500 animate-spin" />
+                            ) : (
+                              <Lock className="w-3.5 h-3.5 text-violet-500" />
+                            )}
+                            <span>•••••••••••• (Encrypted)</span>
+                          </div>
+                          <span className="text-[10px] font-sans font-bold text-violet-600 dark:text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-lg">
+                            {decryptingIds[item.id] ? 'Decrypting...' : 'Tap to Decrypt'}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -933,7 +985,7 @@ export function VaultScreen() {
                   No vault items found.
                 </div>
               ) : (
-                sortedVaultItems.map((item) => {
+                sortedVaultItems.map((item, listIdx) => {
                   const itemColor = item.color || '#3B82F6';
                   const cachedSecrets = decryptedSecretsMap[item.id] || (item.secrets && item.secrets.length > 0 ? item.secrets : null);
                   const primarySecret = cachedSecrets && cachedSecrets.length > 0 ? cachedSecrets[0] : null;
@@ -1031,16 +1083,27 @@ export function VaultScreen() {
                           <button
                             type="button"
                             onClick={() => ensureDecrypted(item)}
-                            className="px-2.5 py-1 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-600 dark:text-violet-400 text-xs font-semibold flex items-center gap-1 transition-colors"
+                            className="px-2.5 py-1 rounded-xl bg-violet-500/15 hover:bg-violet-500/25 text-violet-600 dark:text-violet-400 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                           >
-                            <Lock className="w-3 h-3" />
-                            <span>Tap to Decrypt</span>
+                            {decryptingIds[item.id] ? (
+                              <Loader2 className="w-3 h-3 text-violet-500 animate-spin" />
+                            ) : (
+                              <Lock className="w-3 h-3 text-violet-500" />
+                            )}
+                            <span>{decryptingIds[item.id] ? 'Decrypting...' : 'Tap to Decrypt'}</span>
                           </button>
                         )}
                       </div>
 
                       {/* Right: Action Buttons */}
                       <div className="flex items-center gap-1 shrink-0 justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-white/5">
+                        <CardMoveButtons
+                          onMoveUp={() => moveItem(item.id, 'up')}
+                          onMoveDown={() => moveItem(item.id, 'down')}
+                          canMoveUp={listIdx > 0}
+                          canMoveDown={listIdx < sortedVaultItems.length - 1}
+                          isLight={isLight}
+                        />
                         {item.username && (
                           <button
                             type="button"

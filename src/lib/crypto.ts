@@ -21,28 +21,49 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer as ArrayBuffer;
 }
 
-export async function deriveKey(masterPassword: string, salt: Uint8Array): Promise<CryptoKey> {
-  const enc = new TextEncoder();
-  const passwordKey = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(masterPassword),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveKey']
-  );
+// In-memory key derivation cache: (masterPassword + saltBase64) -> Promise<CryptoKey>
+// Eliminates redundant PBKDF2 100,000 round derivations during mass decrypt/encrypt
+const derivedKeyCache = new Map<string, Promise<CryptoKey>>();
 
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt as any,
-      iterations: 100000,
-      hash: 'SHA-256',
-    },
-    passwordKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
+export function clearKeyCache(): void {
+  derivedKeyCache.clear();
+}
+
+export async function deriveKey(masterPassword: string, salt: Uint8Array): Promise<CryptoKey> {
+  const saltKey = arrayBufferToBase64(salt.buffer as ArrayBuffer);
+  const cacheKey = `${masterPassword}::${saltKey}`;
+
+  const existing = derivedKeyCache.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
+  const derivationPromise = (async () => {
+    const enc = new TextEncoder();
+    const passwordKey = await crypto.subtle.importKey(
+      'raw',
+      enc.encode(masterPassword),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey']
+    );
+
+    return crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: salt as any,
+        iterations: 100000,
+        hash: 'SHA-256',
+      },
+      passwordKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  })();
+
+  derivedKeyCache.set(cacheKey, derivationPromise);
+  return derivationPromise;
 }
 
 export async function encryptData(

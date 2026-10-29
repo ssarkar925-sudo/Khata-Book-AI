@@ -26,6 +26,8 @@ import { syncEngine } from '@/lib/syncEngine';
 import { NoteDetailModal } from '@/components/modals/NoteDetailModal';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
+import { CardMoveButtons } from '@/components/common/CardMoveButtons';
+import { useCardOrder } from '@/lib/useCardOrder';
 
 export function NotesScreen() {
   const { notes: allNotes } = useNoteStore();
@@ -52,6 +54,7 @@ export function NotesScreen() {
   };
 
   const NOTE_SORT_OPTIONS: SortOption[] = [
+    { value: 'custom', label: 'Custom Order (Arrange)', shortLabel: 'Arrange' },
     { value: 'updated_desc', label: 'Last Updated (Newest)', shortLabel: 'Updated' },
     { value: 'created_desc', label: 'Date Created (Newest)', shortLabel: 'Newest' },
     { value: 'title_asc', label: 'Title (A to Z)', shortLabel: 'A-Z' },
@@ -331,7 +334,16 @@ export function NotesScreen() {
     new Map(filteredNotes.map((n) => [n.id, n])).values()
   );
 
+  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder(
+    'notes',
+    notes,
+    noteSort
+  );
+
   const sortedNotes = React.useMemo(() => {
+    if (noteSort === 'custom') {
+      return applyCustomOrder(dedupedFilteredNotes);
+    }
     return [...dedupedFilteredNotes].sort((a, b) => {
       if (noteSort === 'pinned_first') {
         if (a.is_pinned && !b.is_pinned) return -1;
@@ -356,7 +368,7 @@ export function NotesScreen() {
       const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
       return timeB - timeA;
     });
-  }, [dedupedFilteredNotes, noteSort]);
+  }, [dedupedFilteredNotes, noteSort, applyCustomOrder]);
 
   // Active viewing note synced with reactive store
   const activeViewingNote = viewingNote
@@ -496,7 +508,7 @@ export function NotesScreen() {
             </p>
           </div>
         ) : (
-          sortedNotes.map((note) => {
+          sortedNotes.map((note, idx) => {
             const matchedColor = colorOptions.find((c) => c.id === note.color) || colorOptions[0];
             const checklistCount = note.checklist_items ? note.checklist_items.length : 0;
             const completedCount = note.checklist_items
@@ -521,6 +533,13 @@ export function NotesScreen() {
                       className="flex items-center gap-1 shrink-0"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      <CardMoveButtons
+                        onMoveUp={() => moveItem(note.id, 'up')}
+                        onMoveDown={() => moveItem(note.id, 'down')}
+                        canMoveUp={idx > 0}
+                        canMoveDown={idx < sortedNotes.length - 1}
+                        isLight={isLight}
+                      />
                       {/* 1-Tap WhatsApp Share */}
                       <button
                         onClick={(e) => handleShareWhatsAppNote(e, note)}
@@ -666,7 +685,7 @@ export function NotesScreen() {
               {searchQuery ? 'No notes matched your search.' : 'No notes written yet.'}
             </div>
           ) : (
-            sortedNotes.map((note) => {
+            sortedNotes.map((note, listIdx) => {
               const matchedColor = colorOptions.find((c) => c.id === note.color) || colorOptions[0];
               const checklistCount = note.checklist_items ? note.checklist_items.length : 0;
               const completedCount = note.checklist_items
@@ -727,6 +746,13 @@ export function NotesScreen() {
                     </div>
 
                     <div className="flex items-center gap-1">
+                      <CardMoveButtons
+                        onMoveUp={() => moveItem(note.id, 'up')}
+                        onMoveDown={() => moveItem(note.id, 'down')}
+                        canMoveUp={listIdx > 0}
+                        canMoveDown={listIdx < sortedNotes.length - 1}
+                        isLight={isLight}
+                      />
                       <button
                         type="button"
                         onClick={() => syncEngine.updateNote(note.id, { is_pinned: !note.is_pinned })}
