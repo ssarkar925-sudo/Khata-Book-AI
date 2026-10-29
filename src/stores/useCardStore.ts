@@ -13,22 +13,66 @@ interface CardState {
 }
 
 const STORAGE_KEY_CARDS = 'rb_cards';
+const STORAGE_KEY_CARD_REMARKS = 'rb_card_remarks';
 const LEGACY_MOCK_WORKSPACE_ID = '00000000-0000-0000-0000-000000000010';
 
 const DEFAULT_CARDS: Card[] = [];
 
-// Helper to deduplicate cards array by ID and normalize legacy IDs to UUIDs
+// Helper to retrieve persistent card remarks
+function getStoredCardRemarks(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_CARD_REMARKS);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+// Helper to save a single card remark to persistent storage
+function persistCardRemark(cardId: string, remark?: string | null) {
+  if (typeof window === 'undefined' || !cardId) return;
+  try {
+    const map = getStoredCardRemarks();
+    if (remark && remark.trim()) {
+      map[cardId] = remark.trim();
+    } else if (remark === null || remark === '') {
+      delete map[cardId];
+    }
+    localStorage.setItem(STORAGE_KEY_CARD_REMARKS, JSON.stringify(map));
+  } catch {}
+}
+
+// Helper to deduplicate cards array by ID, preserve local remarks, and normalize legacy IDs
 function dedupeCards(cards: Card[]): Card[] {
   const map = new Map<string, Card>();
+  const remarksMap = getStoredCardRemarks();
+
   for (const c of cards) {
     if (c && c.id) {
-      map.set(c.id, c);
+      const existing = map.get(c.id);
+      const note = c.notes || remarksMap[c.id] || existing?.notes || null;
+      if (note) remarksMap[c.id] = note;
+
+      map.set(c.id, {
+        ...existing,
+        ...c,
+        notes: note,
+        variant: c.variant || existing?.variant,
+        network: c.network || existing?.network || 'visa',
+      });
     }
+  }
+
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY_CARD_REMARKS, JSON.stringify(remarksMap));
+    } catch {}
   }
   return Array.from(map.values());
 }
 
-export const useCardStore = create<CardState>((set) => ({
+export const useCardStore = create<CardState>((set, get) => ({
   cards: (() => {
     if (typeof window !== 'undefined') {
       try {
@@ -52,14 +96,39 @@ export const useCardStore = create<CardState>((set) => ({
   isLoading: false,
 
   setCards: (cards) => {
-    const deduped = dedupeCards(cards);
+    const current = get().cards;
+    const currentMap = new Map<string, Card>(current.map((c) => [c.id, c]));
+    const remarksMap = getStoredCardRemarks();
+
+    const merged = cards.map((c) => {
+      const existing = currentMap.get(c.id);
+      const note =
+        c.notes !== undefined && c.notes !== null
+          ? c.notes
+          : (remarksMap[c.id] || existing?.notes || null);
+      if (note) remarksMap[c.id] = note;
+
+      return {
+        ...existing,
+        ...c,
+        notes: note,
+        variant: c.variant || existing?.variant,
+        network: c.network || existing?.network || 'visa',
+      };
+    });
+
+    const deduped = dedupeCards(merged);
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEY_CARDS, JSON.stringify(deduped));
+      localStorage.setItem(STORAGE_KEY_CARD_REMARKS, JSON.stringify(remarksMap));
     }
     set({ cards: deduped });
   },
 
-  addCardOptimistic: (card) =>
+  addCardOptimistic: (card) => {
+    if (card.notes) {
+      persistCardRemark(card.id, card.notes);
+    }
     set((state) => {
       // Check if card with this id already exists to prevent duplicate entry
       if (state.cards.some((c) => c.id === card.id)) {
@@ -70,25 +139,32 @@ export const useCardStore = create<CardState>((set) => ({
         localStorage.setItem(STORAGE_KEY_CARDS, JSON.stringify(updated));
       }
       return { cards: updated };
-    }),
+    });
+  },
 
-  updateCardOptimistic: (cardId, updates) =>
+  updateCardOptimistic: (cardId, updates) => {
+    if (updates.notes !== undefined) {
+      persistCardRemark(cardId, updates.notes);
+    }
     set((state) => {
       const updated = state.cards.map((c) => (c.id === cardId ? { ...c, ...updates } : c));
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY_CARDS, JSON.stringify(updated));
       }
       return { cards: updated };
-    }),
+    });
+  },
 
-  deleteCardOptimistic: (cardId) =>
+  deleteCardOptimistic: (cardId) => {
+    persistCardRemark(cardId, null);
     set((state) => {
       const updated = state.cards.filter((c) => c.id !== cardId);
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY_CARDS, JSON.stringify(updated));
       }
       return { cards: updated };
-    }),
+    });
+  },
 
   clearCardData: () => {
     if (typeof window !== 'undefined') {

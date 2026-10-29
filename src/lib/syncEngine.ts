@@ -250,17 +250,32 @@ class SyncEngine {
         supabase.from('vault_items').select('*').eq('workspace_id', workspaceId),
       ]);
 
-      // 1. Process Bank Accounts with Ledger Reconciliation
+      // 1. Process Bank Accounts with Ledger Reconciliation & Remarks Preservation
       if (accResult.status === 'fulfilled' && Array.isArray(accResult.value.data)) {
         const remoteAccounts = accResult.value.data;
+        const currentAccounts = useAccountStore.getState().accounts;
+        const currentAccMap = new Map<string, BankAccountItem>(currentAccounts.map((a) => [a.id, a]));
         const remoteLedger =
           ledgerResult.status === 'fulfilled' && Array.isArray(ledgerResult.value.data)
             ? ledgerResult.value.data
             : useLedgerStore.getState().entries;
 
         const reconciledAccounts = remoteAccounts.map((acc: any) => {
+          const localAcc = currentAccMap.get(acc.id);
+          const preservedNotes =
+            acc.notes !== undefined && acc.notes !== null
+              ? acc.notes
+              : (localAcc?.notes ?? null);
+
           const accLedger = remoteLedger.filter((e: any) => e.cash_location_id === acc.id);
-          if (accLedger.length === 0) return acc;
+          if (accLedger.length === 0) {
+            return {
+              ...acc,
+              notes: preservedNotes,
+              gradient: acc.gradient || localAcc?.gradient,
+              iconColor: acc.icon_color || acc.iconColor || localAcc?.iconColor,
+            };
+          }
 
           const credits = accLedger
             .filter((e: any) => e.type === 'cash_in')
@@ -281,9 +296,20 @@ class SyncEngine {
                 .update({ balance: net, updated_at: new Date().toISOString() })
                 .eq('id', acc.id)
             ).catch(() => {});
-            return { ...acc, balance: net };
+            return {
+              ...acc,
+              balance: net,
+              notes: preservedNotes,
+              gradient: acc.gradient || localAcc?.gradient,
+              iconColor: acc.icon_color || acc.iconColor || localAcc?.iconColor,
+            };
           }
-          return acc;
+          return {
+            ...acc,
+            notes: preservedNotes,
+            gradient: acc.gradient || localAcc?.gradient,
+            iconColor: acc.icon_color || acc.iconColor || localAcc?.iconColor,
+          };
         });
 
         useAccountStore.getState().setAccounts(reconciledAccounts);
@@ -299,9 +325,25 @@ class SyncEngine {
         useCustomerStore.getState().setDues(duesResult.value.data);
       }
 
-      // 4. Process Cards
+      // 4. Process Cards with Remarks & Variant Preservation
       if (cardResult.status === 'fulfilled' && Array.isArray(cardResult.value.data)) {
-        useCardStore.getState().setCards(cardResult.value.data);
+        const currentCards = useCardStore.getState().cards;
+        const currentCardMap = new Map<string, Card>(currentCards.map((c) => [c.id, c]));
+
+        const preservedCards = cardResult.value.data.map((remoteCard: any) => {
+          const localCard = currentCardMap.get(remoteCard.id);
+          return {
+            ...remoteCard,
+            notes:
+              remoteCard.notes !== undefined && remoteCard.notes !== null
+                ? remoteCard.notes
+                : (localCard?.notes ?? null),
+            variant: remoteCard.variant || localCard?.variant || undefined,
+            network: remoteCard.network || localCard?.network || 'visa',
+          };
+        });
+
+        useCardStore.getState().setCards(preservedCards);
       }
 
       // 5. Process Ledger Entries
@@ -399,7 +441,18 @@ class SyncEngine {
           if (payload.eventType === 'INSERT') {
             useAccountStore.getState().addAccount(payload.new as BankAccountItem);
           } else if (payload.eventType === 'UPDATE') {
-            useAccountStore.getState().updateAccount(payload.new.id, payload.new as Partial<BankAccountItem>);
+            const local = useAccountStore.getState().accounts.find((a) => a.id === payload.new.id);
+            const incoming = payload.new as any;
+            const merged = {
+              ...incoming,
+              notes:
+                incoming.notes !== undefined && incoming.notes !== null
+                  ? incoming.notes
+                  : (local?.notes ?? null),
+              gradient: incoming.gradient || local?.gradient,
+              iconColor: incoming.icon_color || incoming.iconColor || local?.iconColor,
+            };
+            useAccountStore.getState().updateAccount(payload.new.id, merged);
           } else if (payload.eventType === 'DELETE') {
             useAccountStore.getState().deleteAccount(payload.old.id);
           }
@@ -448,7 +501,18 @@ class SyncEngine {
           if (payload.eventType === 'INSERT') {
             useCardStore.getState().addCardOptimistic(payload.new as Card);
           } else if (payload.eventType === 'UPDATE') {
-            useCardStore.getState().updateCardOptimistic(payload.new.id, payload.new as Partial<Card>);
+            const local = useCardStore.getState().cards.find((c) => c.id === payload.new.id);
+            const incoming = payload.new as any;
+            const merged = {
+              ...incoming,
+              notes:
+                incoming.notes !== undefined && incoming.notes !== null
+                  ? incoming.notes
+                  : (local?.notes ?? null),
+              variant: incoming.variant || local?.variant || undefined,
+              network: incoming.network || local?.network || 'visa',
+            };
+            useCardStore.getState().updateCardOptimistic(payload.new.id, merged);
           } else if (payload.eventType === 'DELETE') {
             useCardStore.getState().deleteCardOptimistic(payload.old.id);
           }

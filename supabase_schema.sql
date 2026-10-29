@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS public.cash_locations (
     ifsc TEXT,
     gradient TEXT,
     icon_color TEXT,
+    notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
     deleted_at TIMESTAMPTZ
@@ -76,6 +77,9 @@ CREATE TABLE IF NOT EXISTS public.cards (
     statement_day INT NOT NULL DEFAULT 1 CHECK (statement_day BETWEEN 1 AND 31),
     due_day INT NOT NULL DEFAULT 5 CHECK (due_day BETWEEN 1 AND 31),
     is_active BOOLEAN NOT NULL DEFAULT true,
+    variant TEXT,
+    network TEXT DEFAULT 'visa',
+    notes TEXT,
     scope TEXT NOT NULL DEFAULT 'business' CHECK (scope IN ('business', 'personal', 'family')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),

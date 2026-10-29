@@ -25,6 +25,7 @@ import {
 import { Card, LedgerEntry } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
 import { useLedgerStore } from '@/stores/useLedgerStore';
+import { useCardStore } from '@/stores/useCardStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { calculateCardBilling } from '@/lib/cardBilling';
 import { syncEngine } from '@/lib/syncEngine';
@@ -40,13 +41,15 @@ interface CardDetailModalProps {
 
 export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEditCard, onDeleteCard }: CardDetailModalProps) {
   const { entries: ledger } = useLedgerStore();
+  const { cards } = useCardStore();
   const [filterType, setFilterType] = useState<'all' | 'billed' | 'unbilled' | 'payments'>('all');
   const [copiedReminder, setCopiedReminder] = useState(false);
 
-  if (!card) return null;
+  const liveCard = card ? (cards.find((c) => c.id === card.id) || card) : null;
+  if (!liveCard) return null;
 
   // Calculate systematic Billed & Unbilled metrics
-  const summary = calculateCardBilling(card, ledger);
+  const summary = calculateCardBilling(liveCard, ledger);
   const formattedDueDate = summary.dueDate.toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
@@ -59,14 +62,14 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEdi
 
   const utilizationPct = Math.min(
     100,
-    Math.round((summary.totalOutstanding / card.credit_limit) * 100)
+    Math.round((summary.totalOutstanding / liveCard.credit_limit) * 100)
   ) || 0;
 
   // Filter transactions based on active tab
   const displayTransactions: { entry: LedgerEntry; isBilled: boolean; isPayment: boolean }[] = [];
 
   const allCardEntries = ledger
-    .filter((e) => e.card_id === card.id && (e.type === 'card_spend' || e.type === 'bill_payment'))
+    .filter((e) => e.card_id === liveCard.id && (e.type === 'card_spend' || e.type === 'bill_payment'))
     .sort((a, b) => new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime());
 
   for (const entry of allCardEntries) {
@@ -89,9 +92,9 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEdi
   }
 
   const handleShareReminder = () => {
-    const text = `💳 *Credit Card Bill Reminder*\n*Card:* ${card.name} (${card.bank} •••• ${card.last4})\n*🔴 Billed Due:* ${formatPaise(summary.billedDue)}\n*⏰ Due Date:* ${formattedDueDate} (${summary.reminderMessage})\n*🟣 Unbilled Spends:* ${formatPaise(summary.netUnbilled)}\n*🟢 Available Limit:* ${formatPaise(summary.availableCredit)} / ${formatPaise(card.credit_limit)}${card.notes ? `\n*📝 Remark:* ${card.notes}` : ''}\n\n_Tracked in Record Book_`;
+    const text = `💳 *Credit Card Bill Reminder*\n*Card:* ${liveCard.name} (${liveCard.bank} •••• ${liveCard.last4})\n*🔴 Billed Due:* ${formatPaise(summary.billedDue)}\n*⏰ Due Date:* ${formattedDueDate} (${summary.reminderMessage})\n*🟣 Unbilled Spends:* ${formatPaise(summary.netUnbilled)}\n*🟢 Available Limit:* ${formatPaise(summary.availableCredit)} / ${formatPaise(liveCard.credit_limit)}${liveCard.notes ? `\n*📝 Remark:* ${liveCard.notes}` : ''}\n\n_Tracked in Record Book_`;
     if (navigator.share) {
-      navigator.share({ title: `${card.name} Payment Reminder`, text }).catch(() => {});
+      navigator.share({ title: `${liveCard.name} Payment Reminder`, text }).catch(() => {});
     } else {
       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     }
@@ -111,21 +114,21 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEdi
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-bold text-base text-slate-900 dark:text-white leading-tight">
-                  {card.name}
+                  {liveCard.name}
                 </h3>
-                {card.variant && (
+                {liveCard.variant && (
                   <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shadow-2xs">
-                    {card.variant}
+                    {liveCard.variant}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs text-slate-400 font-mono">
-                  {card.bank} •••• {card.last4}
+                  {liveCard.bank} •••• {liveCard.last4}
                 </span>
-                {card.network && (
+                {liveCard.network && (
                   <span className="text-[9px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded border border-slate-200 dark:border-white/10">
-                    {card.network}
+                    {liveCard.network}
                   </span>
                 )}
               </div>
@@ -146,7 +149,7 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEdi
               <button
                 onClick={() => {
                   onClose();
-                  onEditCard(card);
+                  onEditCard(liveCard);
                 }}
                 className="p-2 rounded-xl hover:bg-amber-500/10 text-slate-400 hover:text-amber-500 transition-colors"
                 title="Edit Card Details (Limit, Dates)"
@@ -158,8 +161,8 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEdi
             {onDeleteCard && (
               <button
                 onClick={() => {
-                  if (confirm(`Delete card "${card.name}" (${card.bank} •••• ${card.last4})?`)) {
-                    onDeleteCard(card.id);
+                  if (confirm(`Delete card "${liveCard.name}" (${liveCard.bank} •••• ${liveCard.last4})?`)) {
+                    onDeleteCard(liveCard.id);
                   }
                 }}
                 className="p-2 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors"
@@ -203,12 +206,12 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEdi
         </div>
 
         {/* Card Remark / Notes Banner */}
-        {card.notes && (
+        {liveCard.notes && (
           <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2 shrink-0">
             <FileText className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold text-amber-900 dark:text-amber-300 mr-1.5">Card Remark:</span>
-              <span>{card.notes}</span>
+              <span>{liveCard.notes}</span>
             </div>
           </div>
         )}
@@ -256,7 +259,7 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEdi
               {formatPaise(summary.availableCredit)}
             </div>
             <span className="text-[10px] text-slate-400 block">
-              Limit: {formatPaise(card.credit_limit)}
+              Limit: {formatPaise(liveCard.credit_limit)}
             </span>
           </div>
         </div>

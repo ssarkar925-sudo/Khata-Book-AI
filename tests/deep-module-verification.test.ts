@@ -855,4 +855,107 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
     };
     assert.strictEqual(testLedger.note, 'Team client lunch at Mainland China');
   });
+
+  // ==========================================================================
+  // 20. PERSISTENT REMARKS PRESERVATION ACROSS REFRESH & CLOUD SYNC
+  // ==========================================================================
+  test('Remarks Persistence: Card and Bank remarks survive page refresh and remote cloud sync with null fields', async () => {
+    const { useCardStore } = await import('../src/stores/useCardStore');
+    const { useAccountStore } = await import('../src/stores/useAccountStore');
+
+    // 1. Card Remarks Survival Test
+    const cardStore = useCardStore.getState();
+    const testCard: Card = {
+      id: 'card-persist-test-1',
+      workspace_id: 'ws-test',
+      name: 'HDFC Regalia Gold',
+      bank: 'HDFC',
+      variant: 'Regalia Gold',
+      network: 'visa',
+      last4: '5566',
+      credit_limit: 50000000,
+      statement_day: 15,
+      due_day: 5,
+      is_active: true,
+      scope: 'personal',
+      notes: 'Priority Pass international lounge access only',
+    };
+
+    // Add card optimistically
+    cardStore.addCardOptimistic(testCard);
+    assert.strictEqual(
+      useCardStore.getState().cards.find((c: Card) => c.id === testCard.id)?.notes,
+      'Priority Pass international lounge access only'
+    );
+
+    // Simulate page refresh / syncEngine.pullAll where remote Supabase returns card with notes: null
+    const remotePulledCardWithoutNotes: Card = {
+      id: 'card-persist-test-1',
+      workspace_id: 'ws-test',
+      name: 'HDFC Regalia Gold',
+      bank: 'HDFC',
+      last4: '5566',
+      credit_limit: 50000000,
+      statement_day: 15,
+      due_day: 5,
+      is_active: true,
+      scope: 'personal',
+      notes: undefined, // Remote DB returned no notes column
+    };
+
+    useCardStore.getState().setCards([remotePulledCardWithoutNotes]);
+
+    // Remarks must NOT be wiped out!
+    const recoveredCard = useCardStore.getState().cards.find((c: Card) => c.id === testCard.id);
+    assert.ok(recoveredCard, 'Card must exist in store');
+    assert.strictEqual(
+      recoveredCard.notes,
+      'Priority Pass international lounge access only',
+      'Card remark must be preserved even if remote database returns null or undefined notes'
+    );
+
+    // 2. Bank Account Remarks Survival Test
+    const accountStore = useAccountStore.getState();
+    const testAccount: BankAccountItem = {
+      id: 'acc-persist-test-1',
+      workspace_id: 'ws-test',
+      name: 'SBI Current A/C',
+      balance: 10000000,
+      is_default: false,
+      account_type: 'current',
+      bank_name: 'State Bank of India',
+      account_number_last4: '7788',
+      notes: 'GST tax payments & vendor RTGS only',
+    };
+
+    accountStore.addAccount(testAccount);
+    assert.strictEqual(
+      useAccountStore.getState().accounts.find((a: BankAccountItem) => a.id === testAccount.id)?.notes,
+      'GST tax payments & vendor RTGS only'
+    );
+
+    // Simulate page refresh / syncEngine.pullAll where remote Supabase returns account without notes
+    const remotePulledAccountWithoutNotes: BankAccountItem = {
+      id: 'acc-persist-test-1',
+      workspace_id: 'ws-test',
+      name: 'SBI Current A/C',
+      balance: 10000000,
+      is_default: false,
+      account_type: 'current',
+      bank_name: 'State Bank of India',
+      account_number_last4: '7788',
+      notes: undefined,
+    };
+
+    useAccountStore.getState().setAccounts([remotePulledAccountWithoutNotes]);
+
+    // Account remark must NOT be wiped out!
+    const recoveredAccount = useAccountStore.getState().accounts.find((a: BankAccountItem) => a.id === testAccount.id);
+    assert.ok(recoveredAccount, 'Account must exist in store');
+    assert.strictEqual(
+      recoveredAccount.notes,
+      'GST tax payments & vendor RTGS only',
+      'Account remark must be preserved even if remote database returns null or undefined notes'
+    );
+  });
 });

@@ -334,6 +334,26 @@ export function CardsScreen() {
       }
     }
 
+    if (selectedCardForDetail && selectedCardForDetail.id === cardToEdit.id) {
+      setSelectedCardForDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: editCardName.trim(),
+              bank: editCardBank.trim() || 'Bank',
+              variant: editCardVariant.trim() || undefined,
+              network: editCardNetwork || 'visa',
+              last4: editLast4.trim(),
+              scope: editCardScope,
+              credit_limit: parseToPaise(editLimitRupees),
+              statement_day: parseInt(editStatementDay, 10) || 15,
+              due_day: parseInt(editDueDay, 10) || 5,
+              notes: editCardNotes.trim() || null,
+            }
+          : null
+      );
+    }
+
     setCardToEdit(null);
   };
 
@@ -1580,7 +1600,7 @@ export function CardsScreen() {
 
       {/* Card Detail Popup Modal */}
       <CardDetailModal
-        card={selectedCardForDetail}
+        card={selectedCardForDetail ? (cards.find((c) => c.id === selectedCardForDetail.id) || selectedCardForDetail) : null}
         onClose={() => setSelectedCardForDetail(null)}
         onRecordSpend={() => {
           if (selectedCardForDetail) setSpendCardId(selectedCardForDetail.id);
