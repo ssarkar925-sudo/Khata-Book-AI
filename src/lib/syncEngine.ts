@@ -221,12 +221,26 @@ class SyncEngine {
       }
 
       if (!wsData) {
-        await supabase.from('workspaces').upsert({
-          id: workspaceId,
-          name: 'Primary Record Book',
-          currency: 'INR',
-          owner_id: user.id, // Strictly authenticated auth.uid()
-        });
+        // Do NOT insert new duplicate workspaces on the fly.
+        // Instead, redirect to the user's existing primary cloud workspace or resolve via default RPC.
+        const existingCloudWs = useSessionStore
+          .getState()
+          .workspaces.find((w) => !w.is_local && w.id !== workspaceId);
+
+        if (existingCloudWs) {
+          console.log('[SyncEngine] Active workspace missing from cloud, switching to existing cloud workspace:', existingCloudWs.id);
+          this.currentWorkspaceId = existingCloudWs.id;
+          useSessionStore.getState().setActiveWorkspaceId(existingCloudWs.id);
+          workspaceId = existingCloudWs.id;
+        } else {
+          const { data: rpcWs } = await supabase.rpc('get_or_create_default_workspace');
+          if (rpcWs && (rpcWs as any).id) {
+            const resolvedId = (rpcWs as any).id;
+            this.currentWorkspaceId = resolvedId;
+            useSessionStore.getState().setActiveWorkspaceId(resolvedId);
+            workspaceId = resolvedId;
+          }
+        }
       }
 
       // Parallel Fetch: Fetch all 8 tables simultaneously with Promise.allSettled

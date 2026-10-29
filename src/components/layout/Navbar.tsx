@@ -16,6 +16,7 @@ import {
   User as UserIcon,
   CloudOff,
   Crown,
+  Trash2,
 } from 'lucide-react';
 import { useSessionStore } from '@/stores/useSessionStore';
 
@@ -35,6 +36,7 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
     workspaces,
     activeWorkspaceId,
     setActiveWorkspaceId,
+    deleteWorkspace,
     pendingSyncCount,
     lastSyncTime,
     lastSyncError,
@@ -111,21 +113,42 @@ export function Navbar({ onOpenAskAI, onRefresh, onOpenBackupRestore }: NavbarPr
                 Workspaces
               </div>
               {workspaces.map((ws) => (
-                <button
+                <div
                   key={ws.id}
-                  onClick={() => {
-                    setActiveWorkspaceId(ws.id);
-                    setShowWsMenu(false);
-                  }}
-                  className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors ${
+                  className={`w-full px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between transition-colors group ${
                     ws.id === activeWorkspaceId
                       ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold'
                       : 'hover:bg-slate-100 dark:hover:bg-white/5 text-slate-600 dark:text-slate-300'
                   }`}
                 >
-                  <span className="truncate">{ws.name}</span>
-                  {ws.id === activeWorkspaceId && <Check className="w-3.5 h-3.5 text-indigo-500 shrink-0" />}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveWorkspaceId(ws.id);
+                      setShowWsMenu(false);
+                    }}
+                    className="flex-1 text-left truncate flex items-center gap-1.5 cursor-pointer min-w-0"
+                  >
+                    <span className="truncate">{ws.name}</span>
+                    {ws.id === activeWorkspaceId && <Check className="w-3.5 h-3.5 text-indigo-500 shrink-0" />}
+                  </button>
+
+                  {user && ws.id !== activeWorkspaceId && ws.owner_id === user.id && (
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Remove duplicate workspace "${ws.name}"?`)) {
+                          await deleteWorkspace(ws.id);
+                        }
+                      }}
+                      title="Delete this workspace"
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0 opacity-60 group-hover:opacity-100"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               ))}
 
               {user && (

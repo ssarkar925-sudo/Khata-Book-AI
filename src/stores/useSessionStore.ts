@@ -101,6 +101,7 @@ interface SessionState {
   }>;
   signOut: () => Promise<void>;
   refreshWorkspacesAndRole: (currentUser?: User | null) => Promise<void>;
+  deleteWorkspace: (workspaceId: string) => Promise<boolean>;
   migrateLocalDataToCloud: (targetWorkspaceId: string) => Promise<MigrationResult>;
   retryFailedMigration: (targetWorkspaceId: string, failedRecords: MigrationFailure[]) => Promise<MigrationResult>;
   resetSession: () => void;
@@ -467,6 +468,33 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         }
       }
 
+      // Auto-cleanup: Purge empty orphan workspaces created previously by syncEngine
+      if (wsList && wsList.length > 1 && user) {
+        const primaryWs = wsList.find((w: any) => w.name === 'Personal Record Book' || w.is_default) || wsList[0];
+        const duplicates = wsList.filter(
+          (w: any) => w.id !== primaryWs.id && w.name === 'Primary Record Book' && w.owner_id === user.id
+        );
+
+        for (const dup of duplicates) {
+          try {
+            const [accCheck, ledgerCheck, cardCheck] = await Promise.all([
+              supabase.from('cash_locations').select('id', { count: 'exact', head: true }).eq('workspace_id', dup.id),
+              supabase.from('ledger_entries').select('id', { count: 'exact', head: true }).eq('workspace_id', dup.id),
+              supabase.from('cards').select('id', { count: 'exact', head: true }).eq('workspace_id', dup.id),
+            ]);
+
+            const hasData = (accCheck.count || 0) > 0 || (ledgerCheck.count || 0) > 0 || (cardCheck.count || 0) > 0;
+            if (!hasData) {
+              console.log('[SessionStore] Purging empty orphan workspace:', dup.id);
+              await supabase.from('workspaces').delete().eq('id', dup.id);
+              wsList = wsList.filter((w: any) => w.id !== dup.id);
+            }
+          } catch (cleanErr) {
+            console.warn('[SessionStore] Cleanup orphan workspace error:', cleanErr);
+          }
+        }
+      }
+
       const availableWorkspaces: Workspace[] = wsList && wsList.length > 0
         ? wsList.map((w: any) => ({
             id: w.id,
@@ -529,6 +557,32 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }
     } catch (err) {
       console.warn('[SessionStore] refreshWorkspacesAndRole exception:', err);
+    }
+  },
+
+  deleteWorkspace: async (workspaceId: string): Promise<boolean> => {
+    const user = get().user;
+    if (!user) return false;
+    try {
+      const { error } = await supabase.from('workspaces').delete().eq('id', workspaceId).eq('owner_id', user.id);
+      if (!error) {
+        const remaining = get().workspaces.filter((w) => w.id !== workspaceId);
+        const nextActive = get().activeWorkspaceId === workspaceId ? (remaining[0]?.id || '') : get().activeWorkspaceId;
+        set({
+          workspaces: remaining,
+          activeWorkspaceId: nextActive,
+        });
+        if (typeof window !== 'undefined' && nextActive) {
+          const nextWs = remaining.find((w) => w.id === nextActive);
+          if (nextWs) {
+            localStorage.setItem('rb_active_workspace', JSON.stringify(nextWs));
+          }
+        }
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
   },
 
