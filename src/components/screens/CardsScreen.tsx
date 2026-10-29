@@ -38,6 +38,7 @@ import { formatPaise, parseToPaise, paiseToRupees } from '@/lib/money';
 import { useCardStore } from '@/stores/useCardStore';
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useSessionStore } from '@/stores/useSessionStore';
+import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 import { useAccountStore } from '@/stores/useAccountStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { CardDetailModal } from '@/components/modals/CardDetailModal';
@@ -87,6 +88,19 @@ export function CardsScreen() {
   // Active view: 'cards' or 'report'
   const [selectedScope, setSelectedScope] = useState<'all' | EntityScope>('all');
   const [activeTab, setActiveTab] = useState<'cards' | 'report'>('cards');
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('rb_view_cards') as ViewMode) || 'grid';
+    }
+    return 'grid';
+  });
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_view_cards', mode);
+    }
+  };
   const [selectedCardForDetail, setSelectedCardForDetail] = useState<Card | null>(null);
 
   // Modals for AI Advisor & Bulk Statement Import
@@ -618,6 +632,10 @@ export function CardsScreen() {
             <span className="truncate">Family</span>
           </button>
         </div>
+
+        {activeTab === 'cards' && (
+          <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+        )}
       </div>
 
       {/* Urgent Dues & WhatsApp Alert Broadcast Banner */}
@@ -850,6 +868,7 @@ export function CardsScreen() {
             </div>
           )}
 
+          {viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {cards.length === 0 ? (
             <div className="col-span-full text-center py-16 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 p-6 text-xs text-slate-400 space-y-3">
@@ -1129,6 +1148,193 @@ export function CardsScreen() {
             })
           )}
         </div>
+      ) : (
+        /* List View for Credit Cards */
+        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 shadow-xs divide-y divide-slate-100 dark:divide-white/5 overflow-hidden">
+          {cards.length === 0 ? (
+            <div className="text-center py-12 text-xs text-slate-400">No credit cards added yet.</div>
+          ) : (
+            billingReport.cardSummaries
+              .filter((summary) => {
+                if (cardFilter === 'due') return summary.billedDue > 0;
+                if (cardFilter === 'safe') return summary.billedDue <= 0;
+                return true;
+              })
+              .map((summary) => {
+                const card = summary.card;
+                const formattedDueDate = summary.dueDate.toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'short',
+                });
+
+                return (
+                  <div
+                    key={card.id}
+                    onClick={() => setSelectedCardForDetail(card)}
+                    className="p-4 sm:px-5 sm:py-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+                  >
+                    {/* Left: Card Name, Last4, Network, Badges */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-xs">
+                        <CreditCard className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors truncate">
+                            {card.name}
+                          </h3>
+                          <span className="font-mono text-xs text-slate-400">•••• {card.last4}</span>
+                          <span
+                            className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shrink-0 ${
+                              card.scope === 'personal'
+                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                : card.scope === 'family'
+                                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                            }`}
+                          >
+                            {card.scope ? (card.scope === 'business' ? '🏢 Biz' : card.scope === 'personal' ? '👤 Pers' : '👨‍👩‍👧‍👦 Fam') : '🏢 Biz'}
+                          </span>
+                          {card.variant && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300 font-bold border border-purple-500/20 shrink-0">
+                              {card.variant}
+                            </span>
+                          )}
+                          {card.network && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 text-slate-500 uppercase font-mono font-bold shrink-0">
+                              {card.network}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-400 mt-1 flex-wrap">
+                          <span>Statement: {summary.statementDay}th</span>
+                          <span>•</span>
+                          <span>Due: {formattedDueDate}</span>
+                          <span>•</span>
+                          <span
+                            className={`font-bold px-1.5 py-0.2 rounded text-[10px] ${
+                              summary.status === 'overdue'
+                                ? 'bg-rose-500 text-white'
+                                : summary.status === 'urgent'
+                                ? 'bg-amber-400 text-slate-900 font-black'
+                                : summary.status === 'due'
+                                ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                : 'bg-slate-100 dark:bg-white/10 text-slate-500'
+                            }`}
+                          >
+                            {summary.status === 'overdue'
+                              ? `Overdue (${Math.abs(summary.daysUntilDue)}d)`
+                              : summary.status === 'urgent'
+                              ? `Due in ${summary.daysUntilDue}d`
+                              : summary.status === 'due'
+                              ? `Due in ${summary.daysUntilDue}d`
+                              : 'No Bill Due'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Middle: Limits breakdown */}
+                    <div className="flex items-center gap-4 text-xs shrink-0">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Limit</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300 tabular-nums">
+                          {formatPaise(card.credit_limit)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Available</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          {formatPaise(summary.availableCredit)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Unbilled</span>
+                        <span className="font-bold text-slate-600 dark:text-slate-400 tabular-nums">
+                          {formatPaise(summary.netUnbilled)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Right: Billed Due + Actions */}
+                    <div
+                      className="flex items-center justify-between lg:justify-end gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-white/5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="text-left lg:text-right">
+                        <div
+                          className={`text-base font-black tabular-nums ${
+                            summary.billedDue > 0
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : 'text-slate-900 dark:text-white'
+                          }`}
+                        >
+                          {formatPaise(summary.billedDue)}
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-medium">Billed Statement Due</span>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSpendCardId(card.id);
+                            setSpendBillingOption('auto');
+                            setShowSpendModal(true);
+                          }}
+                          title="Record Spend"
+                          className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openPayModalForCard(card.id)}
+                          title="Pay Bill"
+                          className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs shadow-xs hover:from-emerald-500 hover:to-teal-500 transition-all cursor-pointer"
+                        >
+                          Pay
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCardForDetail(card)}
+                          title="View Statement"
+                          className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleShareCardReminder(card, summary)}
+                          title="Share WhatsApp Reminder"
+                          className="p-2 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditCard(card)}
+                          title="Edit Card"
+                          className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCardToDelete(card)}
+                          title="Delete Card"
+                          className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+          )}
+        </div>
+      )}
       </div>
       )}
 

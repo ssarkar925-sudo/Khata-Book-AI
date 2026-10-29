@@ -30,6 +30,7 @@ import { useAccountStore, BankAccountItem } from '@/stores/useAccountStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { AccountDetailModal } from '@/components/modals/AccountDetailModal';
 import { CashDenominationModal } from '@/components/modals/CashDenominationModal';
+import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 
 const BANK_OPTIONS = [
   'State Bank of India',
@@ -123,6 +124,19 @@ export function CashScreen() {
   // Filter state: 'all' | 'bank' | 'cash' | 'wallet'
   const [selectedScope, setSelectedScope] = useState<'all' | EntityScope>('all');
   const [accountFilter, setAccountFilter] = useState<'all' | 'bank' | 'cash' | 'wallet'>('all');
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('rb_view_cash') as ViewMode) || 'grid';
+    }
+    return 'grid';
+  });
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_view_cash', mode);
+    }
+  };
 
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -506,196 +520,326 @@ export function CashScreen() {
         </p>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-        <button
-          onClick={() => setAccountFilter('all')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-            accountFilter === 'all'
-              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-              : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
-          }`}
-        >
-          All Accounts ({scopeFilteredAccounts.length})
-        </button>
-        <button
-          onClick={() => setAccountFilter('bank')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-            accountFilter === 'bank'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
-          }`}
-        >
-          <Landmark className="w-3.5 h-3.5" />
-          <span>Banks & UPI ({bankCount})</span>
-        </button>
-        <button
-          onClick={() => setAccountFilter('cash')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-            accountFilter === 'cash'
-              ? 'bg-amber-500 text-white shadow-sm'
-              : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
-          }`}
-        >
-          <Coins className="w-3.5 h-3.5" />
-          <span>Cash Counters ({cashCount})</span>
-        </button>
-        <button
-          onClick={() => setAccountFilter('wallet')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-            accountFilter === 'wallet'
-              ? 'bg-purple-600 text-white shadow-sm'
-              : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
-          }`}
-        >
-          <Wallet className="w-3.5 h-3.5" />
-          <span>Prepaid Wallets ({walletCount})</span>
-        </button>
+      {/* Filter Tabs & View Mode Toggle */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+          <button
+            onClick={() => setAccountFilter('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              accountFilter === 'all'
+                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+            }`}
+          >
+            All Accounts ({scopeFilteredAccounts.length})
+          </button>
+          <button
+            onClick={() => setAccountFilter('bank')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              accountFilter === 'bank'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+            }`}
+          >
+            <Landmark className="w-3.5 h-3.5" />
+            <span>Banks & UPI ({bankCount})</span>
+          </button>
+          <button
+            onClick={() => setAccountFilter('cash')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              accountFilter === 'cash'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+            }`}
+          >
+            <Coins className="w-3.5 h-3.5" />
+            <span>Cash Counters ({cashCount})</span>
+          </button>
+          <button
+            onClick={() => setAccountFilter('wallet')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              accountFilter === 'wallet'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+            }`}
+          >
+            <Wallet className="w-3.5 h-3.5" />
+            <span>Prepaid Wallets ({walletCount})</span>
+          </button>
+        </div>
+
+        <ViewToggle viewMode={viewMode} onChange={setViewMode} />
       </div>
 
-      {/* Accounts Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredAccounts.map((acc) => (
-          <div
-            key={acc.id}
-            onClick={() => setSelectedAccForDetail(acc)}
-            className={`cursor-pointer rounded-3xl border p-5 transition-all hover-lift bg-gradient-to-br ${
-              acc.gradient || 'from-blue-600/20 via-cyan-500/10 to-transparent'
-            } ${
-              isLight
-                ? 'bg-white border-slate-200 shadow-sm hover:border-slate-300'
-                : 'bg-slate-900/80 border-white/10 hover:border-white/20'
-            } flex flex-col justify-between space-y-4`}
-          >
-            <div>
-              {/* Account Card Header */}
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-xs shadow-md ${
-                      acc.iconColor || 'bg-blue-600 text-white'
-                    }`}
-                  >
-                    {getAccountIcon(acc.account_type)}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
-                      {acc.name}
-                    </h3>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                        {acc.bank_name || 'Bank'}
-                      </span>
-                      {acc.account_number_last4 && (
-                        <span className="text-[10px] font-mono text-slate-400">
-                          •••• {acc.account_number_last4}
-                        </span>
-                      )}
+      {/* Accounts: Grid View vs List View */}
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAccounts.map((acc) => (
+            <div
+              key={acc.id}
+              onClick={() => setSelectedAccForDetail(acc)}
+              className={`cursor-pointer rounded-3xl border p-5 transition-all hover-lift bg-gradient-to-br ${
+                acc.gradient || 'from-blue-600/20 via-cyan-500/10 to-transparent'
+              } ${
+                isLight
+                  ? 'bg-white border-slate-200 shadow-sm hover:border-slate-300'
+                  : 'bg-slate-900/80 border-white/10 hover:border-white/20'
+              } flex flex-col justify-between space-y-4`}
+            >
+              <div>
+                {/* Account Card Header */}
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-xs shadow-md ${
+                        acc.iconColor || 'bg-blue-600 text-white'
+                      }`}
+                    >
+                      {getAccountIcon(acc.account_type)}
                     </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
+                        {acc.name}
+                      </h3>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                          {acc.bank_name || 'Bank'}
+                        </span>
+                        {acc.account_number_last4 && (
+                          <span className="text-[10px] font-mono text-slate-400">
+                            •••• {acc.account_number_last4}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <span
+                      className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
+                        acc.scope === 'personal'
+                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                          : acc.scope === 'family'
+                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                          : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                      }`}
+                    >
+                      {acc.scope ? (acc.scope === 'business' ? '🏢 Biz' : acc.scope === 'personal' ? '👤 Pers' : '👨‍👩‍👧‍👦 Fam') : '🏢 Biz'}
+                    </span>
+
+                    {acc.is_default ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
+                        Primary
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-400 font-semibold">
+                        {getAccountTypeBadge(acc.account_type)}
+                      </span>
+                    )}
+
+                    {/* Count Physical Cash / Notes Button for Cash Counter accounts */}
+                    {(acc.account_type === 'cash_counter' || acc.name.toLowerCase().includes('cash')) && (
+                      <button
+                        onClick={() => {
+                          setDenominationTargetAccount(acc);
+                          setShowDenominationModal(true);
+                        }}
+                        title="Count Physical Notes & Coins (Denomination Counter)"
+                        className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors cursor-pointer"
+                      >
+                        <Calculator className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    {/* Edit Button */}
+                    <button
+                      onClick={() => handleOpenEdit(acc)}
+                      title="Edit Account"
+                      className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Delete Button (non-default only) */}
+                    {!acc.is_default && (
+                      <button
+                        onClick={() => setAccountToDelete(acc)}
+                        title="Delete Account"
+                        className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <span
-                    className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
-                      acc.scope === 'personal'
-                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                        : acc.scope === 'family'
-                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                        : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
-                    }`}
+                {/* Balance Amount */}
+                <div className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">
+                  {formatPaise(acc.balance)}
+                </div>
+              </div>
+
+              {/* Bottom Action Footer */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-200/60 dark:border-white/10 text-xs">
+                <span className="font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                  <FileText className="w-3 h-3" />
+                  <span>View Passbook</span>
+                </span>
+
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAccForDetail(acc);
+                      setOpenDetailWithAddRecord(true);
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] hover:bg-emerald-500/25 transition-all flex items-center gap-1 cursor-pointer"
                   >
-                    {acc.scope ? (acc.scope === 'business' ? '🏢 Biz' : acc.scope === 'personal' ? '👤 Pers' : '👨‍👩‍👧‍👦 Fam') : '🏢 Biz'}
-                  </span>
+                    <Plus className="w-3 h-3" />
+                    <span>Record</span>
+                  </button>
 
-                  {acc.is_default ? (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
-                      Primary
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFromAccId(acc.id);
+                      setShowTransferModal(true);
+                    }}
+                    className="text-[11px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center gap-1 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    <span>Transfer</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* List View */
+        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 shadow-xs divide-y divide-slate-100 dark:divide-white/5 overflow-hidden">
+          {filteredAccounts.map((acc) => (
+            <div
+              key={acc.id}
+              onClick={() => setSelectedAccForDetail(acc)}
+              className="p-4 sm:px-5 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shadow-xs shrink-0 ${
+                    acc.iconColor || 'bg-blue-600 text-white'
+                  }`}
+                >
+                  {getAccountIcon(acc.account_type)}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                      {acc.name}
+                    </h3>
+                    <span
+                      className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shrink-0 ${
+                        acc.scope === 'personal'
+                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                          : acc.scope === 'family'
+                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                          : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                      }`}
+                    >
+                      {acc.scope ? (acc.scope === 'business' ? '🏢 Biz' : acc.scope === 'personal' ? '👤 Pers' : '👨‍👩‍👧‍👦 Fam') : '🏢 Biz'}
                     </span>
-                  ) : (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-400 font-semibold">
-                      {getAccountTypeBadge(acc.account_type)}
-                    </span>
-                  )}
+                    {acc.is_default ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20 shrink-0">
+                        Primary
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-400 font-semibold shrink-0">
+                        {getAccountTypeBadge(acc.account_type)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                    <span>{acc.bank_name || 'Bank'}</span>
+                    {acc.account_number_last4 && (
+                      <span className="font-mono text-[11px] text-slate-400">
+                        •••• {acc.account_number_last4}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-                  {/* Count Physical Cash / Notes Button for Cash Counter accounts */}
+              <div
+                className="flex items-center justify-between sm:justify-end gap-3.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-white/5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-left sm:text-right">
+                  <div className="text-base sm:text-lg font-black text-slate-900 dark:text-white tabular-nums">
+                    {formatPaise(acc.balance)}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Available balance</span>
+                </div>
+
+                <div className="flex items-center gap-1">
                   {(acc.account_type === 'cash_counter' || acc.name.toLowerCase().includes('cash')) && (
                     <button
+                      type="button"
                       onClick={() => {
                         setDenominationTargetAccount(acc);
                         setShowDenominationModal(true);
                       }}
-                      title="Count Physical Notes & Coins (Denomination Counter)"
-                      className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+                      title="Count Physical Notes"
+                      className="p-2 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-950/30 text-amber-600 dark:text-amber-400 transition-colors cursor-pointer"
                     >
-                      <Calculator className="w-3.5 h-3.5" />
+                      <Calculator className="w-4 h-4" />
                     </button>
                   )}
-
-                  {/* Edit Button */}
                   <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAccForDetail(acc);
+                      setOpenDetailWithAddRecord(true);
+                    }}
+                    title="Quick Record Transaction"
+                    className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFromAccId(acc.id);
+                      setShowTransferModal(true);
+                    }}
+                    title="Transfer Funds"
+                    className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
+                  >
+                    <ArrowRightLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleOpenEdit(acc)}
                     title="Edit Account"
-                    className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 transition-colors"
+                    className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
                   >
-                    <Edit3 className="w-3.5 h-3.5" />
+                    <Edit3 className="w-4 h-4" />
                   </button>
-
-                  {/* Delete Button (non-default only) */}
                   {!acc.is_default && (
                     <button
+                      type="button"
                       onClick={() => setAccountToDelete(acc)}
                       title="Delete Account"
-                      className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-rose-600 transition-colors"
+                      className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
               </div>
-
-              {/* Balance Amount */}
-              <div className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">
-                {formatPaise(acc.balance)}
-              </div>
             </div>
-
-            {/* Bottom Action Footer */}
-            <div className="flex items-center justify-between pt-3 border-t border-slate-200/60 dark:border-white/10 text-xs">
-              <span className="font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
-                <FileText className="w-3 h-3" />
-                <span>View Passbook</span>
-              </span>
-
-              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedAccForDetail(acc);
-                    setOpenDetailWithAddRecord(true);
-                  }}
-                  className="px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] hover:bg-emerald-500/25 transition-all flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Record</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFromAccId(acc.id);
-                    setShowTransferModal(true);
-                  }}
-                  className="text-[11px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center gap-1 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                >
-                  <span>Transfer</span>
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* POPUP: Account Passbook Detail */}
       <AccountDetailModal

@@ -49,6 +49,7 @@ import { useSheetStore, convertExcelSerialToDate } from '@/stores/useSheetStore'
 import { useSessionStore } from '@/stores/useSessionStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { SheetColumn, SheetColumnType, SheetRow } from '@/types';
+import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 
 const SHEET_COLORS = [
   { id: '#6366F1', name: 'Indigo' },
@@ -235,6 +236,19 @@ export function SheetsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [wrapText, setWrapText] = useState(false);
   const [showGridlines, setShowGridlines] = useState(true);
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('rb_view_sheets') as ViewMode) || 'list';
+    }
+    return 'list';
+  });
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_view_sheets', mode);
+    }
+  };
 
   // Selection states
   const [selectedColId, setSelectedColId] = useState<string | null>(null);
@@ -1190,6 +1204,9 @@ export function SheetsScreen() {
                   .XLSX
                 </button>
 
+                {/* View Mode Toggle: Spreadsheet Table (List) vs Record Cards (Grid) */}
+                <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+
                 {/* Delete Entire Sheet */}
                 <button
                   onClick={(e) => handleDeleteSheet(activeSheet.id, activeSheet.title, e)}
@@ -1528,6 +1545,7 @@ export function SheetsScreen() {
           {/* ========================================================
               EXCEL GRID TABLE (FIXED ROWS & FIXED COLUMNS MATRIX)
              ======================================================== */}
+          {viewMode === 'list' ? (
           <div
             ref={tableContainerRef}
             className="overflow-x-auto overflow-y-auto max-h-[70vh] relative scrollbar-thin"
@@ -1850,6 +1868,115 @@ export function SheetsScreen() {
               </tbody>
             </table>
           </div>
+          ) : (
+            /* Card Grid View for Records */
+            <div className="p-4 bg-slate-50/60 dark:bg-slate-900/40">
+              {filteredRows.length === 0 ? (
+                <div className="text-center py-12 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 p-6 text-xs text-slate-400 space-y-2">
+                  <FileSpreadsheet className="w-8 h-8 mx-auto text-blue-500/40" />
+                  <p className="font-semibold text-slate-600 dark:text-slate-300">No records found.</p>
+                  <p className="text-[11px]">Click &quot;+ Row&quot; above to create the first record in this sheet.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {paginatedRows.map((row, rowIdx) => {
+                    const absoluteIndex = pageSize > 0 ? (currentPage - 1) * pageSize + rowIdx + 1 : rowIdx + 1;
+                    return (
+                      <div
+                        key={row.id}
+                        className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4 shadow-xs space-y-3 hover:border-blue-400/50 transition-all hover-lift group"
+                      >
+                        {/* Card Header: Record # and actions */}
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-2">
+                          <span className="font-mono text-xs font-black px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                            #{absoluteIndex}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedCell({ rowId: row.id, colId: activeSheet.columns[0]?.id || '' });
+                                handleDuplicateRow();
+                              }}
+                              title="Duplicate Record"
+                              className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-blue-500 transition-colors"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteRow(activeSheet.id, row.id)}
+                              title="Delete Record"
+                              className="p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-400 hover:text-rose-500 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Card Fields: Columns Grid */}
+                        <div className="space-y-2 text-xs">
+                          {activeSheet.columns.map((col) => {
+                            const cellVal = row.data[col.id];
+                            const isDateType = col.type === 'date' || /birth|dob|date|expiry|joining/i.test(col.name);
+                            const displayVal = isDateType ? convertExcelSerialToDate(cellVal) : cellVal;
+
+                            return (
+                              <div key={col.id} className="flex flex-col gap-0.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                                  {col.name}
+                                </span>
+                                {col.type === 'select' || (col.options && col.options.length > 0) ? (
+                                  <select
+                                    value={String(displayVal ?? '')}
+                                    onChange={(e) => updateCell(activeSheet.id, row.id, col.id, e.target.value)}
+                                    className="w-full rounded-xl border border-slate-200/70 dark:border-white/10 bg-slate-50/50 dark:bg-white/5 px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  >
+                                    <option value="" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                                      -- Select --
+                                    </option>
+                                    {(col.options || ['Active', 'Pending', 'Completed']).map((opt) => (
+                                      <option key={opt} value={opt} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                                        {opt}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <div className="rounded-xl border border-slate-200/70 dark:border-white/10 bg-slate-50/50 dark:bg-white/5 px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-100">
+                                    <SheetCellInput
+                                      value={String(displayVal ?? '')}
+                                      type={col.type}
+                                      isBold={false}
+                                      isItalic={false}
+                                      align="left"
+                                      wrapText={true}
+                                      onChange={(newVal) => updateCell(activeSheet.id, row.id, col.id, newVal)}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Add Continuation Row Button in Grid View */}
+              <div className="mt-4 pt-2">
+                <button
+                  type="button"
+                  onClick={handleQuickAddRow}
+                  className="w-full py-3 rounded-2xl border-2 border-dashed border-slate-200 dark:border-white/10 hover:border-blue-500/50 dark:hover:border-blue-500/50 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 font-bold text-xs flex items-center justify-center gap-2 transition-all hover:bg-blue-50/30 dark:hover:bg-blue-950/20"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Add New Record</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* ========================================================
               PAGINATION & ROW WINDOWING BAR (60 FPS PERFORMANCE)

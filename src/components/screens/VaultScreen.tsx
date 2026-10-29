@@ -28,6 +28,7 @@ import { useVaultStore } from '@/stores/useVaultStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { encryptData, decryptData } from '@/lib/crypto';
 import { syncEngine } from '@/lib/syncEngine';
+import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 
 const VAULT_COLORS = [
   { id: '#3B82F6', name: 'Blue', label: 'Banking & Finance', bg: 'bg-blue-500', text: 'text-blue-500' },
@@ -113,6 +114,19 @@ export function VaultScreen() {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('all');
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('rb_view_vault') as ViewMode) || 'grid';
+    }
+    return 'grid';
+  });
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_view_vault', mode);
+    }
+  };
 
   // Change PIN Modal
   const [showChangePinModal, setShowChangePinModal] = useState(false);
@@ -669,20 +683,24 @@ export function VaultScreen() {
               })}
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full md:w-64">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Search secrets, IDs, notes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-              />
+            {/* Search Input & View Toggle */}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Search secrets, IDs, notes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+              <ViewToggle viewMode={viewMode} onChange={setViewMode} />
             </div>
           </div>
 
-          {/* Vault Cards Grid */}
+          {/* Vault: Grid vs List View */}
+          {viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredVaultItems.length === 0 ? (
               <div className="col-span-full text-center py-12 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 p-6 text-xs text-slate-400 space-y-2">
@@ -854,6 +872,164 @@ export function VaultScreen() {
               })
             )}
           </div>
+          ) : (
+            /* Vault List View */
+            <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 shadow-xs divide-y divide-slate-100 dark:divide-white/5 overflow-hidden">
+              {filteredVaultItems.length === 0 ? (
+                <div className="text-center py-12 text-xs text-slate-400">
+                  No vault items found.
+                </div>
+              ) : (
+                filteredVaultItems.map((item) => {
+                  const itemColor = item.color || '#3B82F6';
+                  const cachedSecrets = decryptedSecretsMap[item.id] || (item.secrets && item.secrets.length > 0 ? item.secrets : null);
+                  const primarySecret = cachedSecrets && cachedSecrets.length > 0 ? cachedSecrets[0] : null;
+                  const isRevealed = primarySecret ? (revealAll || revealedFields[`${item.id}_${primarySecret.id}`]) : false;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-4 sm:px-5 sm:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors group"
+                    >
+                      {/* Left: Indicator, Title, Category, URL */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div
+                          className="w-3 h-3 rounded-full shrink-0 shadow-xs"
+                          style={{ backgroundColor: itemColor }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                              {item.title}
+                            </h4>
+                            <span
+                              className="text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shrink-0"
+                              style={{
+                                backgroundColor: `${itemColor}15`,
+                                color: itemColor,
+                                border: `1px solid ${itemColor}30`,
+                              }}
+                            >
+                              {item.category || 'General'}
+                            </span>
+                            {item.url && (
+                              <a
+                                href={item.url.startsWith('http') ? item.url : `https://${item.url}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-slate-400 hover:text-blue-500 transition-colors shrink-0"
+                                title={item.url}
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5 flex-wrap">
+                            {item.username && (
+                              <span className="font-mono text-slate-600 dark:text-slate-300">
+                                {item.username}
+                              </span>
+                            )}
+                            {item.notes && (
+                              <span className="text-[11px] text-slate-400 truncate max-w-xs">
+                                • {item.notes}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Middle: Secret / Decrypt */}
+                      <div className="flex items-center gap-2 shrink-0 md:min-w-[200px] justify-start md:justify-center">
+                        {cachedSecrets ? (
+                          primarySecret ? (
+                            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-white/5 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-white/10">
+                              <span className="font-mono text-xs text-slate-700 dark:text-slate-200">
+                                {isRevealed ? primarySecret.value : '••••••••••••'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => toggleRevealField(item, primarySecret.id)}
+                                className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                              >
+                                {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCopySecret(primarySecret.value, `${item.id}_${primarySecret.id}`)}
+                                className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                              >
+                                {copiedKey === `${item.id}_${primarySecret.id}` ? (
+                                  <Check className="w-3 h-3 text-emerald-500" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                              {cachedSecrets.length > 1 && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-500 ml-1">
+                                  +{cachedSecrets.length - 1} more
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">No secrets saved</span>
+                          )
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => ensureDecrypted(item)}
+                            className="px-2.5 py-1 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-600 dark:text-violet-400 text-xs font-semibold flex items-center gap-1 transition-colors"
+                          >
+                            <Lock className="w-3 h-3" />
+                            <span>Tap to Decrypt</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Right: Action Buttons */}
+                      <div className="flex items-center gap-1 shrink-0 justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-white/5">
+                        {item.username && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopySecret(item.username!, `${item.id}_user`)}
+                            title="Copy Username"
+                            className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-blue-500 transition-colors"
+                          >
+                            {copiedKey === `${item.id}_user` ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(item)}
+                          title="Edit Item"
+                          className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-blue-500 transition-colors"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Delete "${item.title}" from vault?`)) {
+                              deleteVaultItemOptimistic(item.id);
+                              syncEngine.deleteVaultItem(item.id);
+                            }
+                          }}
+                          title="Delete Item"
+                          className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-rose-500 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
       )}
 

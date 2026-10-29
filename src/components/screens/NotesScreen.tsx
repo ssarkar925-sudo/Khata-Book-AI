@@ -24,6 +24,7 @@ import { useNoteStore } from '@/stores/useNoteStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { NoteDetailModal } from '@/components/modals/NoteDetailModal';
+import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
 
 export function NotesScreen() {
   const { notes: allNotes } = useNoteStore();
@@ -35,6 +36,19 @@ export function NotesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   // Category / Tag / Color filter: 'all' | 'pinned' | 'checklist' | color id
   const [noteFilter, setNoteFilter] = useState<string>('all');
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('rb_view_notes') as ViewMode) || 'grid';
+    }
+    return 'grid';
+  });
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_view_notes', mode);
+    }
+  };
 
   // Popup Viewing Modal
   const [viewingNote, setViewingNote] = useState<NoteItem | null>(null);
@@ -381,31 +395,36 @@ export function NotesScreen() {
           </button>
         </div>
 
-        {/* Color Palette Filters */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Colors:</span>
-          {colorOptions.map((c) => {
-            const isSelected = noteFilter === c.id;
-            const count = notes.filter((n) => n.color === c.id).length;
-            return (
-              <button
-                key={c.id}
-                onClick={() => setNoteFilter(isSelected ? 'all' : c.id)}
-                title={`Filter ${c.name} notes (${count})`}
-                className={`w-5 h-5 rounded-full ${c.dot} transition-transform flex items-center justify-center ${
-                  isSelected
-                    ? 'scale-125 ring-2 ring-slate-900 dark:ring-white ring-offset-1 dark:ring-offset-slate-950'
-                    : 'opacity-60 hover:opacity-100'
-                }`}
-              >
-                {isSelected && <span className="w-1.5 h-1.5 bg-white rounded-full shadow-xs" />}
-              </button>
-            );
-          })}
+        {/* Color Palette Filters & View Toggle */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Colors:</span>
+            {colorOptions.map((c) => {
+              const isSelected = noteFilter === c.id;
+              const count = notes.filter((n) => n.color === c.id).length;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setNoteFilter(isSelected ? 'all' : c.id)}
+                  title={`Filter ${c.name} notes (${count})`}
+                  className={`w-5 h-5 rounded-full ${c.dot} transition-transform flex items-center justify-center ${
+                    isSelected
+                      ? 'scale-125 ring-2 ring-slate-900 dark:ring-white ring-offset-1 dark:ring-offset-slate-950'
+                      : 'opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  {isSelected && <span className="w-1.5 h-1.5 bg-white rounded-full shadow-xs" />}
+                </button>
+              );
+            })}
+          </div>
+
+          <ViewToggle viewMode={viewMode} onChange={setViewMode} />
         </div>
       </div>
 
-      {/* Notes Grid */}
+      {/* Notes: Grid vs List View */}
+      {viewMode === 'grid' ? (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {dedupedFilteredNotes.length === 0 ? (
           <div className="col-span-full text-center py-12 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 p-6 text-xs text-slate-400 space-y-2">
@@ -582,6 +601,132 @@ export function NotesScreen() {
           })
         )}
       </div>
+      ) : (
+        /* Notes List View */
+        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 shadow-xs divide-y divide-slate-100 dark:divide-white/5 overflow-hidden">
+          {dedupedFilteredNotes.length === 0 ? (
+            <div className="text-center py-12 text-xs text-slate-400">
+              {searchQuery ? 'No notes matched your search.' : 'No notes written yet.'}
+            </div>
+          ) : (
+            dedupedFilteredNotes.map((note) => {
+              const matchedColor = colorOptions.find((c) => c.id === note.color) || colorOptions[0];
+              const checklistCount = note.checklist_items ? note.checklist_items.length : 0;
+              const completedCount = note.checklist_items
+                ? note.checklist_items.filter((i) => i.is_done).length
+                : 0;
+
+              return (
+                <div
+                  key={note.id}
+                  onClick={() => setViewingNote(note)}
+                  className="p-4 sm:px-5 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-3.5 h-3.5 rounded-full ${matchedColor.dot} shrink-0`} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
+                          {note.title || <span className="italic opacity-60">Untitled Note</span>}
+                        </h4>
+                        {note.is_pinned && (
+                          <span className="p-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                            <Pin className="w-3 h-3 fill-current" />
+                          </span>
+                        )}
+                        <span
+                          className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shrink-0 ${
+                            note.scope === 'personal'
+                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                              : note.scope === 'family'
+                              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                              : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                          }`}
+                        >
+                          {note.scope ? (note.scope === 'business' ? '🏢 Biz' : note.scope === 'personal' ? '👤 Pers' : '👨‍👩‍👧‍👦 Fam') : '🏢 Biz'}
+                        </span>
+                      </div>
+                      {note.body && (
+                        <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">
+                          {note.body}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-white/5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      {checklistCount > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300">
+                          ✓ {completedCount}/{checklistCount}
+                        </span>
+                      )}
+                      <span className="text-[11px] font-mono">
+                        {note.created_at ? new Date(note.created_at).toLocaleDateString() : 'Today'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => syncEngine.updateNote(note.id, { is_pinned: !note.is_pinned })}
+                        title={note.is_pinned ? 'Unpin' : 'Pin'}
+                        className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-amber-500 transition-colors cursor-pointer"
+                      >
+                        <Pin className={`w-3.5 h-3.5 ${note.is_pinned ? 'fill-current text-amber-500' : ''}`} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleShareWhatsAppNote(e, note)}
+                        title="Share via WhatsApp"
+                        className="p-1.5 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDuplicateNote(note);
+                        }}
+                        title="Duplicate Note"
+                        className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
+                      >
+                        <Files className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEdit(note);
+                        }}
+                        title="Edit Note"
+                        className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNoteToDelete(note.id);
+                        }}
+                        title="Delete Note"
+                        className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
       {/* POPUP VIEW MODAL */}
       <NoteDetailModal

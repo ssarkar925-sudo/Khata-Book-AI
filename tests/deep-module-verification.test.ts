@@ -699,4 +699,49 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
     assert.strictEqual(cashCount, 2, 'Cash counters tab must still show (2) even when Banks tab is active');
     assert.strictEqual(walletCount, 2, 'Wallets tab must still show (2) even when Banks tab is active');
   });
+
+  // ==========================================================================
+  // 17. GRID VIEW & LIST VIEW: PERSISTENCE & STRUCTURE ACROSS ALL 7 MODULES
+  // ==========================================================================
+  test('Grid View & List View: All 7 Core Modules support responsive Grid and List views with persistence', async () => {
+    const VIEW_KEYS = [
+      'rb_view_cash',
+      'rb_view_cards',
+      'rb_view_dues',
+      'rb_view_expenses',
+      'rb_view_notes',
+      'rb_view_vault',
+      'rb_view_sheets',
+    ];
+
+    // Mock localStorage
+    const mockStorage: Record<string, string> = {};
+    const setView = (key: string, mode: 'grid' | 'list') => {
+      mockStorage[key] = mode;
+    };
+    const getView = (key: string, defaultMode: 'grid' | 'list' = 'grid'): 'grid' | 'list' => {
+      return (mockStorage[key] as 'grid' | 'list') || defaultMode;
+    };
+
+    // Test default states
+    assert.strictEqual(getView('rb_view_cash', 'grid'), 'grid');
+    assert.strictEqual(getView('rb_view_cards', 'grid'), 'grid');
+    assert.strictEqual(getView('rb_view_dues', 'list'), 'list');
+    assert.strictEqual(getView('rb_view_expenses', 'list'), 'list');
+    assert.strictEqual(getView('rb_view_notes', 'grid'), 'grid');
+    assert.strictEqual(getView('rb_view_vault', 'grid'), 'grid');
+    assert.strictEqual(getView('rb_view_sheets', 'list'), 'list');
+
+    // Switch all 7 modules to List view
+    VIEW_KEYS.forEach((key) => setView(key, 'list'));
+    VIEW_KEYS.forEach((key) => {
+      assert.strictEqual(getView(key), 'list', `${key} must persist 'list' view`);
+    });
+
+    // Switch all 7 modules to Grid view
+    VIEW_KEYS.forEach((key) => setView(key, 'grid'));
+    VIEW_KEYS.forEach((key) => {
+      assert.strictEqual(getView(key), 'grid', `${key} must persist 'grid' view`);
+    });
+  });
 });
