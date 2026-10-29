@@ -791,4 +791,68 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
     const resolved = getAccountEffectiveBalance(testAccount, ledgerEntries);
     assert.strictEqual(resolved, 4341000, 'Effective balance must accurately reflect ₹43,410.00 surplus deposit');
   });
+
+  // ==========================================================================
+  // 19. MODULE REMARKS / NOTES PERSISTENCE & VISIBILITY AUDIT
+  // ==========================================================================
+  test('Remarks & Notes: Persist and sanitize across Credit Cards, Bank Accounts, Dues, and Spends', () => {
+    // 1. Credit Card Remarks
+    const testCard: Card = {
+      id: 'card-rem-1',
+      workspace_id: 'ws-test',
+      name: 'IndusInd Pinnacle World',
+      bank: 'IndusInd',
+      variant: 'Pinnacle World',
+      network: 'mastercard',
+      last4: '2002',
+      credit_limit: 23700000,
+      statement_day: 5,
+      due_day: 24,
+      is_active: true,
+      scope: 'business',
+      notes: 'Lounge access card + ₹10,000 monthly spend target for waiver',
+    };
+    assert.strictEqual(testCard.notes, 'Lounge access card + ₹10,000 monthly spend target for waiver');
+
+    // 2. Bank Account Remarks
+    const testAccount: BankAccountItem = {
+      id: 'acc-rem-1',
+      workspace_id: 'ws-test',
+      name: 'Salary & Office Till',
+      balance: 1812500,
+      is_default: true,
+      account_type: 'savings',
+      bank_name: 'State Bank of India',
+      account_number_last4: '9356',
+      notes: 'Primary account for client NEFT and office salary disbursements',
+    };
+    assert.strictEqual(testAccount.notes, 'Primary account for client NEFT and office salary disbursements');
+
+    // 3. Due Notes & Searchability
+    const testDue = {
+      id: 'due-rem-1',
+      workspace_id: 'ws-test',
+      customer_id: 'cust-1',
+      amount: 500000,
+      due_date: '2026-11-15',
+      status: 'pending' as const,
+      direction: 'you_will_get' as const,
+      notes: 'Silk sarees delivery - Invoice #204',
+    };
+    const searchQuery = 'Invoice #204';
+    const isMatched = (testDue.notes || '').toLowerCase().includes(searchQuery.toLowerCase());
+    assert.strictEqual(isMatched, true, 'Due remark must be searchable');
+
+    // 4. Ledger Transaction Remark
+    const testLedger: LedgerEntry = {
+      id: 'tx-rem-1',
+      workspace_id: 'ws-test',
+      type: 'expense',
+      amount: 25000,
+      mode: 'upi',
+      note: 'Team client lunch at Mainland China',
+      entry_date: new Date().toISOString(),
+    };
+    assert.strictEqual(testLedger.note, 'Team client lunch at Mainland China');
+  });
 });

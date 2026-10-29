@@ -161,6 +161,7 @@ export function CashScreen() {
   const [newAccLast4, setNewAccLast4] = useState('');
   const [newAccBalanceRupees, setNewAccBalanceRupees] = useState('');
   const [newAccColor, setNewAccColor] = useState('blue');
+  const [newAccNotes, setNewAccNotes] = useState('');
 
   // Form state for Edit Account
   const [editScope, setEditScope] = useState<EntityScope>('business');
@@ -173,6 +174,7 @@ export function CashScreen() {
   const [editLast4, setEditLast4] = useState('');
   const [editBalanceRupees, setEditBalanceRupees] = useState('');
   const [editColor, setEditColor] = useState('blue');
+  const [editNotes, setEditNotes] = useState('');
 
   // Transfer state
   const [fromAccId, setFromAccId] = useState('');
@@ -269,6 +271,7 @@ export function CashScreen() {
       color_theme: newAccColor,
       gradient: themeDef.gradient,
       iconColor: themeDef.iconColor,
+      notes: newAccNotes.trim() || undefined,
       created_at: new Date().toISOString(),
     };
 
@@ -281,6 +284,7 @@ export function CashScreen() {
     setNewAccCustomWallet('');
     setNewAccLast4('');
     setNewAccBalanceRupees('');
+    setNewAccNotes('');
     setNewAccType('savings');
     setNewAccColor('blue');
   };
@@ -311,6 +315,7 @@ export function CashScreen() {
     setEditLast4(acc.account_number_last4 || '');
     setEditBalanceRupees(acc.balance ? paiseToRupees(acc.balance).toString() : '0');
     setEditColor(acc.color_theme || 'blue');
+    setEditNotes(acc.notes || '');
   };
 
   // Save Edit Account
@@ -337,6 +342,7 @@ export function CashScreen() {
       scope: editScope,
       account_number_last4: editLast4.trim() || undefined,
       balance: newBalance,
+      notes: editNotes.trim() || null,
       color_theme: editColor,
       gradient: themeDef.gradient,
       iconColor: themeDef.iconColor,
@@ -709,6 +715,16 @@ export function CashScreen() {
                 <div className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">
                   {formatPaise(getAccountEffectiveBalance(acc))}
                 </div>
+
+                {/* Account Remark */}
+                {acc.notes && (
+                  <div className="mt-2 text-xs text-amber-800 dark:text-amber-200 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span className="truncate font-medium">
+                      <strong className="text-amber-700 dark:text-amber-300">Remark:</strong> {acc.notes}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Bottom Action Footer */}
@@ -798,6 +814,12 @@ export function CashScreen() {
                       </span>
                     )}
                   </div>
+                  {acc.notes && (
+                    <div className="flex items-center gap-1 mt-1 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 max-w-fit font-medium">
+                      <FileText className="w-3 h-3 text-amber-500 shrink-0" />
+                      <span className="truncate"><strong className="text-amber-800 dark:text-amber-200">Remark:</strong> {acc.notes}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1207,6 +1229,20 @@ export function CashScreen() {
                 </div>
               </div>
 
+              {/* Remark / Notes */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Remark / Account Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Primary salary account, Shop cash counter, GST vendor payouts"
+                  value={newAccNotes}
+                  onChange={(e) => setNewAccNotes(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
               {/* Submit Buttons */}
               <div className="pt-2 flex gap-2 shrink-0 border-t border-slate-100 dark:border-white/5">
                 <button
@@ -1464,6 +1500,20 @@ export function CashScreen() {
                     />
                   ))}
                 </div>
+              </div>
+
+              {/* Remark / Notes */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Remark / Account Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Primary salary account, Shop cash counter, GST vendor payouts"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500"
+                />
               </div>
 
               <div className="pt-2 flex gap-2 shrink-0 border-t border-slate-100 dark:border-white/5">

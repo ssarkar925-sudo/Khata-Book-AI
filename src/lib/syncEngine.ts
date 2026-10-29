@@ -734,7 +734,7 @@ class SyncEngine {
       return;
     }
 
-    const payload = {
+    const payload: Record<string, any> = {
       id: account.id,
       workspace_id: account.workspace_id,
       name: account.name,
@@ -748,8 +748,15 @@ class SyncEngine {
       gradient: account.gradient || null,
       icon_color: account.iconColor || null,
     };
+    if (account.notes) payload.notes = account.notes;
+
     try {
-      const { error } = await supabase.from('cash_locations').upsert(payload);
+      let { error } = await supabase.from('cash_locations').upsert(payload);
+      if (error && (error.message?.includes('notes') || error.code === 'PGRST204')) {
+        const { notes, ...fallbackPayload } = payload;
+        const res = await supabase.from('cash_locations').upsert(fallbackPayload);
+        error = res.error;
+      }
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
       useSessionStore.getState().setLastSyncTime(new Date().toISOString());
@@ -782,14 +789,23 @@ class SyncEngine {
     if (updates.bank_name !== undefined) payload.bank_name = updates.bank_name;
     if (updates.account_number_last4 !== undefined) payload.account_number_last4 = updates.account_number_last4;
     if (updates.ifsc !== undefined) payload.ifsc = updates.ifsc;
+    if (updates.notes !== undefined) payload.notes = updates.notes;
     if (updates.gradient !== undefined) payload.gradient = updates.gradient;
     if (updates.iconColor !== undefined) payload.icon_color = updates.iconColor;
 
     try {
-      const { error } = await supabase
+      let { error } = await supabase
         .from('cash_locations')
         .update(payload)
         .eq('id', id);
+      if (error && (error.message?.includes('notes') || error.code === 'PGRST204')) {
+        const { notes, ...sanitized } = payload;
+        const res = await supabase
+          .from('cash_locations')
+          .update(sanitized)
+          .eq('id', id);
+        error = res.error;
+      }
       if (error) throw error;
       useSessionStore.getState().setSyncStatus('synced');
       useSessionStore.getState().setLastSyncTime(new Date().toISOString());
@@ -1170,11 +1186,12 @@ class SyncEngine {
       };
       if (cardWithScope.variant) basePayload.variant = cardWithScope.variant;
       if (cardWithScope.network) basePayload.network = cardWithScope.network;
+      if (cardWithScope.notes) basePayload.notes = cardWithScope.notes;
 
       let { error } = await supabase.from('cards').upsert(basePayload);
-      if (error && (error.message?.includes('variant') || error.message?.includes('network') || error.code === 'PGRST204')) {
-        // Fallback without variant and network if columns are not in remote Supabase table yet
-        const { variant, network, ...fallbackPayload } = basePayload;
+      if (error && (error.message?.includes('variant') || error.message?.includes('network') || error.message?.includes('notes') || error.code === 'PGRST204')) {
+        // Fallback without variant, network, and notes if columns are not in remote Supabase table yet
+        const { variant, network, notes, ...fallbackPayload } = basePayload;
         const res = await supabase.from('cards').upsert(fallbackPayload);
         error = res.error;
       }
@@ -1204,8 +1221,8 @@ class SyncEngine {
         .from('cards')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', cardId);
-      if (error && (error.message?.includes('variant') || error.message?.includes('network') || error.code === 'PGRST204')) {
-        const { variant, network, ...sanitized } = updates;
+      if (error && (error.message?.includes('variant') || error.message?.includes('network') || error.message?.includes('notes') || error.code === 'PGRST204')) {
+        const { variant, network, notes, ...sanitized } = updates;
         const res = await supabase
           .from('cards')
           .update({ ...sanitized, updated_at: new Date().toISOString() })

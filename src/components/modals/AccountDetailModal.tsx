@@ -163,6 +163,7 @@ export function AccountDetailModal({
     if (liveAccount.account_number_last4)
       msg += `A/C Ending: •••• ${liveAccount.account_number_last4}\n`;
     msg += `Type: ${getAccountTypeLabel(liveAccount.account_type)}\n`;
+    if (liveAccount.notes) msg += `📝 Remark: ${liveAccount.notes}\n`;
     msg += `------------------------------\n`;
     msg += `💰 *Current Balance:* ${formatPaise(effectiveBalance)}\n`;
     msg += `🟢 *Total Credits:* ${formatPaise(totalCredits)}\n`;
@@ -354,6 +355,17 @@ export function AccountDetailModal({
                 </span>
               </div>
             </div>
+
+            {/* Account Remark / Notes */}
+            {liveAccount.notes && (
+              <div className="pt-2 border-t border-white/10 text-xs text-indigo-200/90 flex items-start gap-2">
+                <FileText className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold text-amber-300 mr-1.5">Account Remark:</span>
+                  <span>{liveAccount.notes}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Quick Record Transaction Box / Collapsible Form */}

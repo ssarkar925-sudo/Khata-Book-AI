@@ -20,6 +20,7 @@ import {
   Edit3,
   Share2,
   Check,
+  FileText,
 } from 'lucide-react';
 import { Card, LedgerEntry } from '@/types';
 import { formatPaise, parseToPaise } from '@/lib/money';
@@ -88,7 +89,7 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEdi
   }
 
   const handleShareReminder = () => {
-    const text = `💳 *Credit Card Bill Reminder*\n*Card:* ${card.name} (${card.bank} •••• ${card.last4})\n*🔴 Billed Due:* ${formatPaise(summary.billedDue)}\n*⏰ Due Date:* ${formattedDueDate} (${summary.reminderMessage})\n*🟣 Unbilled Spends:* ${formatPaise(summary.netUnbilled)}\n*🟢 Available Limit:* ${formatPaise(summary.availableCredit)} / ${formatPaise(card.credit_limit)}\n\n_Tracked in Record Book_`;
+    const text = `💳 *Credit Card Bill Reminder*\n*Card:* ${card.name} (${card.bank} •••• ${card.last4})\n*🔴 Billed Due:* ${formatPaise(summary.billedDue)}\n*⏰ Due Date:* ${formattedDueDate} (${summary.reminderMessage})\n*🟣 Unbilled Spends:* ${formatPaise(summary.netUnbilled)}\n*🟢 Available Limit:* ${formatPaise(summary.availableCredit)} / ${formatPaise(card.credit_limit)}${card.notes ? `\n*📝 Remark:* ${card.notes}` : ''}\n\n_Tracked in Record Book_`;
     if (navigator.share) {
       navigator.share({ title: `${card.name} Payment Reminder`, text }).catch(() => {});
     } else {
@@ -200,6 +201,17 @@ export function CardDetailModal({ card, onClose, onRecordSpend, onPayBill, onEdi
             <span>{formattedDueDate}</span>
           </div>
         </div>
+
+        {/* Card Remark / Notes Banner */}
+        {card.notes && (
+          <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2 shrink-0">
+            <FileText className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-amber-900 dark:text-amber-300 mr-1.5">Card Remark:</span>
+              <span>{card.notes}</span>
+            </div>
+          </div>
+        )}
 
         {/* Billed vs Unbilled KPI Summary Cards */}
         <div className="grid grid-cols-3 gap-2.5 shrink-0">

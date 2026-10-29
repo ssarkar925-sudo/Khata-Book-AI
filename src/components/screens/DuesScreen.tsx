@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Edit3,
   Trash2,
+  FileText,
   Globe,
   Building2,
   Users2,
@@ -589,9 +590,12 @@ export function DuesScreen() {
                     </div>
 
                     {due.notes && (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-1 bg-white/40 dark:bg-black/20 p-1.5 rounded-xl">
-                        {due.notes}
-                      </p>
+                      <div className="mt-2 text-xs text-amber-800 dark:text-amber-200 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span className="truncate font-medium">
+                          <strong className="text-amber-700 dark:text-amber-300">Remark:</strong> {due.notes}
+                        </span>
+                      </div>
                     )}
                   </div>
 
@@ -666,7 +670,12 @@ export function DuesScreen() {
                             📞 {cust.phone}
                           </span>
                         )}
-                        {due.notes && <span>• {due.notes}</span>}
+                        {due.notes && (
+                          <span className="inline-flex items-center gap-1 font-medium text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 text-[10px]">
+                            <FileText className="w-3 h-3 text-amber-500 shrink-0" />
+                            <span>{due.notes}</span>
+                          </span>
+                        )}
                         <span>•</span>
                         <span
                           className={`font-bold px-2 py-0.2 rounded-md border text-[10px] ${deadline.color}`}

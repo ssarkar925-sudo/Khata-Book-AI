@@ -259,9 +259,14 @@ export function ContactDetailModal({
                       className="py-3 flex items-center justify-between text-xs hover:bg-slate-50 dark:hover:bg-white/5 px-2 rounded-xl transition-colors"
                     >
                       <div>
-                        <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">
-                          {due.notes || (isGet ? 'Credit given (Udhar)' : 'Payment owed')}
+                        <div className="font-bold text-slate-800 dark:text-slate-200 text-sm flex items-center gap-1.5 flex-wrap">
+                          <span>{due.notes || (isGet ? 'Credit given (Udhar)' : 'Payment owed')}</span>
                         </div>
+                        {due.notes && (
+                          <div className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 font-medium">
+                            <span>📝 Remark: {due.notes}</span>
+                          </div>
+                        )}
                         <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
                           <span>Due: {new Date(due.due_date).toLocaleDateString()}</span>
                           <span>•</span>

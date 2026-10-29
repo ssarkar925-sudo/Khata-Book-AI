@@ -91,6 +91,7 @@ export interface CashLocation {
   bank_name?: string;
   account_number_last4?: string;
   ifsc?: string;
+  notes?: string | null;
   color_theme?: string;
   created_at?: string;
   updated_at?: string;
@@ -151,6 +152,7 @@ export interface Card {
   due_day?: number;
   is_active: boolean;
   scope?: EntityScope;
+  notes?: string | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;

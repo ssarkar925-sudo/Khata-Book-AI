@@ -28,6 +28,7 @@ import {
   Edit3,
   Share2,
   Check,
+  FileText,
   Globe,
   User,
   Users2,
@@ -128,6 +129,7 @@ export function CardsScreen() {
   const [editUnbilledRupees, setEditUnbilledRupees] = useState('');
   const [originalBilledRupees, setOriginalBilledRupees] = useState('');
   const [originalUnbilledRupees, setOriginalUnbilledRupees] = useState('');
+  const [editCardNotes, setEditCardNotes] = useState('');
   const [copiedReminderId, setCopiedReminderId] = useState<string | null>(null);
 
   // Scoped Cards
@@ -151,6 +153,7 @@ export function CardsScreen() {
   const [dueDay, setDueDay] = useState('5');
   const [initialBilledRupees, setInitialBilledRupees] = useState('');
   const [initialUnbilledRupees, setInitialUnbilledRupees] = useState('');
+  const [cardNotes, setCardNotes] = useState('');
 
   // Spend State - Auto Cycle is DEFAULT as requested
   const [showSpendModal, setShowSpendModal] = useState(false);
@@ -234,6 +237,7 @@ export function CardsScreen() {
     setEditLimitRupees(paiseToRupees(card.credit_limit).toString());
     setEditStatementDay((card.statement_day || 15).toString());
     setEditDueDay((card.due_day || 5).toString());
+    setEditCardNotes(card.notes || '');
 
     // Calculate live billed due and unbilled spends
     const summary = calculateCardBilling(card, ledger);
@@ -259,6 +263,7 @@ export function CardsScreen() {
       credit_limit: parseToPaise(editLimitRupees),
       statement_day: parseInt(editStatementDay, 10) || 15,
       due_day: parseInt(editDueDay, 10) || 5,
+      notes: editCardNotes.trim() || null,
     });
 
     // Reconcile Billed Statement Due if changed
@@ -338,7 +343,7 @@ export function CardsScreen() {
       month: 'short',
       year: 'numeric',
     });
-    const text = `💳 *Credit Card Bill Reminder*\n*Card:* ${card.name} (${card.bank} •••• ${card.last4})\n*🔴 Billed Due:* ${formatPaise(summary.billedDue)}\n*⏰ Due Date:* ${formattedDueDate} (${summary.reminderMessage})\n*🟣 Unbilled Spends:* ${formatPaise(summary.netUnbilled)}\n*🟢 Available Limit:* ${formatPaise(summary.availableCredit)} / ${formatPaise(card.credit_limit)}\n\n_Tracked in Record Book_`;
+    const text = `💳 *Credit Card Bill Reminder*\n*Card:* ${card.name} (${card.bank} •••• ${card.last4})\n*🔴 Billed Due:* ${formatPaise(summary.billedDue)}\n*⏰ Due Date:* ${formattedDueDate} (${summary.reminderMessage})\n*🟣 Unbilled Spends:* ${formatPaise(summary.netUnbilled)}\n*🟢 Available Limit:* ${formatPaise(summary.availableCredit)} / ${formatPaise(card.credit_limit)}${card.notes ? `\n*📝 Remark:* ${card.notes}` : ''}\n\n_Tracked in Record Book_`;
     if (navigator.share) {
       navigator.share({ title: `${card.name} Payment Reminder`, text }).catch(() => {});
     } else {
@@ -383,6 +388,7 @@ export function CardsScreen() {
       statement_day: parseInt(statementDay, 10) || 15,
       due_day: parseInt(dueDay, 10) || 5,
       is_active: true,
+      notes: cardNotes.trim() || undefined,
     };
 
     syncEngine.pushCard(newCard);
@@ -432,6 +438,7 @@ export function CardsScreen() {
     setDueDay('5');
     setInitialBilledRupees('');
     setInitialUnbilledRupees('');
+    setCardNotes('');
   };
 
   const handleRecordSpend = (e: React.FormEvent) => {
@@ -1060,6 +1067,16 @@ export function CardsScreen() {
                     </div>
                   </div>
 
+                  {/* Card Remark Pill */}
+                  {card.notes && (
+                    <div className="relative z-10 mb-2 px-3 py-1.5 rounded-xl bg-black/45 backdrop-blur-xs border border-white/15 text-xs text-amber-200/90 flex items-center gap-1.5 shadow-inner">
+                      <FileText className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                      <span className="font-semibold text-[11px] truncate">
+                        <span className="text-amber-300 font-bold">Remark:</span> {card.notes}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Bottom Action Footer with Swipe, Pay, Detail, and Delete Button */}
                   <div className="relative z-10 pt-1 flex items-center gap-2">
                     <button
@@ -1231,6 +1248,12 @@ export function CardsScreen() {
                               : 'No Bill Due'}
                           </span>
                         </div>
+                        {card.notes && (
+                          <div className="flex items-center gap-1 mt-1.5 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 max-w-fit font-medium">
+                            <FileText className="w-3 h-3 text-amber-500 shrink-0" />
+                            <span className="truncate"><strong className="text-amber-800 dark:text-amber-200">Remark:</strong> {card.notes}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1836,6 +1859,19 @@ export function CardsScreen() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Remark / Card Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Primary fuel card, ₹10k monthly milestone, Lounge access, Auto-pay on 20th"
+                  value={cardNotes}
+                  onChange={(e) => setCardNotes(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
               <div className="pt-2 flex gap-2 shrink-0">
                 <button
                   type="button"
@@ -2113,6 +2149,19 @@ export function CardsScreen() {
                     </span>
                   </div>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Remark / Card Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Primary fuel card, ₹10k monthly milestone, Lounge access, Auto-pay on 20th"
+                  value={editCardNotes}
+                  onChange={(e) => setEditCardNotes(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+                />
               </div>
 
               <div className="pt-2 flex gap-2 shrink-0">

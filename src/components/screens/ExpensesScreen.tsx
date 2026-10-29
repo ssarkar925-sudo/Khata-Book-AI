@@ -13,6 +13,7 @@ import {
   CreditCard,
   Users,
   FileSpreadsheet,
+  FileText,
   ArrowUpRight,
   ArrowRight,
   Download,
@@ -720,6 +721,15 @@ export function ExpensesScreen({
                       {expense.note || cat.name}
                     </h4>
 
+                    {expense.note && expense.note !== cat.name && (
+                      <div className="mt-1.5 text-xs text-amber-800 dark:text-amber-200 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 px-2 py-1 rounded-xl flex items-center gap-1.5">
+                        <FileText className="w-3 h-3 text-amber-500 shrink-0" />
+                        <span className="truncate font-medium">
+                          <strong className="text-amber-700 dark:text-amber-300">Remark:</strong> {expense.note}
+                        </span>
+                      </div>
+                    )}
+
                     {/* Cross-link chips */}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap text-xs">
                       {acc && (
@@ -815,6 +825,12 @@ export function ExpensesScreen({
                         >
                           {cat.name}
                         </span>
+                        {expense.note && expense.note !== cat.name && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 font-medium">
+                            <FileText className="w-3 h-3 text-amber-500 shrink-0" />
+                            <span>{expense.note}</span>
+                          </span>
+                        )}
                       </div>
 
                       {/* Cross-linking Badges */}
