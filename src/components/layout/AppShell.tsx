@@ -11,6 +11,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { AppLockScreen } from '@/components/security/AppLockScreen';
 import { syncEngine } from '@/lib/syncEngine';
+import { cloudSnapshotEngine } from '@/lib/cloudSnapshotEngine';
 import { X, Camera, Mic, Shield } from 'lucide-react';
 
 // Dynamic Code Splitting for ultra-fast startup
@@ -73,6 +74,16 @@ export function AppShell() {
     if (user && activeWorkspaceId) {
       syncEngine.pullAll(activeWorkspaceId);
       syncEngine.subscribeRealtime(activeWorkspaceId);
+
+      // Run daily automated cloud snapshot check in background after 3s
+      const snapTimer = setTimeout(() => {
+        cloudSnapshotEngine.checkAndRunAutoDailySnapshot();
+      }, 3000);
+
+      return () => {
+        clearTimeout(snapTimer);
+        syncEngine.destroy();
+      };
     }
 
     return () => {

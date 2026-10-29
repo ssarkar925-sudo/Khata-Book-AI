@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Phone,
@@ -19,6 +19,7 @@ import {
 import { Customer, PeopleDue } from '@/types';
 import { formatPaise } from '@/lib/money';
 import { useCustomerStore } from '@/stores/useCustomerStore';
+import { WhatsAppReminderModal } from '@/components/modals/WhatsAppReminderModal';
 
 interface ContactDetailModalProps {
   customer: Customer | null;
@@ -38,6 +39,7 @@ export function ContactDetailModal({
   onDeleteContact,
 }: ContactDetailModalProps) {
   const { dues } = useCustomerStore();
+  const [isReminderOpen, setIsReminderOpen] = useState(false);
 
   if (!customer) return null;
 
@@ -55,6 +57,20 @@ export function ContactDetailModal({
   const netBalance = totalGet - totalGive;
   const nameInitial = customer.name.charAt(0).toUpperCase();
   const isSupplier = customer.type === 'supplier';
+
+  const primaryDue: PeopleDue | null = pendingDues[0] || (netBalance > 0 ? {
+    id: `due-net-${customer.id}`,
+    workspace_id: customer.workspace_id,
+    customer_id: customer.id,
+    amount: Math.abs(netBalance),
+    direction: 'you_will_get',
+    due_date: new Date().toISOString().slice(0, 10),
+    status: 'pending',
+    notes: 'Net Outstanding Balance',
+    scope: customer.scope || 'business',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  } : null);
 
   const handleShareStatement = () => {
     let msg = `📋 *Khata Statement — ${customer.name}*\n`;
@@ -186,13 +202,23 @@ export function ContactDetailModal({
 
           {/* Action Buttons: WhatsApp & Record Due */}
           <div className="flex gap-2 shrink-0">
-            <button
-              onClick={handleShareStatement}
-              className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/25 transition-all hover-lift"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Send WhatsApp Bill</span>
-            </button>
+            {primaryDue ? (
+              <button
+                onClick={() => setIsReminderOpen(true)}
+                className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/25 transition-all hover-lift"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>UPI Reminder &amp; Bill</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleShareStatement}
+                className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/25 transition-all hover-lift"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Share Statement</span>
+              </button>
+            )}
 
             <button
               onClick={() => {
@@ -283,6 +309,15 @@ export function ContactDetailModal({
           </div>
         </div>
       </div>
+
+      {primaryDue && (
+        <WhatsAppReminderModal
+          isOpen={isReminderOpen}
+          onClose={() => setIsReminderOpen(false)}
+          due={primaryDue}
+          customer={customer}
+        />
+      )}
     </div>
   );
 }

@@ -30,6 +30,7 @@ import { useSessionStore } from '@/stores/useSessionStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { ContactDetailModal } from '@/components/modals/ContactDetailModal';
 import { SettleDueModal } from '@/components/modals/SettleDueModal';
+import { WhatsAppReminderModal } from '@/components/modals/WhatsAppReminderModal';
 
 export function DuesScreen() {
   const { customers, dues } = useCustomerStore();
@@ -47,6 +48,7 @@ export function DuesScreen() {
   const [showAddDueModal, setShowAddDueModal] = useState(false);
   const [dueToSettle, setDueToSettle] = useState<{ due: PeopleDue; customer: Customer } | null>(null);
   const [custToEdit, setCustToEdit] = useState<Customer | null>(null);
+  const [reminderModalData, setReminderModalData] = useState<{ due: PeopleDue; customer: Customer } | null>(null);
 
   // Add Customer State
   const [custName, setCustName] = useState('');
@@ -268,28 +270,7 @@ export function DuesScreen() {
 
   const handleSendWhatsAppReminder = (e: React.MouseEvent, due: PeopleDue, cust: Customer) => {
     e.stopPropagation();
-    const isGet = due.direction === 'you_will_get';
-    let msg = `Dear *${cust.name}*,\n\n`;
-    if (isGet) {
-      msg += `This is a gentle reminder regarding your pending balance of *${formatPaise(
-        due.amount
-      )}* with Record Book.\n`;
-      msg += `Payment Due Date: ${new Date(due.due_date).toLocaleDateString()}\n`;
-      if (due.notes) msg += `Remark: ${due.notes}\n`;
-      msg += `\nKindly arrange the payment via UPI, GPay, or Net Banking at your earliest convenience. Thank you!`;
-    } else {
-      msg += `Hello! This is regarding the payment of *${formatPaise(
-        due.amount
-      )}* due on ${new Date(due.due_date).toLocaleDateString()}.\n`;
-      if (due.notes) msg += `Remark: ${due.notes}\n`;
-      msg += `\nPlease share your current payment details/QR code for settlement. Thank you!`;
-    }
-
-    const encoded = encodeURIComponent(msg);
-    const targetUrl = cust.phone
-      ? `https://wa.me/91${cust.phone.replace(/\D/g, '')}?text=${encoded}`
-      : `https://wa.me/?text=${encoded}`;
-    window.open(targetUrl, '_blank');
+    setReminderModalData({ due, customer: cust });
   };
 
   return (
@@ -1082,6 +1063,13 @@ export function DuesScreen() {
           </div>
         </div>
       )}
+      {/* WhatsApp Reminder & UPI Modal */}
+      <WhatsAppReminderModal
+        isOpen={!!reminderModalData}
+        onClose={() => setReminderModalData(null)}
+        due={reminderModalData?.due || null}
+        customer={reminderModalData?.customer || null}
+      />
     </div>
   );
 }

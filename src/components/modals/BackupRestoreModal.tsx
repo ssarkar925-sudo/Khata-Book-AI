@@ -28,19 +28,20 @@ import { useSessionStore } from '@/stores/useSessionStore';
 import { useAppLockStore } from '@/stores/useAppLockStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { encryptData, decryptData } from '@/lib/crypto';
+import { cloudSnapshotEngine, CloudSnapshot } from '@/lib/cloudSnapshotEngine';
 
 interface BackupRestoreModalProps {
   isOpen: boolean;
   onClose: () => void;
-  defaultTab?: 'backup' | 'restore' | 'security';
+  defaultTab?: 'snapshots' | 'backup' | 'restore' | 'security';
 }
 
 export function BackupRestoreModal({
   isOpen,
   onClose,
-  defaultTab = 'backup',
+  defaultTab = 'snapshots',
 }: BackupRestoreModalProps) {
-  const [activeTab, setActiveTab] = useState<'backup' | 'restore' | 'security'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'snapshots' | 'backup' | 'restore' | 'security'>(defaultTab);
 
   // Stores
   const { accounts, setAccounts } = useAccountStore();
@@ -83,6 +84,48 @@ export function BackupRestoreModal({
     payload: string;
     exported_at?: string;
   } | null>(null);
+
+  // Cloud Snapshot State
+  const [snapshotsList, setSnapshotsList] = useState<CloudSnapshot[]>(() => cloudSnapshotEngine.listSnapshots());
+  const [isTakingSnapshot, setIsTakingSnapshot] = useState(false);
+  const [snapshotMessage, setSnapshotMessage] = useState('');
+  const [isAutoBackupOn, setIsAutoBackupOn] = useState(() => cloudSnapshotEngine.isAutoBackupEnabled());
+  const [confirmRestoreId, setConfirmRestoreId] = useState<string | null>(null);
+
+  const handleTakeSnapshot = async () => {
+    setIsTakingSnapshot(true);
+    setSnapshotMessage('');
+    try {
+      const s = await cloudSnapshotEngine.takeSnapshot();
+      setSnapshotsList(cloudSnapshotEngine.listSnapshots());
+      setSnapshotMessage(`Snapshot taken successfully! (${s.total_records} records backed up)`);
+    } catch (err: any) {
+      setSnapshotMessage(`Failed to take snapshot: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setIsTakingSnapshot(false);
+    }
+  };
+
+  const handleRestoreSnapshot = async (id: string) => {
+    const success = await cloudSnapshotEngine.restoreSnapshot(id);
+    if (success) {
+      setRestoreSuccess('Cloud Snapshot restored successfully into your active session!');
+      setConfirmRestoreId(null);
+    } else {
+      setRestoreError('Failed to restore selected snapshot.');
+    }
+  };
+
+  const handleDeleteSnapshot = async (id: string) => {
+    await cloudSnapshotEngine.deleteSnapshot(id);
+    setSnapshotsList(cloudSnapshotEngine.listSnapshots());
+  };
+
+  const handleToggleAutoBackup = () => {
+    const next = !isAutoBackupOn;
+    setIsAutoBackupOn(next);
+    cloudSnapshotEngine.setAutoBackupEnabled(next);
+  };
 
   // App Lock Form State
   const [newPin, setNewPin] = useState('');
@@ -347,13 +390,25 @@ export function BackupRestoreModal({
         </div>
 
         {/* Tab Controls */}
-        <div className="flex border-b border-slate-100 dark:border-white/10 px-6 pt-3 gap-2 bg-slate-50 dark:bg-white/5">
+        <div className="flex border-b border-slate-100 dark:border-white/10 px-6 pt-3 gap-2 bg-slate-50 dark:bg-white/5 overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => setActiveTab('snapshots')}
+            className={`flex items-center gap-1.5 px-3 py-2 border-b-2 text-xs font-bold transition-all shrink-0 ${
+              activeTab === 'snapshots'
+                ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:white'
+            }`}
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Cloud Snapshots</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('backup')}
-            className={`flex items-center gap-1.5 px-3 py-2 border-b-2 text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 border-b-2 text-xs font-bold transition-all shrink-0 ${
               activeTab === 'backup'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:white'
             }`}
           >
             <Download className="w-3.5 h-3.5" />
@@ -362,10 +417,10 @@ export function BackupRestoreModal({
 
           <button
             onClick={() => setActiveTab('restore')}
-            className={`flex items-center gap-1.5 px-3 py-2 border-b-2 text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 border-b-2 text-xs font-bold transition-all shrink-0 ${
               activeTab === 'restore'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:white'
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
@@ -374,20 +429,169 @@ export function BackupRestoreModal({
 
           <button
             onClick={() => setActiveTab('security')}
-            className={`flex items-center gap-1.5 px-3 py-2 border-b-2 text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 border-b-2 text-xs font-bold transition-all shrink-0 ${
               activeTab === 'security'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:white'
             }`}
           >
             <Lock className="w-3.5 h-3.5" />
-            <span>App Lock on Launch</span>
+            <span>App Lock</span>
           </button>
         </div>
 
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-5">
-          {/* TAB 1: 1-CLICK BACKUP */}
+          {/* TAB 0: CLOUD SNAPSHOTS */}
+          {activeTab === 'snapshots' && (
+            <div className="space-y-4">
+              {/* Snapshot Control Card */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-emerald-500" />
+                      <span>Multi-Device Automated Cloud Backups</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Automatic daily snapshots protect all your data across phones and laptops.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleAutoBackup}
+                    className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-colors ${
+                      isAutoBackupOn
+                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-slate-100 dark:bg-white/10 border-slate-300 dark:border-white/20 text-slate-500'
+                    }`}
+                  >
+                    {isAutoBackupOn ? '✓ Auto-Daily: ON' : '✕ Auto-Daily: OFF'}
+                  </button>
+                </div>
+
+                <div className="pt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isTakingSnapshot}
+                    onClick={handleTakeSnapshot}
+                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isTakingSnapshot ? 'animate-spin' : ''}`} />
+                    <span>{isTakingSnapshot ? 'Taking Snapshot...' : 'Take Cloud Snapshot Now'}</span>
+                  </button>
+                </div>
+
+                {snapshotMessage && (
+                  <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded-lg">
+                    {snapshotMessage}
+                  </p>
+                )}
+                {restoreSuccess && (
+                  <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 p-2 rounded-lg">
+                    {restoreSuccess}
+                  </p>
+                )}
+                {restoreError && (
+                  <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 p-2 rounded-lg">
+                    {restoreError}
+                  </p>
+                )}
+              </div>
+
+              {/* Snapshots Timeline List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <span>Available Versioned Snapshots ({snapshotsList.length})</span>
+                  <span>Timeline</span>
+                </div>
+
+                {snapshotsList.length === 0 ? (
+                  <div className="text-center py-8 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl text-xs text-slate-400 space-y-1">
+                    <Database className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+                    <p className="font-bold">No snapshots recorded yet.</p>
+                    <p className="text-[11px]">Click &quot;Take Cloud Snapshot Now&quot; above to capture your first state.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                    {snapshotsList.map((snap) => (
+                      <div
+                        key={snap.id}
+                        className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex flex-col gap-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                              {snap.device_name}
+                            </span>
+                            {snap.is_auto && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                                Auto
+                              </span>
+                            )}
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                              {snap.label}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(snap.created_at).toLocaleString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between pt-1 border-t border-slate-100 dark:border-white/5">
+                          <span>Total records: <strong>{snap.total_records}</strong> (Ledger: {snap.data.ledger?.length || 0}, Dues: {snap.data.dues?.length || 0}, Sheets: {snap.data.sheets?.length || 0})</span>
+
+                          <div className="flex items-center gap-2">
+                            {confirmRestoreId === snap.id ? (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRestoreSnapshot(snap.id)}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[10px]"
+                                >
+                                  Confirm Restore
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmRestoreId(null)}
+                                  className="px-2 py-1 rounded-lg bg-slate-200 dark:bg-white/10 text-[10px]"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmRestoreId(snap.id)}
+                                  className="px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-[10px] transition-colors"
+                                >
+                                  Restore
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSnapshot(snap.id)}
+                                  className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                                  title="Delete snapshot"
+                                >
+                                  ✕
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {activeTab === 'backup' && (
             <div className="space-y-4">
               <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-800 dark:text-blue-300">

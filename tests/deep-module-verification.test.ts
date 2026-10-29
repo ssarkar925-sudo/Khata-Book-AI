@@ -257,4 +257,112 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
     assert.strictEqual(normalized.rows[0].data['col-3'], '2023-08-15', 'Receive date normalized to YYYY-MM-DD');
     assert.strictEqual(normalized.rows[0].data['col-4'], '2023-10-31', 'Excel serial normalized to YYYY-MM-DD');
   });
+
+  // ==========================================================================
+  // 8. AI CASHFLOW & DUE RISK FORECAST ENGINE
+  // ==========================================================================
+  test('AI Forecast: Accurately projects 30-day balance, burn rate, and segments due risk levels', async () => {
+    const { computeCashflowForecast } = await import('../src/lib/cashflowForecasting');
+
+    const accounts = [
+      { id: 'acc-1', workspace_id: 'ws-1', name: 'HDFC Bank', balance: 5000000, is_default: true }, // 50,000 INR
+    ];
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const overduePastStr = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // 20 days ago
+
+    const dues = [
+      {
+        id: 'due-1',
+        workspace_id: 'ws-1',
+        customer_id: 'cust-1',
+        amount: 1000000, // 10,000 INR
+        direction: 'you_will_get' as const,
+        due_date: todayStr,
+        status: 'pending' as const,
+        created_at: todayStr,
+      },
+      {
+        id: 'due-2',
+        workspace_id: 'ws-1',
+        customer_id: 'cust-2',
+        amount: 2000000, // 20,000 INR
+        direction: 'you_will_get' as const,
+        due_date: overduePastStr,
+        status: 'pending' as const,
+        created_at: overduePastStr,
+      },
+    ];
+
+    const customers = [
+      { id: 'cust-1', workspace_id: 'ws-1', name: 'Rahul', type: 'customer' as const, created_at: todayStr },
+      { id: 'cust-2', workspace_id: 'ws-1', name: 'Amit (Overdue)', type: 'customer' as const, created_at: overduePastStr },
+    ];
+
+    const ledger = [
+      {
+        id: 'tx-1',
+        workspace_id: 'ws-1',
+        type: 'cash_in' as const,
+        amount: 6000000, // 60,000 INR in 30 days = 2,000/day
+        mode: 'upi' as const,
+        entry_date: todayStr,
+      },
+      {
+        id: 'tx-2',
+        workspace_id: 'ws-1',
+        type: 'cash_out' as const,
+        amount: 3000000, // 30,000 INR in 30 days = 1,000/day
+        mode: 'cash' as const,
+        entry_date: todayStr,
+      },
+    ];
+
+    const cards: any[] = [];
+
+    const forecast = computeCashflowForecast(ledger as any, accounts as any, dues as any, cards, customers as any);
+
+    assert.strictEqual(forecast.currentLiquidCashPaise, 5000000, 'Liquid cash is 50,000 INR');
+    assert.strictEqual(forecast.dailyInflowRatePaise, 200000, 'Daily inflow is 2,000 INR');
+    assert.strictEqual(forecast.dailyBurnRatePaise, 100000, 'Daily burn is 1,000 INR');
+    assert.strictEqual(forecast.netVelocityPaise, 100000, 'Net cashflow velocity is +1,000 INR/day');
+    assert.strictEqual(forecast.runwayDays, 'infinite', 'Positive cashflow has infinite runway');
+    assert.strictEqual(forecast.projected30DayBalancePaise, 5000000 + 100000 * 30, 'Projected balance is 80,000 INR');
+
+    // Risk segmentation
+    assert.strictEqual(forecast.riskBreakdown.items.length, 2);
+    const rahulDue = forecast.riskBreakdown.items.find((i) => i.customerId === 'cust-1');
+    const amitDue = forecast.riskBreakdown.items.find((i) => i.customerId === 'cust-2');
+
+    assert.strictEqual(rahulDue?.riskLevel, 'low', 'Due today is low risk');
+    assert.strictEqual(rahulDue?.recoveryProbability, 0.95, 'Low risk recovery is 95%');
+    assert.strictEqual(amitDue?.riskLevel, 'high', '20-day overdue is high risk');
+    assert.strictEqual(amitDue?.recoveryProbability, 0.35, 'High risk recovery is 35%');
+    assert.ok(forecast.recommendations.length > 0, 'Generates actionable recommendations');
+  });
+
+  // ==========================================================================
+  // 9. MULTI-DEVICE CLOUD SNAPSHOT ENGINE
+  // ==========================================================================
+  test('Cloud Snapshots: Takes versioned snapshots and restores state cleanly', async () => {
+    const { cloudSnapshotEngine } = await import('../src/lib/cloudSnapshotEngine');
+    const { useAccountStore } = await import('../src/stores/useAccountStore');
+
+    useAccountStore.getState().setAccounts([
+      { id: 'acc-snap-test', workspace_id: 'ws-1', name: 'Snap Bank', balance: 99000, is_default: true },
+    ]);
+
+    const snap = await cloudSnapshotEngine.takeSnapshot('Pre-Migration Backup', false);
+    assert.ok(snap.id.startsWith('snap-'));
+    assert.strictEqual(snap.data.accounts[0].name, 'Snap Bank');
+
+    // Mutate state
+    useAccountStore.getState().setAccounts([]);
+    assert.strictEqual(useAccountStore.getState().accounts.length, 0);
+
+    // Restore from snapshot
+    const ok = await cloudSnapshotEngine.restoreSnapshot(snap.id);
+    assert.strictEqual(ok, true);
+    assert.strictEqual(useAccountStore.getState().accounts[0].name, 'Snap Bank');
+  });
 });

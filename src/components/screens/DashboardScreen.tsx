@@ -46,6 +46,7 @@ import { TabType, LedgerEntry, EntityScope } from '@/types';
 import { TransactionDetailModal } from '@/components/modals/TransactionDetailModal';
 import { InterSphereTransferModal } from '@/components/modals/InterSphereTransferModal';
 import { CardSpendModal } from '@/components/modals/CardSpendModal';
+import { CashflowForecastWidget } from '@/components/ai/CashflowForecastWidget';
 import { getCategoryById } from '@/lib/categories';
 
 interface DashboardProps {
@@ -780,6 +781,11 @@ export function DashboardScreen({
           ))}
         </div>
       )}
+
+      {/* ========================================================= */}
+      {/* AI CASHFLOW & DUE FORECAST DASHBOARD                      */}
+      {/* ========================================================= */}
+      <CashflowForecastWidget onNavigateTab={onNavigateTab} />
 
       {/* ========================================================= */}
       {/* INTERACTIVE VISUAL CHARTS & ANALYTICS                     */}

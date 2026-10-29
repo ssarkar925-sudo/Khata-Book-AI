@@ -26,7 +26,8 @@ import { syncEngine } from '@/lib/syncEngine';
 import { NoteDetailModal } from '@/components/modals/NoteDetailModal';
 
 export function NotesScreen() {
-  const { notes } = useNoteStore();
+  const { notes: allNotes } = useNoteStore();
+  const notes = allNotes.filter((n) => !n.tags || !n.tags.includes('__system_cloud_snapshot__'));
   const { activeWorkspaceId, theme } = useSessionStore();
   const isLight = theme === 'light';
 

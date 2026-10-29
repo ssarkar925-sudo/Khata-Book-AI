@@ -35,6 +35,11 @@ import { paiseToRupees, formatPaise } from '@/lib/money';
 import { calculateAllCardsBillingReport } from '@/lib/cardBilling';
 import { getCategoryById, EXPENSE_CATEGORIES } from '@/lib/categories';
 import { StatementPrintModal } from '@/components/modals/StatementPrintModal';
+import {
+  exportComprehensiveFinancialWorkbook,
+  exportLedgerOnlyWorkbook,
+  exportUdharOnlyWorkbook,
+} from '@/lib/excelReportGenerator';
 import { TabType } from '@/types';
 
 type DatePreset = 'today' | 'this_week' | 'this_month' | 'last_month' | 'this_fy' | 'all_time' | 'custom';
@@ -322,6 +327,60 @@ export function ReportsScreen({ onNavigateTab }: ReportsScreenProps = {}) {
       .slice(-7);
   }, [filteredEntries]);
 
+  // Excel (.xlsx) Exporters
+  const handleExportFullExcel = async () => {
+    try {
+      const totalRec = dues
+        .filter((d) => d.status === 'pending' && d.direction === 'you_will_get')
+        .reduce((s, d) => s + Number(d.amount), 0);
+      const totalPay = dues
+        .filter((d) => d.status === 'pending' && d.direction === 'you_will_give')
+        .reduce((s, d) => s + Number(d.amount), 0);
+      const totalAccBal = accounts.reduce((s, a) => s + Number(a.balance || 0), 0);
+      const totalCards = cardBillingReport.totalOutstanding;
+
+      await exportComprehensiveFinancialWorkbook({
+        workspace: activeWs,
+        dateRange: { startDateStr, endDateStr, periodLabel },
+        ledger: filteredEntries,
+        customers,
+        dues,
+        cards,
+        accounts,
+        summary: {
+          totalInflowPaise: totalInflow,
+          totalOutflowPaise: totalOutflow,
+          netCashflowPaise: netProfit,
+          receivablesPaise: totalRec,
+          payablesPaise: totalPay,
+          totalCashBalancePaise: totalAccBal,
+          totalCardDuesPaise: totalCards,
+        },
+      });
+      setShowExportMenu(false);
+    } catch (err) {
+      console.error('Failed to export comprehensive Excel:', err);
+    }
+  };
+
+  const handleExportLedgerExcel = async () => {
+    try {
+      await exportLedgerOnlyWorkbook(filteredEntries, accounts, customers, periodLabel);
+      setShowExportMenu(false);
+    } catch (err) {
+      console.error('Failed to export Ledger Excel:', err);
+    }
+  };
+
+  const handleExportUdharExcel = async () => {
+    try {
+      await exportUdharOnlyWorkbook(dues, customers);
+      setShowExportMenu(false);
+    } catch (err) {
+      console.error('Failed to export Udhar Excel:', err);
+    }
+  };
+
   // CSV Exporters
   const handleExportFullCSV = () => {
     const headers = ['Date', 'Type', 'Category', 'Account', 'Amount (Rupees)', 'Payment Mode', 'Notes'];
@@ -521,34 +580,67 @@ export function ReportsScreen({ onNavigateTab }: ReportsScreenProps = {}) {
               className="flex items-center gap-1.5 px-3 py-2 rounded-2xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-xs transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Export CSV</span>
+              <span>Export Reports</span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
 
             {showExportMenu && (
-              <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl py-2 z-30 animate-in fade-in zoom-in-95 text-xs">
+              <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl py-2 z-30 animate-in fade-in zoom-in-95 text-xs">
+                {/* Excel Section */}
+                <div className="px-3.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  Excel Workbooks (.xlsx)
+                </div>
+                <button
+                  onClick={handleExportFullExcel}
+                  className="w-full text-left px-3.5 py-2.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-2 border-b border-slate-100 dark:border-white/5"
+                >
+                  <span className="text-base">📗</span>
+                  <div>
+                    <div>Full Financial Workbook (.xlsx)</div>
+                    <span className="text-[10px] text-slate-400 font-normal">All 4 Sheets: Summary, Ledger, Dues, Cards</span>
+                  </div>
+                </button>
+                <button
+                  onClick={handleExportLedgerExcel}
+                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-white/5 font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2"
+                >
+                  <span>📗</span>
+                  <span>Transaction Ledger (.xlsx)</span>
+                </button>
+                <button
+                  onClick={handleExportUdharExcel}
+                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-white/5 font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2 border-b border-slate-100 dark:border-white/5"
+                >
+                  <span>📗</span>
+                  <span>Udhar Register (.xlsx)</span>
+                </button>
+
+                {/* CSV Section */}
+                <div className="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 mt-1">
+                  Standard CSV Exports
+                </div>
                 <button
                   onClick={handleExportFullCSV}
-                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-white/5 font-medium text-slate-700 dark:text-slate-200"
+                  className="w-full text-left px-3.5 py-1.5 hover:bg-slate-50 dark:hover:bg-white/5 font-medium text-slate-700 dark:text-slate-200"
                 >
                   📄 Full Ledger CSV ({filteredEntries.length} rows)
                 </button>
                 <button
                   onClick={handleExportPnLCSV}
-                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-white/5 font-medium text-slate-700 dark:text-slate-200"
+                  className="w-full text-left px-3.5 py-1.5 hover:bg-slate-50 dark:hover:bg-white/5 font-medium text-slate-700 dark:text-slate-200"
                 >
                   📊 P&L Category Breakdown CSV
                 </button>
                 <button
                   onClick={handleExportUdharCSV}
-                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-white/5 font-medium text-slate-700 dark:text-slate-200"
+                  className="w-full text-left px-3.5 py-1.5 hover:bg-slate-50 dark:hover:bg-white/5 font-medium text-slate-700 dark:text-slate-200"
                 >
-                  👥 Customer & Supplier Udhar CSV
+                  👥 Customer &amp; Supplier Udhar CSV
                 </button>
                 {cards.length > 0 && (
                   <button
                     onClick={handleExportCardBillingCSV}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-white/5 font-medium text-slate-700 dark:text-slate-200"
+                    className="w-full text-left px-3.5 py-1.5 hover:bg-slate-50 dark:hover:bg-white/5 font-medium text-slate-700 dark:text-slate-200"
                   >
                     💳 Credit Card Billing CSV
                   </button>
