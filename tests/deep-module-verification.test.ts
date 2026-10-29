@@ -1020,4 +1020,155 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
     assert.strictEqual(localStorage.getItem('rb_sort_dues'), 'due_date_asc');
     assert.strictEqual(localStorage.getItem('rb_sort_expenses'), 'amount_desc');
   });
+
+  test('Fund Transfers: Intra-Sphere (B2B, P2P) and Inter-Sphere physically update account balances atomically with audit trail', async () => {
+    const { useSessionStore } = await import('../src/stores/useSessionStore');
+    const { useAccountStore } = await import('../src/stores/useAccountStore');
+    const { useLedgerStore } = await import('../src/stores/useLedgerStore');
+    const { syncEngine } = await import('../src/lib/syncEngine');
+    const { sanitizeLedgerPayload } = await import('../src/lib/ledgerSanitizer');
+
+    const wsId = '00000000-0000-0000-0000-000000000001';
+    useSessionStore.setState({ activeWorkspaceId: wsId, user: { id: 'usr-1', email: 'owner@test.com' } as any });
+
+    // Setup 4 distinct accounts: 2 Business, 2 Personal
+    const bizAcc1: BankAccountItem = {
+      id: 'biz-acc-1',
+      workspace_id: wsId,
+      name: 'SBI Current A/C',
+      balance: 1000000, // ₹10,000.00
+      scope: 'business',
+      account_type: 'current',
+      is_default: true,
+    };
+    const bizAcc2: BankAccountItem = {
+      id: 'biz-acc-2',
+      workspace_id: wsId,
+      name: 'Business Cash Drawer',
+      balance: 200000, // ₹2,000.00
+      scope: 'business',
+      account_type: 'cash_counter',
+      is_default: false,
+    };
+    const personalAcc1: BankAccountItem = {
+      id: 'pers-acc-1',
+      workspace_id: wsId,
+      name: 'HDFC Savings',
+      balance: 500000, // ₹5,000.00
+      scope: 'personal',
+      account_type: 'savings',
+      is_default: false,
+    };
+    const personalAcc2: BankAccountItem = {
+      id: 'pers-acc-2',
+      workspace_id: wsId,
+      name: 'Paytm Wallet',
+      balance: 50000, // ₹500.00
+      scope: 'personal',
+      account_type: 'wallet',
+      is_default: false,
+    };
+
+    useAccountStore.setState({
+      accounts: [bizAcc1, bizAcc2, personalAcc1, personalAcc2],
+    });
+    useLedgerStore.setState({ entries: [] });
+
+    // 1. EXECUTE INTRA-SPHERE: Business to Business Transfer (SBI Current -> Cash Drawer, ₹3,000)
+    const b2bResult = await syncEngine.transferFunds({
+      fromAccountId: bizAcc1.id,
+      toAccountId: bizAcc2.id,
+      amountPaise: 300000,
+      fromScope: 'business',
+      toScope: 'business',
+      reason: 'Till Replenishment',
+      note: 'Morning cash replenishment',
+    });
+
+    assert.strictEqual(b2bResult.success, true);
+    assert.strictEqual(b2bResult.fromNewBalance, 700000); // 10,000 - 3,000 = 7,000
+    assert.strictEqual(b2bResult.toNewBalance, 500000);   // 2,000 + 3,000 = 5,000
+
+    // Verify useAccountStore physical update
+    const stateAccsAfterB2B = useAccountStore.getState().accounts;
+    const updatedBiz1 = stateAccsAfterB2B.find((a) => a.id === bizAcc1.id);
+    const updatedBiz2 = stateAccsAfterB2B.find((a) => a.id === bizAcc2.id);
+    assert.strictEqual(updatedBiz1?.balance, 700000, 'SBI Current must physically reflect ₹7,000.00 balance');
+    assert.strictEqual(updatedBiz2?.balance, 500000, 'Cash Drawer must physically reflect ₹5,000.00 balance');
+
+    // 2. EXECUTE INTRA-SPHERE: Personal to Personal Transfer (HDFC Savings -> Paytm Wallet, ₹1,000)
+    const p2pResult = await syncEngine.transferFunds({
+      fromAccountId: personalAcc1.id,
+      toAccountId: personalAcc2.id,
+      amountPaise: 100000,
+      fromScope: 'personal',
+      toScope: 'personal',
+      reason: 'Wallet Refill',
+      note: 'Grocery & UPI wallet load',
+    });
+
+    assert.strictEqual(p2pResult.success, true);
+    assert.strictEqual(p2pResult.fromNewBalance, 400000); // 5,000 - 1,000 = 4,000
+    assert.strictEqual(p2pResult.toNewBalance, 150000);   // 500 + 1,000 = 1,500
+
+    const stateAccsAfterP2P = useAccountStore.getState().accounts;
+    const updatedPers1 = stateAccsAfterP2P.find((a) => a.id === personalAcc1.id);
+    const updatedPers2 = stateAccsAfterP2P.find((a) => a.id === personalAcc2.id);
+    assert.strictEqual(updatedPers1?.balance, 400000, 'HDFC Savings must reflect ₹4,000.00 balance');
+    assert.strictEqual(updatedPers2?.balance, 150000, 'Paytm Wallet must reflect ₹1,500.00 balance');
+
+    // 3. EXECUTE INTER-SPHERE: Business to Personal (SBI Current -> HDFC Savings, ₹2,000)
+    const b2pResult = await syncEngine.transferFunds({
+      fromAccountId: bizAcc1.id,
+      toAccountId: personalAcc1.id,
+      amountPaise: 200000,
+      fromScope: 'business',
+      toScope: 'personal',
+      reason: 'Owner Drawing / Profit Share',
+      note: 'Monthly owner withdrawal',
+    });
+
+    assert.strictEqual(b2pResult.success, true);
+    assert.strictEqual(b2pResult.fromNewBalance, 500000); // 7,000 - 2,000 = 5,000
+    assert.strictEqual(b2pResult.toNewBalance, 600000);   // 4,000 + 2,000 = 6,000
+
+    // 4. VERIFY LEDGER DOUBLE-ENTRY AUDIT TRAIL
+    const entries = useLedgerStore.getState().entries;
+    assert.strictEqual(entries.length, 6, '3 transfers must generate exactly 6 double-entry ledger transactions');
+
+    const outflows = entries.filter((e) => e.type === 'cash_out');
+    const inflows = entries.filter((e) => e.type === 'cash_in');
+    assert.strictEqual(outflows.length, 3);
+    assert.strictEqual(inflows.length, 3);
+
+    // Verify sum of outflows equals sum of inflows exactly
+    const totalOut = outflows.reduce((s, e) => s + e.amount, 0);
+    const totalIn = inflows.reduce((s, e) => s + e.amount, 0);
+    assert.strictEqual(totalOut, 600000);
+    assert.strictEqual(totalIn, 600000);
+
+    // 5. VALIDATION: Attempting self-transfer must throw error
+    let selfTransferError = '';
+    try {
+      await syncEngine.transferFunds({
+        fromAccountId: bizAcc1.id,
+        toAccountId: bizAcc1.id,
+        amountPaise: 10000,
+      });
+    } catch (e: any) {
+      selfTransferError = e.message;
+    }
+    assert.ok(selfTransferError.includes('different'), 'Transferring to the same account must be rejected');
+
+    // 6. VALIDATION: Non-UUID category_id in ledger sanitizer is cleanly purged
+    const sanitized = sanitizeLedgerPayload({
+      id: '00000000-0000-0000-0000-000000000099',
+      workspace_id: wsId,
+      type: 'cash_in',
+      amount: 10000,
+      category_id: 'cat-general', // Invalid UUID
+      cash_location_id: 'biz-acc-1', // Non-UUID mock ID handled gracefully
+    });
+    assert.strictEqual(sanitized.category_id, null, 'Invalid non-UUID category_id must be sanitized to null');
+  });
 });

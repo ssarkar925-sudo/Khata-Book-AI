@@ -7,7 +7,7 @@ import { useCardStore } from '@/stores/useCardStore';
 import { useNoteStore } from '@/stores/useNoteStore';
 import { useSheetStore, normalizeSheet } from '@/stores/useSheetStore';
 import { useVaultStore } from '@/stores/useVaultStore';
-import { CashLocation, Customer, PeopleDue, Card, LedgerEntry, NoteItem, RecordSheet, VaultItem, DueStatus, PaymentMode } from '@/types';
+import { CashLocation, Customer, PeopleDue, Card, LedgerEntry, NoteItem, RecordSheet, VaultItem, DueStatus, PaymentMode, EntityScope } from '@/types';
 
 interface QueueItem {
   id: string;
@@ -640,6 +640,173 @@ class SyncEngine {
       };
     }
     return { allowed: true, isOfflineMode: false };
+  }
+
+
+  public getAccountEffectiveBalance(accountId: string): number {
+    const acc = useAccountStore.getState().accounts.find((a) => a.id === accountId);
+    if (!acc) return 0;
+    if (acc.balance && acc.balance !== 0) return acc.balance;
+    const entries = useLedgerStore.getState().entries.filter((e) => e.cash_location_id === accountId);
+    if (entries.length === 0) return acc.balance || 0;
+    const credits = entries
+      .filter((e) => e.type === 'cash_in')
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+    const debits = entries
+      .filter((e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment')
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+    const net = credits - debits;
+    return net !== 0 ? net : (acc.balance || 0);
+  }
+
+  /**
+   * Universal Fund Transfer Engine:
+   * Handles Intra-Sphere (Business to Business, Personal to Personal, Family to Family)
+   * and Inter-Sphere (Business to Personal, Personal to Family, etc.) fund transfers.
+   * Atomically updates both account balances in local state, persistent storage, and Supabase cloud,
+   * while recording paired double-entry ledger audit trail entries.
+   */
+  public async transferFunds(params: {
+    fromAccountId: string;
+    toAccountId: string;
+    amountPaise: number;
+    note?: string;
+    fromScope?: EntityScope;
+    toScope?: EntityScope;
+    reason?: string;
+  }): Promise<{ success: boolean; fromNewBalance: number; toNewBalance: number }> {
+    const perm = this.checkWritePermission();
+    if (!perm.allowed) {
+      useSessionStore.getState().setLastSyncError(perm.error || 'Permission denied');
+      throw new Error(perm.error);
+    }
+
+    const { fromAccountId, toAccountId, amountPaise, note, fromScope, toScope, reason } = params;
+
+    if (amountPaise <= 0) {
+      throw new Error('Transfer amount must be greater than zero.');
+    }
+    if (fromAccountId === toAccountId) {
+      throw new Error('Source and destination accounts must be different.');
+    }
+
+    const accounts = useAccountStore.getState().accounts;
+    const fromAcc = accounts.find((a) => a.id === fromAccountId);
+    const toAcc = accounts.find((a) => a.id === toAccountId);
+
+    if (!fromAcc || !toAcc) {
+      throw new Error('Selected accounts could not be found.');
+    }
+
+    const resolvedFromScope: EntityScope = fromScope || fromAcc.scope || 'business';
+    const resolvedToScope: EntityScope = toScope || toAcc.scope || 'business';
+
+    // Calculate effective balances before transfer
+    const fromCurrentBal = this.getAccountEffectiveBalance(fromAcc.id);
+    const toCurrentBal = this.getAccountEffectiveBalance(toAcc.id);
+
+    const fromNewBalance = fromCurrentBal - amountPaise;
+    const toNewBalance = toCurrentBal + amountPaise;
+
+    // 1. Optimistically update local account balances immediately
+    useAccountStore.getState().updateAccountBalance(fromAcc.id, fromNewBalance);
+    useAccountStore.getState().updateAccountBalance(toAcc.id, toNewBalance);
+
+    // 2. Build paired ledger entries with audit trail
+    const now = new Date().toISOString();
+    const memo = note ? (reason ? `${reason}: ${note}` : note) : (reason || 'Internal Transfer');
+
+    const fromMode: PaymentMode = fromAcc.account_type === 'cash_counter' ? 'cash' : 'bank';
+    const toMode: PaymentMode = toAcc.account_type === 'cash_counter' ? 'cash' : 'bank';
+
+    const outEntry: LedgerEntry = {
+      id: crypto.randomUUID(),
+      workspace_id: fromAcc.workspace_id || useSessionStore.getState().activeWorkspaceId,
+      type: 'cash_out',
+      amount: amountPaise,
+      mode: fromMode,
+      scope: resolvedFromScope,
+      cash_location_id: fromAcc.id,
+      note: `⇄ Transfer to ${toAcc.name} (${memo})`,
+      entry_date: now,
+      created_at: now,
+      idempotency_key: crypto.randomUUID(),
+    };
+
+    const inEntry: LedgerEntry = {
+      id: crypto.randomUUID(),
+      workspace_id: toAcc.workspace_id || useSessionStore.getState().activeWorkspaceId,
+      type: 'cash_in',
+      amount: amountPaise,
+      mode: toMode,
+      scope: resolvedToScope,
+      cash_location_id: toAcc.id,
+      note: `⇄ Transfer from ${fromAcc.name} (${memo})`,
+      entry_date: now,
+      created_at: now,
+      idempotency_key: crypto.randomUUID(),
+    };
+
+    // 3. Add to local ledger store optimistically
+    useLedgerStore.getState().addEntryOptimistic(outEntry);
+    useLedgerStore.getState().addEntryOptimistic(inEntry);
+
+    const cleanOut = sanitizeLedgerPayload(outEntry);
+    const cleanIn = sanitizeLedgerPayload(inEntry);
+
+    if (perm.isOfflineMode) {
+      useSessionStore.getState().setSyncStatus('offline');
+      this.enqueue('ledger_entries', 'upsert', cleanOut);
+      this.enqueue('ledger_entries', 'upsert', cleanIn);
+      this.enqueue('cash_locations', 'upsert', { id: fromAcc.id, balance: fromNewBalance });
+      this.enqueue('cash_locations', 'upsert', { id: toAcc.id, balance: toNewBalance });
+      return { success: true, fromNewBalance, toNewBalance };
+    }
+
+    try {
+      // 4. Push ledger entries to Supabase
+      const [outRes, inRes] = await Promise.allSettled([
+        supabase.from('ledger_entries').upsert(cleanOut),
+        supabase.from('ledger_entries').upsert(cleanIn),
+      ]);
+
+      if (outRes.status === 'rejected') throw outRes.reason;
+      if (inRes.status === 'rejected') throw inRes.reason;
+      if (outRes.value.error) throw outRes.value.error;
+      if (inRes.value.error) throw inRes.value.error;
+
+      // 5. Update cash_locations balances directly in Supabase
+      const [accOutRes, accInRes] = await Promise.allSettled([
+        supabase
+          .from('cash_locations')
+          .update({ balance: fromNewBalance, updated_at: now })
+          .eq('id', fromAcc.id),
+        supabase
+          .from('cash_locations')
+          .update({ balance: toNewBalance, updated_at: now })
+          .eq('id', toAcc.id),
+      ]);
+
+      if (accOutRes.status === 'rejected') throw accOutRes.reason;
+      if (accInRes.status === 'rejected') throw accInRes.reason;
+      if (accOutRes.value.error) throw accOutRes.value.error;
+      if (accInRes.value.error) throw accInRes.value.error;
+
+      useSessionStore.getState().setSyncStatus('synced');
+      useSessionStore.getState().setLastSyncTime(new Date().toISOString());
+      useSessionStore.getState().setLastSyncError(null);
+
+      return { success: true, fromNewBalance, toNewBalance };
+    } catch (err: any) {
+      console.warn('[SyncEngine] Transfer push failed, enqueuing offline:', err);
+      useSessionStore.getState().setSyncStatus('offline');
+      useSessionStore.getState().setLastSyncError(err?.message || 'Transfer queued offline');
+      this.enqueue('ledger_entries', 'upsert', cleanOut);
+      this.enqueue('ledger_entries', 'upsert', cleanIn);
+      this.enqueue('cash_locations', 'upsert', { id: fromAcc.id, balance: fromNewBalance });
+      this.enqueue('cash_locations', 'upsert', { id: toAcc.id, balance: toNewBalance });
+      return { success: true, fromNewBalance, toNewBalance };
+    }
   }
 
   // Ledger

@@ -418,7 +418,7 @@ export function CashScreen() {
   };
 
   // Handle Internal Funds Transfer with Ledger Audit Trail
-  const handleTransfer = (e: React.FormEvent) => {
+  const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     const amountPaise = parseToPaise(transferAmountRupees);
     if (amountPaise <= 0 || !fromAccId || !toAccId || fromAccId === toAccId) return;
@@ -427,33 +427,22 @@ export function CashScreen() {
     const toAcc = accounts.find((a) => a.id === toAccId);
     if (!fromAcc || !toAcc) return;
 
-    // 1. Outflow from source account
-    syncEngine.pushLedgerEntry({
-      id: crypto.randomUUID(),
-      workspace_id: activeWorkspaceId,
-      type: 'cash_out',
-      amount: amountPaise,
-      mode: 'bank',
-      cash_location_id: fromAccId,
-      note: transferNote.trim() ? `Transfer: ${transferNote} (To ${toAcc.name})` : `Transfer to ${toAcc.name}`,
-      entry_date: new Date().toISOString(),
-    });
-
-    // 2. Inflow to destination account
-    syncEngine.pushLedgerEntry({
-      id: crypto.randomUUID(),
-      workspace_id: activeWorkspaceId,
-      type: 'cash_in',
-      amount: amountPaise,
-      mode: 'bank',
-      cash_location_id: toAccId,
-      note: transferNote.trim() ? `Transfer: ${transferNote} (From ${fromAcc.name})` : `Transfer from ${fromAcc.name}`,
-      entry_date: new Date().toISOString(),
-    });
-
-    setShowTransferModal(false);
-    setTransferAmountRupees('');
-    setTransferNote('');
+    try {
+      await syncEngine.transferFunds({
+        fromAccountId: fromAccId,
+        toAccountId: toAccId,
+        amountPaise,
+        note: transferNote.trim(),
+        fromScope: fromAcc.scope || 'business',
+        toScope: toAcc.scope || 'business',
+        reason: 'Bank & Counter Transfer',
+      });
+      setShowTransferModal(false);
+      setTransferAmountRupees('');
+      setTransferNote('');
+    } catch (err: any) {
+      alert(err?.message || 'Transfer failed. Please check account details.');
+    }
   };
 
   const getAccountIcon = (type?: string) => {
@@ -1665,8 +1654,8 @@ export function CashScreen() {
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
                 >
                   {accounts.map((a) => (
-                    <option key={a.id} value={a.id} className="dark:bg-slate-900">
-                      {a.name} ({formatPaise(getAccountEffectiveBalance(a))})
+                    <option key={a.id} value={a.id} disabled={a.id === fromAccId} className="dark:bg-slate-900">
+                      {a.name} ({formatPaise(getAccountEffectiveBalance(a))}){a.id === fromAccId ? ' — (Source)' : ''}
                     </option>
                   ))}
                 </select>
