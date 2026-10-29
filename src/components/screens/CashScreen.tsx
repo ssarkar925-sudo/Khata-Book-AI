@@ -107,6 +107,7 @@ export function CashScreen() {
   const [showDenominationModal, setShowDenominationModal] = useState(false);
   const [denominationTargetAccount, setDenominationTargetAccount] = useState<CashLocation | null>(null);
   const [selectedAccForDetail, setSelectedAccForDetail] = useState<CashLocation | null>(null);
+  const [openDetailWithAddRecord, setOpenDetailWithAddRecord] = useState(false);
   const [accountToEdit, setAccountToEdit] = useState<BankAccountItem | null>(null);
   const [accountToDelete, setAccountToDelete] = useState<BankAccountItem | null>(null);
 
@@ -594,17 +595,31 @@ export function CashScreen() {
                 <span>View Passbook</span>
               </span>
 
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFromAccId(acc.id);
-                  setShowTransferModal(true);
-                }}
-                className="text-[11px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center gap-1 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-              >
-                <span>Transfer</span>
-                <ArrowRight className="w-3 h-3" />
-              </button>
+              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedAccForDetail(acc);
+                    setOpenDetailWithAddRecord(true);
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] hover:bg-emerald-500/25 transition-all flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Record</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFromAccId(acc.id);
+                    setShowTransferModal(true);
+                  }}
+                  className="text-[11px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center gap-1 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                >
+                  <span>Transfer</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -613,7 +628,11 @@ export function CashScreen() {
       {/* POPUP: Account Passbook Detail */}
       <AccountDetailModal
         account={selectedAccForDetail}
-        onClose={() => setSelectedAccForDetail(null)}
+        initialOpenAddRecord={openDetailWithAddRecord}
+        onClose={() => {
+          setSelectedAccForDetail(null);
+          setOpenDetailWithAddRecord(false);
+        }}
         onTransfer={() => {
           if (selectedAccForDetail) setFromAccId(selectedAccForDetail.id);
           setShowTransferModal(true);

@@ -139,17 +139,50 @@ export function CashDenominationModal({
   const [closingRemark, setClosingRemark] = useState('');
   const [syncSuccess, setSyncSuccess] = useState(false);
 
-  // Initialize selected account
+  const getStorageKey = (accId: string) => `rb_cash_denominations_${accId}`;
+
+  const loadSavedState = (accId: string) => {
+    if (typeof window === 'undefined' || !accId) return;
+    try {
+      const raw = localStorage.getItem(getStorageKey(accId));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.counts) setCounts(parsed.counts);
+        if (parsed.looseRupees !== undefined) setLooseRupees(parsed.looseRupees);
+        if (parsed.closingRemark !== undefined) setClosingRemark(parsed.closingRemark);
+        return;
+      }
+    } catch {}
+    setCounts({ 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0 });
+    setLooseRupees('');
+    setClosingRemark('');
+  };
+
+  const persistSavedState = (
+    accId: string,
+    updatedCounts: Record<number, number>,
+    loose: string,
+    remark: string
+  ) => {
+    if (typeof window === 'undefined' || !accId) return;
+    try {
+      localStorage.setItem(
+        getStorageKey(accId),
+        JSON.stringify({ counts: updatedCounts, looseRupees: loose, closingRemark: remark })
+      );
+    } catch {}
+  };
+
+  // Initialize selected account & load its specific denomination state
   useEffect(() => {
     if (isOpen) {
-      if (targetAccount) {
-        setSelectedAccountId(targetAccount.id);
-      } else if (activeCashAccounts.length > 0) {
-        setSelectedAccountId(activeCashAccounts[0].id);
-      }
+      const targetId =
+        targetAccount?.id || (activeCashAccounts.length > 0 ? activeCashAccounts[0].id : '');
+      setSelectedAccountId(targetId);
+      loadSavedState(targetId);
       setSyncSuccess(false);
     }
-  }, [isOpen, targetAccount, activeCashAccounts]);
+  }, [isOpen, targetAccount?.id]);
 
   if (!isOpen) return null;
 
@@ -172,9 +205,20 @@ export function CashDenominationModal({
   const totalCountedPaise = totalDenominationPaise + loosePaise;
   const differencePaise = totalCountedPaise - expectedPaise;
 
+  const handleSwitchAccount = (newId: string) => {
+    setSelectedAccountId(newId);
+    loadSavedState(newId);
+  };
+
   const handleCountChange = (val: number, newCount: number) => {
     const safeCount = Math.max(0, Math.floor(newCount || 0));
-    setCounts((prev) => ({ ...prev, [val]: safeCount }));
+    setCounts((prev) => {
+      const updated = { ...prev, [val]: safeCount };
+      if (selectedAccountId) {
+        persistSavedState(selectedAccountId, updated, looseRupees, closingRemark);
+      }
+      return updated;
+    });
   };
 
   const handleStepCount = (val: number, delta: number) => {
@@ -183,29 +227,22 @@ export function CashDenominationModal({
   };
 
   const handleReset = () => {
-    setCounts({
-      500: 0,
-      200: 0,
-      100: 0,
-      50: 0,
-      20: 0,
-      10: 0,
-      5: 0,
-      2: 0,
-      1: 0,
-    });
+    const emptyCounts = { 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0 };
+    setCounts(emptyCounts);
     setLooseRupees('');
     setClosingRemark('');
+    if (typeof window !== 'undefined' && selectedAccountId) {
+      try {
+        localStorage.removeItem(getStorageKey(selectedAccountId));
+      } catch {}
+    }
   };
 
-  // Sync drawer balance to counted physical cash
+  // Sync drawer balance to counted physical cash without double-counting
   const handleSyncDrawerBalance = () => {
     if (!currentAccount) return;
 
-    // 1. Update account balance directly
-    syncEngine.updateAccountBalance(currentAccount.id, totalCountedPaise);
-
-    // 2. If there is a reconciliation difference, record a ledger entry for audit trail
+    // If there is a reconciliation difference, push ledger entry which automatically updates account balance
     if (differencePaise !== 0) {
       const isExcess = differencePaise > 0;
       syncEngine.pushLedgerEntry({
@@ -215,11 +252,15 @@ export function CashDenominationModal({
         amount: Math.abs(differencePaise),
         mode: 'cash',
         cash_location_id: currentAccount.id,
-        note: `Cash Drawer Tally Adjustment (${isExcess ? 'Surplus' : 'Shortage'} reconciled)${
-          closingRemark.trim() ? ': ' + closingRemark.trim() : ''
+        scope: currentAccount.scope || 'business',
+        note: `Physical Cash Tally Reconciled (${isExcess ? 'Surplus +' : 'Shortage -'}${formatPaise(Math.abs(differencePaise))})${
+          closingRemark.trim() ? ' — ' + closingRemark.trim() : ''
         }`,
         entry_date: new Date().toISOString(),
       });
+    } else {
+      // If exactly matched, update account verified balance directly
+      syncEngine.updateAccountBalance(currentAccount.id, totalCountedPaise);
     }
 
     setSyncSuccess(true);
@@ -310,36 +351,41 @@ export function CashDenominationModal({
           </div>
         </div>
 
-        {/* Scrollable Body */}
-        <div className="overflow-y-auto space-y-4 pr-1 flex-1">
-          {/* Target Cash Drawer Selector */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-            <div className="flex items-center gap-2">
-              <Coins className="w-4 h-4 text-amber-500" />
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Cash Drawer / Counter:
-              </span>
-            </div>
-
-            <select
-              value={selectedAccountId}
-              onChange={(e) => setSelectedAccountId(e.target.value)}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-xs font-bold text-slate-900 dark:text-white"
-            >
-              {activeCashAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} ({formatPaise(a.balance)})
-                </option>
-              ))}
-            </select>
+        {/* Sticky Cash Drawer Selector (Always visible, never scrolls away) */}
+        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25">
+          <div className="flex items-center gap-2">
+            <Coins className="w-4 h-4 text-amber-500 shrink-0" />
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+              Active Cash Drawer:
+            </span>
           </div>
 
+          <select
+            value={selectedAccountId}
+            onChange={(e) => handleSwitchAccount(e.target.value)}
+            className="px-3 py-1.5 rounded-xl border border-amber-500/30 bg-white dark:bg-slate-900 text-xs font-bold text-slate-900 dark:text-white shadow-xs focus:ring-2 focus:ring-amber-500"
+          >
+            {activeCashAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} ({a.scope ? a.scope.toUpperCase() : 'BIZ'}) — Balance: {formatPaise(a.balance)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Scrollable Body */}
+        <div className="overflow-y-auto space-y-4 pr-1 flex-1">
           {/* Hero Count Summary & Difference Card */}
           <div className="rounded-2xl p-5 bg-gradient-to-br from-slate-900 via-amber-950/40 to-slate-950 text-white border border-amber-500/30 shadow-lg space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300">
-                Total Physical Cash Counted
-              </span>
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 block">
+                  Total Physical Cash Counted
+                </span>
+                <span className="text-[10px] text-amber-200/80 font-medium">
+                  Drawer: {currentAccount?.name} ({currentAccount?.scope ? currentAccount.scope.toUpperCase() : 'BIZ'})
+                </span>
+              </div>
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300">
                 {totalNotesCount} notes • {totalCoinsCount} coins
               </span>

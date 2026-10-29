@@ -365,4 +365,95 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
     assert.strictEqual(ok, true);
     assert.strictEqual(useAccountStore.getState().accounts[0].name, 'Snap Bank');
   });
+
+  // ==========================================================================
+  // 10. ACCOUNT STORE DEDUPLICATION (PREVENT CARD DUPLICATION BEFORE REFRESH)
+  // ==========================================================================
+  test('Account Store Deduplication: addAccount never creates duplicate items', async () => {
+    const { useAccountStore } = await import('../src/stores/useAccountStore');
+
+    useAccountStore.getState().setAccounts([]);
+
+    const newCounter = {
+      id: 'counter-reserve-123',
+      workspace_id: 'ws-test',
+      name: 'Counter Reserv',
+      balance: 1350000,
+      account_type: 'cash_counter' as const,
+      is_default: false,
+    };
+
+    // 1. Optimistic push
+    useAccountStore.getState().addAccount(newCounter);
+    assert.strictEqual(useAccountStore.getState().accounts.length, 1);
+
+    // 2. Realtime WebSocket echo arrives for the same account
+    useAccountStore.getState().addAccount({ ...newCounter, name: 'Counter Reserv Updated' });
+
+    // Must NOT duplicate!
+    assert.strictEqual(useAccountStore.getState().accounts.length, 1, 'Account count must remain 1');
+    assert.strictEqual(
+      useAccountStore.getState().accounts[0].name,
+      'Counter Reserv Updated',
+      'Account details must update without creating a second card'
+    );
+  });
+
+  // ==========================================================================
+  // 11. MULTI-DRAWER ISOLATION & DIRECT TRANSACTION PASSBOOK RECORDING
+  // ==========================================================================
+  test('Multi-Drawer Isolation: Each drawer maintains independent balances and transactions', async () => {
+    const { useAccountStore } = await import('../src/stores/useAccountStore');
+    const { useLedgerStore } = await import('../src/stores/useLedgerStore');
+
+    const drawer1 = {
+      id: 'drawer-primary',
+      workspace_id: 'ws-test',
+      name: 'Counter',
+      balance: 0,
+      account_type: 'cash_counter' as const,
+      is_default: true,
+      scope: 'business' as const,
+    };
+
+    const drawer2 = {
+      id: 'drawer-reserv',
+      workspace_id: 'ws-test',
+      name: 'Counter Reserv',
+      balance: 1350000,
+      account_type: 'cash_counter' as const,
+      is_default: false,
+      scope: 'business' as const,
+    };
+
+    useAccountStore.getState().setAccounts([drawer1, drawer2]);
+    useLedgerStore.getState().clearLedger();
+
+    // Direct transaction into Drawer 2 only
+    const entryDrawer2 = {
+      id: 'tx-drawer-2',
+      workspace_id: 'ws-test',
+      type: 'cash_in' as const,
+      amount: 500000, // ₹5,000
+      cash_location_id: drawer2.id,
+      mode: 'cash' as const,
+      scope: 'business' as const,
+      note: 'Deposit into Counter Reserv',
+      entry_date: new Date().toISOString(),
+    };
+
+    useLedgerStore.getState().addEntryOptimistic(entryDrawer2);
+
+    // Filter passbooks
+    const drawer1Passbook = useLedgerStore
+      .getState()
+      .entries.filter((e) => e.cash_location_id === drawer1.id);
+    const drawer2Passbook = useLedgerStore
+      .getState()
+      .entries.filter((e) => e.cash_location_id === drawer2.id);
+
+    assert.strictEqual(drawer1Passbook.length, 0, 'Drawer 1 passbook must have 0 transactions');
+    assert.strictEqual(drawer2Passbook.length, 1, 'Drawer 2 passbook must have 1 transaction');
+    assert.strictEqual(drawer2Passbook[0].amount, 500000);
+  });
 });

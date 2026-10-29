@@ -91,7 +91,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   addVaultItemOptimistic: (item) =>
     set((state) => {
-      const updated = [item, ...state.vaultItems];
+      const exists = state.vaultItems.some((v) => v.id === item.id);
+      const updated = exists
+        ? state.vaultItems.map((v) => (v.id === item.id ? { ...v, ...item } : v))
+        : [item, ...state.vaultItems];
       if (typeof window !== 'undefined') {
         localStorage.setItem(VAULT_ITEMS_KEY, JSON.stringify(updated));
       }

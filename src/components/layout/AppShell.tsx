@@ -49,12 +49,58 @@ const WorkspaceMembersModal = dynamic(
   () => import('@/components/modals/WorkspaceMembersModal').then((m) => m.WorkspaceMembersModal)
 );
 
+const VALID_TABS: TabType[] = ['dashboard', 'cash', 'expenses', 'dues', 'cards', 'sheets', 'notes', 'vault', 'reports'];
+
+function getInitialTab(): TabType {
+  if (typeof window !== 'undefined') {
+    try {
+      const hash = window.location.hash.replace(/^#\/?/, '') as TabType;
+      if (VALID_TABS.includes(hash)) {
+        return hash;
+      }
+      const saved = localStorage.getItem('rb_active_tab') as TabType;
+      if (saved && VALID_TABS.includes(saved)) {
+        return saved;
+      }
+    } catch {}
+  }
+  return 'dashboard';
+}
+
 export function AppShell() {
   const { user, authLoading, theme, activeWorkspaceId, initAuth } = useSessionStore();
   const { addEntryOptimistic } = useLedgerStore();
   const isLight = theme === 'light';
 
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [activeTab, setActiveTabState] = useState<TabType>(getInitialTab);
+
+  const setActiveTab = (tab: TabType) => {
+    setActiveTabState(tab);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('rb_active_tab', tab);
+        window.history.replaceState(null, '', `#${tab}`);
+      } catch {}
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const initial = getInitialTab();
+    if (window.location.hash.replace(/^#\/?/, '') !== initial) {
+      window.history.replaceState(null, '', `#${initial}`);
+    }
+
+    const handleHash = () => {
+      const hash = window.location.hash.replace(/^#\/?/, '') as TabType;
+      if (VALID_TABS.includes(hash)) {
+        setActiveTabState(hash);
+        localStorage.setItem('rb_active_tab', hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
   const [isAskAIOpen, setIsAskAIOpen] = useState(false);
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);

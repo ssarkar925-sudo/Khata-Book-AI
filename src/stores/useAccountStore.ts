@@ -9,6 +9,16 @@ export interface BankAccountItem extends CashLocation {
 const DEFAULT_ACCOUNTS: BankAccountItem[] = [];
 const LEGACY_MOCK_WORKSPACE_ID = '00000000-0000-0000-0000-000000000010';
 
+function dedupeAccounts(accounts: BankAccountItem[]): BankAccountItem[] {
+  const map = new Map<string, BankAccountItem>();
+  for (const a of accounts) {
+    if (a && a.id) {
+      map.set(a.id, a);
+    }
+  }
+  return Array.from(map.values());
+}
+
 interface AccountState {
   accounts: BankAccountItem[];
   isLoading: boolean;
@@ -34,10 +44,11 @@ export const useAccountStore = create<AccountState>((set) => ({
             const clean = parsed.filter(
               (a) => a && a.workspace_id !== LEGACY_MOCK_WORKSPACE_ID && a.workspace_id !== 'default'
             );
-            if (clean.length !== parsed.length) {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+            const deduped = dedupeAccounts(clean);
+            if (deduped.length !== parsed.length) {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(deduped));
             }
-            return clean;
+            return deduped;
           }
         }
       } catch {}
@@ -47,15 +58,24 @@ export const useAccountStore = create<AccountState>((set) => ({
   isLoading: false,
 
   setAccounts: (accounts) => {
+    const deduped = dedupeAccounts(accounts);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(deduped));
     }
-    set({ accounts });
+    set({ accounts: deduped });
   },
 
   addAccount: (account) =>
     set((state) => {
-      const updated = [...state.accounts, account];
+      // Deduplicate: If an account with this id already exists, update it or ignore
+      if (state.accounts.some((a) => a.id === account.id)) {
+        const updated = state.accounts.map((a) => (a.id === account.id ? { ...a, ...account } : a));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        }
+        return { accounts: updated };
+      }
+      const updated = dedupeAccounts([...state.accounts, account]);
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       }
