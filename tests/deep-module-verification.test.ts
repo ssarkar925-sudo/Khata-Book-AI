@@ -1,5 +1,6 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import type { Card, LedgerEntry } from '../src/types';
 
 // Mock localStorage for node environment
 const storage: Record<string, string> = {};
@@ -462,7 +463,6 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
   // ==========================================================================
   test('Card Registration: Accurately stores variant, network, and opening billed & unbilled balances', async () => {
     const { calculateCardBilling } = await import('../src/lib/cardBilling');
-    const { Card, LedgerEntry } = await import('../src/types');
 
     const card: Card = {
       id: 'card-indusind-pinnacle',
@@ -528,7 +528,6 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
   // ==========================================================================
   test('Card Edit: Live reconciliation adjusts ledger entries when user modifies billed or unbilled due', async () => {
     const { calculateCardBilling } = await import('../src/lib/cardBilling');
-    const { Card, LedgerEntry } = await import('../src/types');
 
     const card: Card = {
       id: 'card-indusind-pinnacle',

@@ -41,6 +41,8 @@ import { useSessionStore } from '@/stores/useSessionStore';
 import { useAccountStore } from '@/stores/useAccountStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { CardDetailModal } from '@/components/modals/CardDetailModal';
+import { CardAdvisorModal } from '@/components/modals/CardAdvisorModal';
+import { CardStatementImportModal } from '@/components/modals/CardStatementImportModal';
 import {
   calculateCardBilling,
   calculateAllCardsBillingReport,
@@ -86,6 +88,10 @@ export function CardsScreen() {
   const [selectedScope, setSelectedScope] = useState<'all' | EntityScope>('all');
   const [activeTab, setActiveTab] = useState<'cards' | 'report'>('cards');
   const [selectedCardForDetail, setSelectedCardForDetail] = useState<Card | null>(null);
+
+  // Modals for AI Advisor & Bulk Statement Import
+  const [showAdvisorModal, setShowAdvisorModal] = useState(false);
+  const [showImportStatementModal, setShowImportStatementModal] = useState(false);
 
   // Card to delete state
   const [cardToDelete, setCardToDelete] = useState<Card | null>(null);
@@ -328,6 +334,24 @@ export function CardsScreen() {
     setTimeout(() => setCopiedReminderId(null), 2000);
   };
 
+  const handleShareAllDuesWhatsApp = () => {
+    const dueCards = billingReport.cardSummaries.filter((s) => s.billedDue > 0);
+    if (dueCards.length === 0) return;
+
+    let text = `💳 *Credit Card Bill Due Digest*\n*Total Billed Due:* ${formatPaise(billingReport.totalBilledDue)}\n*Cards Requiring Payment (${dueCards.length}):*\n`;
+    dueCards.forEach((s, idx) => {
+      const dueDate = s.dueDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      text += `\n${idx + 1}. *${s.card.name}* (${s.card.bank} •••• ${s.card.last4})\n   🔴 Billed Due: ${formatPaise(s.billedDue)}\n   ⏰ Due Date: ${dueDate} (${s.reminderMessage})\n`;
+    });
+    text += `\n_Tracked via Record Book Financial Hub_`;
+
+    if (navigator.share) {
+      navigator.share({ title: 'Credit Card Bill Due Digest', text }).catch(() => {});
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
+  };
+
   const handleAddCard = (e: React.FormEvent) => {
     e.preventDefault();
     if (!cardName.trim() || last4.length !== 4) return;
@@ -521,6 +545,26 @@ export function CardsScreen() {
                 <CheckCircle2 className="w-4 h-4" />
                 <span className="truncate">Pay Bill</span>
               </button>
+
+              {/* AI Best Card Swipe Advisor */}
+              <button
+                onClick={() => setShowAdvisorModal(true)}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-3 sm:py-2.5 px-3 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-xs border border-amber-500/30 active:scale-[0.98] transition-all min-h-[44px] sm:min-h-0 cursor-pointer"
+                title="AI Card Rewards & Best Swipe Advisor"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span className="truncate">Advisor</span>
+              </button>
+
+              {/* Import Statement */}
+              <button
+                onClick={() => setShowImportStatementModal(true)}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 py-3 sm:py-2.5 px-3 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-white/10 active:scale-[0.98] transition-all min-h-[44px] sm:min-h-0 cursor-pointer"
+                title="Bulk Import Statement CSV/Text"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span className="truncate">Import</span>
+              </button>
             </div>
           )}
         </div>
@@ -575,6 +619,55 @@ export function CardsScreen() {
           </button>
         </div>
       </div>
+
+      {/* Urgent Dues & WhatsApp Alert Broadcast Banner */}
+      {billingReport.totalBilledDue > 0 && (
+        <div className="p-4 rounded-3xl bg-gradient-to-r from-rose-500/15 via-purple-500/10 to-amber-500/15 border border-rose-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-rose-500/30">
+              <AlertTriangle className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <span>Statement Bills Due: {formatPaise(billingReport.totalBilledDue)}</span>
+                {billingReport.urgentCardsCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-600 text-white animate-pulse">
+                    {billingReport.urgentCardsCount} Urgent
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {billingReport.cardSummaries
+                  .filter((s) => s.billedDue > 0)
+                  .map((s) => `${s.card.name} (${formatPaise(s.billedDue)})`)
+                  .join(' • ')}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleShareAllDuesWhatsApp}
+              className="flex-1 sm:flex-initial py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 active:scale-95 transition-all cursor-pointer"
+              title="Share due bills digest via WhatsApp"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>WhatsApp Digest</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const firstDue = billingReport.cardSummaries.find((s) => s.billedDue > 0);
+                if (firstDue) openPayModalForCard(firstDue.card.id);
+              }}
+              className="flex-1 sm:flex-initial py-2 px-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/25 active:scale-95 transition-all cursor-pointer"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Pay Now</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 3 Core Metric KPI Cards: Billed Due vs Unbilled Spends vs Advance / Available */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -2218,6 +2311,25 @@ export function CardsScreen() {
           </div>
         </div>
       )}
+      {/* Modal: Smart Card Swipe Advisor */}
+      <CardAdvisorModal
+        isOpen={showAdvisorModal}
+        onClose={() => setShowAdvisorModal(false)}
+        cards={cards}
+        onSelectCardToSpend={(cardId) => {
+          setSpendCardId(cardId);
+          setSpendBillingOption('auto');
+          setShowSpendModal(true);
+        }}
+      />
+
+      {/* Modal: Card Statement CSV / Text Importer */}
+      <CardStatementImportModal
+        isOpen={showImportStatementModal}
+        onClose={() => setShowImportStatementModal(false)}
+        cards={cards}
+        initialCardId={cards[0]?.id}
+      />
     </div>
   );
 }
