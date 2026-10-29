@@ -31,8 +31,8 @@ export function formatPaise(paise: number | null | undefined, showSymbol: boolea
     return showSymbol ? '₹0.00' : '0.00';
   }
 
-  const isNegative = numPaise < 0;
   const absPaise = Math.round(Math.abs(numPaise));
+  const isNegative = numPaise < 0 && absPaise > 0;
 
   const rupees = Math.floor(absPaise / 100);
   const remainderPaise = absPaise % 100;

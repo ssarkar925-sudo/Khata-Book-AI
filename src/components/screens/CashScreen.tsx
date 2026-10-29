@@ -236,17 +236,24 @@ export function CashScreen() {
 
   // Derive effective balance per account taking ledger entries into account if stored balance is 0
   const getAccountEffectiveBalance = (acc: BankAccountItem): number => {
-    if (acc.balance && acc.balance !== 0) return acc.balance;
-    const entries = ledger.filter((e) => e.cash_location_id === acc.id);
-    if (entries.length === 0) return acc.balance || 0;
-    const credits = entries
-      .filter((e) => e.type === 'cash_in')
-      .reduce((sum, e) => sum + Number(e.amount), 0);
-    const debits = entries
-      .filter((e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment')
-      .reduce((sum, e) => sum + Number(e.amount), 0);
-    const net = credits - debits;
-    return net !== 0 ? net : (acc.balance || 0);
+    let bal = acc.balance;
+    if (bal === 0 || !bal) {
+      const entries = ledger.filter((e) => e.cash_location_id === acc.id);
+      if (entries.length > 0) {
+        const credits = entries
+          .filter((e) => e.type === 'cash_in')
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        const debits = entries
+          .filter((e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment')
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        bal = credits - debits;
+      }
+    }
+    // Liquid accounts (cash drawer, wallet, bank accounts) cannot have negative available cash — floor at 0
+    if (acc.account_type !== 'od_cc') {
+      return Math.max(0, bal || 0);
+    }
+    return bal || 0;
   };
 
   const sortedAccounts = React.useMemo(() => {
@@ -280,12 +287,14 @@ export function CashScreen() {
     0
   );
 
-  // Auto-heal account balances in the background if stored balance is 0 but active ledger entries exist
+  // Auto-heal account balances in the background: heal negative liquid balances to 0, or restore positive ledger entries
   useEffect(() => {
     accounts.forEach((acc) => {
-      if (acc.balance === 0) {
+      if (acc.account_type !== 'od_cc' && acc.balance < 0) {
+        syncEngine.updateAccountBalance(acc.id, 0);
+      } else if (acc.balance === 0) {
         const eff = getAccountEffectiveBalance(acc);
-        if (eff !== 0) {
+        if (eff > 0) {
           syncEngine.updateAccountBalance(acc.id, eff);
         }
       }

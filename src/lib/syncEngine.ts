@@ -646,17 +646,24 @@ class SyncEngine {
   public getAccountEffectiveBalance(accountId: string): number {
     const acc = useAccountStore.getState().accounts.find((a) => a.id === accountId);
     if (!acc) return 0;
-    if (acc.balance && acc.balance !== 0) return acc.balance;
-    const entries = useLedgerStore.getState().entries.filter((e) => e.cash_location_id === accountId);
-    if (entries.length === 0) return acc.balance || 0;
-    const credits = entries
-      .filter((e) => e.type === 'cash_in')
-      .reduce((sum, e) => sum + Number(e.amount), 0);
-    const debits = entries
-      .filter((e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment')
-      .reduce((sum, e) => sum + Number(e.amount), 0);
-    const net = credits - debits;
-    return net !== 0 ? net : (acc.balance || 0);
+    let bal = acc.balance;
+    if (bal === 0 || !bal) {
+      const entries = useLedgerStore.getState().entries.filter((e) => e.cash_location_id === accountId);
+      if (entries.length > 0) {
+        const credits = entries
+          .filter((e) => e.type === 'cash_in')
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        const debits = entries
+          .filter((e) => e.type === 'cash_out' || e.type === 'expense' || e.type === 'bill_payment')
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        bal = credits - debits;
+      }
+    }
+    // Liquid accounts (cash drawer, wallet, bank accounts) cannot have negative available cash — floor at 0
+    if (acc.account_type !== 'od_cc') {
+      return Math.max(0, bal || 0);
+    }
+    return bal || 0;
   }
 
   /**
@@ -705,7 +712,10 @@ class SyncEngine {
     const fromCurrentBal = this.getAccountEffectiveBalance(fromAcc.id);
     const toCurrentBal = this.getAccountEffectiveBalance(toAcc.id);
 
-    const fromNewBalance = fromCurrentBal - amountPaise;
+    // Liquid accounts floor balance at 0 (showing minus should be 0)
+    const fromNewBalance = fromAcc.account_type === 'od_cc' 
+      ? fromCurrentBal - amountPaise 
+      : Math.max(0, fromCurrentBal - amountPaise);
     const toNewBalance = toCurrentBal + amountPaise;
 
     // 1. Optimistically update local account balances immediately
@@ -837,7 +847,7 @@ class SyncEngine {
           entryWithMeta.type === 'expense' ||
           entryWithMeta.type === 'bill_payment'
         ) {
-          newBalance -= entryWithMeta.amount;
+          newBalance = acc.account_type === "od_cc" ? newBalance - entryWithMeta.amount : Math.max(0, newBalance - entryWithMeta.amount);
         }
         targetNewBalance = newBalance;
         useAccountStore.getState().updateAccountBalance(entryWithMeta.cash_location_id, newBalance);

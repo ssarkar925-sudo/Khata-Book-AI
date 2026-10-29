@@ -8,6 +8,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   CheckCircle2,
+  AlertCircle,
   Share2,
   Edit3,
   Trash2,
@@ -108,15 +109,22 @@ export function AccountDetailModal({
     : 0;
 
   const netLedgerFlow = totalCredits - totalDebits;
-  const effectiveBalance =
+  const isOverdraft = liveAccount?.account_type === 'od_cc';
+  const rawBalance =
     liveAccount && liveAccount.balance !== 0 ? liveAccount.balance : netLedgerFlow;
+  // Floor at 0 for liquid accounts (wallet, bank, cash drawer) — showing minus should be 0
+  const effectiveBalance = isOverdraft ? rawBalance : Math.max(0, rawBalance);
 
-  // Auto-heal account balance if zero but active ledger transactions exist
+  // Auto-heal account balance: floor non-OD accounts at 0, restore if positive ledger exists
   useEffect(() => {
-    if (liveAccount && liveAccount.balance === 0 && netLedgerFlow !== 0) {
-      syncEngine.updateAccountBalance(liveAccount.id, netLedgerFlow);
+    if (liveAccount) {
+      if (!isOverdraft && liveAccount.balance < 0) {
+        syncEngine.updateAccountBalance(liveAccount.id, 0);
+      } else if (liveAccount.balance === 0 && netLedgerFlow > 0) {
+        syncEngine.updateAccountBalance(liveAccount.id, netLedgerFlow);
+      }
     }
-  }, [liveAccount?.id, liveAccount?.balance, netLedgerFlow]);
+  }, [liveAccount?.id, liveAccount?.balance, netLedgerFlow, isOverdraft]);
 
   if (!account || !liveAccount) return null;
 
@@ -327,9 +335,15 @@ export function AccountDetailModal({
               <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-300">
                 Available Liquid Balance
               </span>
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                <CheckCircle2 className="w-3 h-3" /> Ready to Spend
-              </span>
+              {effectiveBalance > 0 ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <CheckCircle2 className="w-3 h-3" /> Ready to Spend
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-white/10 px-2 py-0.5 rounded-full border border-white/15">
+                  <AlertCircle className="w-3 h-3" /> Zero Balance
+                </span>
+              )}
             </div>
 
             <div className="text-3xl font-black tracking-tight text-white tabular-nums">

@@ -1171,4 +1171,59 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
     });
     assert.strictEqual(sanitized.category_id, null, 'Invalid non-UUID category_id must be sanitized to null');
   });
+
+  test('Available Liquid Balance: Wallets, Cash Drawer, and Bank accounts clamp at 0 and never show minus (₹0.00)', async () => {
+    const { useSessionStore } = await import('../src/stores/useSessionStore');
+    const { useAccountStore } = await import('../src/stores/useAccountStore');
+    const { useLedgerStore } = await import('../src/stores/useLedgerStore');
+    const { syncEngine } = await import('../src/lib/syncEngine');
+    const { formatPaise } = await import('../src/lib/money');
+
+    const wsId = '00000000-0000-0000-0000-000000000001';
+    useSessionStore.setState({ activeWorkspaceId: wsId, user: { id: 'usr-1', email: 'owner@test.com' } as any });
+
+    // Setup an account with 0 opening balance (like Digipay Wallet in screenshot)
+    const digipayWallet: BankAccountItem = {
+      id: 'digipay-wallet-1',
+      workspace_id: wsId,
+      name: 'Digipay Wallet',
+      balance: 0,
+      scope: 'business',
+      account_type: 'wallet',
+      is_default: false,
+    };
+
+    useAccountStore.setState({
+      accounts: [digipayWallet],
+    });
+
+    // Simulate transfer or withdrawal of ₹15,600 out of Digipay Wallet
+    useLedgerStore.setState({
+      entries: [
+        {
+          id: 'tx-out-15600',
+          workspace_id: wsId,
+          type: 'cash_out',
+          amount: 1560000, // ₹15,600.00
+          mode: 'bank',
+          scope: 'business',
+          cash_location_id: digipayWallet.id,
+          note: 'Transfer to Sarkar Communication',
+          entry_date: new Date().toISOString(),
+        },
+      ],
+    });
+
+    // 1. Check getAccountEffectiveBalance
+    const effBal = syncEngine.getAccountEffectiveBalance(digipayWallet.id);
+    assert.strictEqual(effBal, 0, 'Effective balance for wallet must be floored at 0, never negative');
+
+    // 2. formatPaise must format as ₹0.00 and never ₹-15,600.00
+    assert.strictEqual(formatPaise(effBal), '₹0.00', 'Available liquid balance must show ₹0.00 instead of minus');
+
+    // 3. updateAccountBalance with negative value must clamp to 0 for non-od accounts
+    useAccountStore.getState().updateAccountBalance(digipayWallet.id, -1560000);
+    const updatedWallet = useAccountStore.getState().accounts.find((a: BankAccountItem) => a.id === digipayWallet.id);
+    assert.strictEqual(updatedWallet?.balance, 0, 'Stored balance in useAccountStore must clamp to 0 for liquid wallets');
+  });
 });

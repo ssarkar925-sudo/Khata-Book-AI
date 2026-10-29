@@ -47,9 +47,13 @@ function dedupeAccounts(accounts: BankAccountItem[]): BankAccountItem[] {
       const note = a.notes || remarksMap[a.id] || existing?.notes || null;
       if (note) remarksMap[a.id] = note;
 
+      const rawBalance = typeof a.balance === 'number' ? a.balance : 0;
+      const sanitizedBalance = a.account_type === 'od_cc' ? rawBalance : Math.max(0, rawBalance);
+
       map.set(a.id, {
         ...existing,
         ...a,
+        balance: sanitizedBalance,
         notes: note,
       });
     }
@@ -165,9 +169,13 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
   updateAccountBalance: (id, newBalance) =>
     set((state) => {
-      const updated = state.accounts.map((acc) =>
-        acc.id === id ? { ...acc, balance: newBalance } : acc
-      );
+      const updated = state.accounts.map((acc) => {
+        if (acc.id === id) {
+          const clamped = acc.account_type === 'od_cc' ? newBalance : Math.max(0, newBalance);
+          return { ...acc, balance: clamped };
+        }
+        return acc;
+      });
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       }
