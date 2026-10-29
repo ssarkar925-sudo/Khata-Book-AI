@@ -32,6 +32,7 @@ import { syncEngine } from '@/lib/syncEngine';
 import { AccountDetailModal } from '@/components/modals/AccountDetailModal';
 import { CashDenominationModal } from '@/components/modals/CashDenominationModal';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
+import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
 
 const BANK_OPTIONS = [
   'State Bank of India',
@@ -140,6 +141,29 @@ export function CashScreen() {
     }
   };
 
+  const ACCOUNT_SORT_OPTIONS: SortOption[] = [
+    { value: 'name_asc', label: 'Account Name (A to Z)', shortLabel: 'A-Z' },
+    { value: 'name_desc', label: 'Account Name (Z to A)', shortLabel: 'Z-A' },
+    { value: 'balance_desc', label: 'Balance (Highest First)', shortLabel: 'High Bal' },
+    { value: 'balance_asc', label: 'Balance (Lowest First)', shortLabel: 'Low Bal' },
+    { value: 'type_asc', label: 'Account Type', shortLabel: 'Type' },
+    { value: 'date_desc', label: 'Recently Added', shortLabel: 'Newest' },
+  ];
+
+  const [accountSort, setAccountSortState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('rb_sort_cash') || 'name_asc';
+    }
+    return 'name_asc';
+  });
+
+  const setAccountSort = (sort: string) => {
+    setAccountSortState(sort);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_sort_cash', sort);
+    }
+  };
+
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -224,6 +248,32 @@ export function CashScreen() {
     const net = credits - debits;
     return net !== 0 ? net : (acc.balance || 0);
   };
+
+  const sortedAccounts = React.useMemo(() => {
+    return [...filteredAccounts].sort((a, b) => {
+      if (accountSort === 'name_asc') {
+        return a.name.localeCompare(b.name);
+      }
+      if (accountSort === 'name_desc') {
+        return b.name.localeCompare(a.name);
+      }
+      if (accountSort === 'balance_desc') {
+        return getAccountEffectiveBalance(b) - getAccountEffectiveBalance(a);
+      }
+      if (accountSort === 'balance_asc') {
+        return getAccountEffectiveBalance(a) - getAccountEffectiveBalance(b);
+      }
+      if (accountSort === 'type_asc') {
+        return (a.account_type || '').localeCompare(b.account_type || '');
+      }
+      if (accountSort === 'date_desc') {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA;
+      }
+      return 0;
+    });
+  }, [filteredAccounts, accountSort, ledger]);
 
   const totalBalance = filteredAccounts.reduce(
     (sum, a) => sum + getAccountEffectiveBalance(a),
@@ -606,13 +656,20 @@ export function CashScreen() {
           </button>
         </div>
 
-        <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+        <div className="flex items-center gap-2">
+          <SortDropdown
+            value={accountSort}
+            onChange={setAccountSort}
+            options={ACCOUNT_SORT_OPTIONS}
+          />
+          <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+        </div>
       </div>
 
       {/* Accounts: Grid View vs List View */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAccounts.map((acc) => (
+          {sortedAccounts.map((acc) => (
             <div
               key={acc.id}
               onClick={() => setSelectedAccForDetail(acc)}
@@ -766,7 +823,7 @@ export function CashScreen() {
       ) : (
         /* List View */
         <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 shadow-xs divide-y divide-slate-100 dark:divide-white/5 overflow-hidden">
-          {filteredAccounts.map((acc) => (
+          {sortedAccounts.map((acc) => (
             <div
               key={acc.id}
               onClick={() => setSelectedAccForDetail(acc)}

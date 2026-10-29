@@ -50,6 +50,7 @@ import { useSessionStore } from '@/stores/useSessionStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { SheetColumn, SheetColumnType, SheetRow } from '@/types';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
+import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
 
 const SHEET_COLORS = [
   { id: '#6366F1', name: 'Indigo' },
@@ -250,6 +251,27 @@ export function SheetsScreen() {
     }
   };
 
+  const SHEET_ROW_SORT_OPTIONS: SortOption[] = [
+    { value: 'original', label: 'Original Order', shortLabel: 'Default' },
+    { value: 'col1_asc', label: 'First Column (A to Z)', shortLabel: 'A-Z' },
+    { value: 'col1_desc', label: 'First Column (Z to A)', shortLabel: 'Z-A' },
+    { value: 'newest_first', label: 'Newest Row First', shortLabel: 'Newest' },
+  ];
+
+  const [sheetRowSort, setSheetRowSortState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('rb_sort_sheets') || 'original';
+    }
+    return 'original';
+  });
+
+  const setSheetRowSort = (sort: string) => {
+    setSheetRowSortState(sort);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_sort_sheets', sort);
+    }
+  };
+
   // Selection states
   const [selectedColId, setSelectedColId] = useState<string | null>(null);
   const [selectedCell, setSelectedCell] = useState<{ rowId: string; colId: string } | null>(null);
@@ -336,14 +358,36 @@ export function SheetsScreen() {
     return activeSheet.columns.find((c) => c.id === selectedColId) || activeSheet.columns[0] || null;
   }, [activeSheet, selectedColId]);
 
-  // Filtered rows
+  // Filtered and sorted rows
   const filteredRows = useMemo(() => {
-    return (activeSheet?.rows || []).filter((r) => {
+    const raw = (activeSheet?.rows || []).filter((r) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       return Object.values(r.data).some((val) => String(val).toLowerCase().includes(q));
     });
-  }, [activeSheet?.rows, searchQuery]);
+
+    if (sheetRowSort === 'original') return raw;
+
+    const firstColId = activeSheet?.columns?.[0]?.id;
+    return [...raw].sort((a, b) => {
+      if (sheetRowSort === 'newest_first') {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return timeB - timeA;
+      }
+      if (firstColId && sheetRowSort === 'col1_asc') {
+        const valA = String(a.data[firstColId] || '');
+        const valB = String(b.data[firstColId] || '');
+        return valA.localeCompare(valB);
+      }
+      if (firstColId && sheetRowSort === 'col1_desc') {
+        const valA = String(a.data[firstColId] || '');
+        const valB = String(b.data[firstColId] || '');
+        return valB.localeCompare(valA);
+      }
+      return 0;
+    });
+  }, [activeSheet?.rows, activeSheet?.columns, searchQuery, sheetRowSort]);
 
   // ==========================================
   // PERFORMANCE PAGINATION & WINDOWING
@@ -1203,6 +1247,12 @@ export function SheetsScreen() {
                 >
                   .XLSX
                 </button>
+
+                <SortDropdown
+                  value={sheetRowSort}
+                  onChange={setSheetRowSort}
+                  options={SHEET_ROW_SORT_OPTIONS}
+                />
 
                 {/* View Mode Toggle: Spreadsheet Table (List) vs Record Cards (Grid) */}
                 <ViewToggle viewMode={viewMode} onChange={setViewMode} />

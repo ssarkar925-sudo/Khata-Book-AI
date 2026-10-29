@@ -47,6 +47,7 @@ import { formatPaise, parseToPaise } from '@/lib/money';
 import { getCategoryById, EXPENSE_CATEGORIES } from '@/lib/categories';
 import { syncEngine } from '@/lib/syncEngine';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
+import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
 
 interface ExpensesScreenProps {
   onNavigateTab: (tab: TabType) => void;
@@ -88,6 +89,29 @@ export function ExpensesScreen({
     setViewModeState(mode);
     if (typeof window !== 'undefined') {
       localStorage.setItem('rb_view_expenses', mode);
+    }
+  };
+
+  const EXPENSE_SORT_OPTIONS: SortOption[] = [
+    { value: 'date_desc', label: 'Date (Newest First)', shortLabel: 'Newest' },
+    { value: 'date_asc', label: 'Date (Oldest First)', shortLabel: 'Oldest' },
+    { value: 'amount_desc', label: 'Amount (Highest First)', shortLabel: 'High Amount' },
+    { value: 'amount_asc', label: 'Amount (Lowest First)', shortLabel: 'Low Amount' },
+    { value: 'name_asc', label: 'Note / Merchant (A to Z)', shortLabel: 'A-Z' },
+    { value: 'mode_asc', label: 'Payment Mode', shortLabel: 'Mode' },
+  ];
+
+  const [expenseSort, setExpenseSortState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('rb_sort_expenses') || 'date_desc';
+    }
+    return 'date_desc';
+  });
+
+  const setExpenseSort = (sort: string) => {
+    setExpenseSortState(sort);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_sort_expenses', sort);
     }
   };
 
@@ -180,6 +204,30 @@ export function ExpensesScreen({
       return true;
     });
   }, [dateFilteredExpenses, searchQuery, selectedCategory, selectedMode, selectedAccount]);
+
+  const sortedExpenses = useMemo(() => {
+    return [...filteredExpenses].sort((a, b) => {
+      if (expenseSort === 'date_desc') {
+        return new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime();
+      }
+      if (expenseSort === 'date_asc') {
+        return new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime();
+      }
+      if (expenseSort === 'amount_desc') {
+        return Number(b.amount) - Number(a.amount);
+      }
+      if (expenseSort === 'amount_asc') {
+        return Number(a.amount) - Number(b.amount);
+      }
+      if (expenseSort === 'name_asc') {
+        return (a.note || '').localeCompare(b.note || '');
+      }
+      if (expenseSort === 'mode_asc') {
+        return (a.mode || '').localeCompare(b.mode || '');
+      }
+      return 0;
+    });
+  }, [filteredExpenses, expenseSort]);
 
   // Analytics Metrics
   const { totalSpentPaise, dailyAveragePaise, topCategory, categoryStats } = useMemo(() => {
@@ -631,6 +679,12 @@ export function ExpensesScreen({
               <span>Export</span>
             </button>
 
+            <SortDropdown
+              value={expenseSort}
+              onChange={setExpenseSort}
+              options={EXPENSE_SORT_OPTIONS}
+            />
+
             <ViewToggle viewMode={viewMode} onChange={setViewMode} />
           </div>
         </div>
@@ -657,7 +711,7 @@ export function ExpensesScreen({
         ) : viewMode === 'grid' ? (
           /* Grid View */
           <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {filteredExpenses.map((expense) => {
+            {sortedExpenses.map((expense) => {
               const cat = getCategoryById(expense.category_id || '');
               const acc = accounts.find((a) => a.id === expense.cash_location_id);
               const card = cards.find((c) => c.id === expense.card_id);
@@ -788,7 +842,7 @@ export function ExpensesScreen({
         ) : (
           /* List View */
           <div className="divide-y divide-slate-100 dark:divide-white/5">
-            {filteredExpenses.map((expense) => {
+            {sortedExpenses.map((expense) => {
               const cat = getCategoryById(expense.category_id || '');
               const acc = accounts.find((a) => a.id === expense.cash_location_id);
               const card = cards.find((c) => c.id === expense.card_id);

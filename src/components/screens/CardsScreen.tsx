@@ -40,6 +40,7 @@ import { useCardStore } from '@/stores/useCardStore';
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
+import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
 import { useAccountStore } from '@/stores/useAccountStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { CardDetailModal } from '@/components/modals/CardDetailModal';
@@ -102,6 +103,31 @@ export function CardsScreen() {
       localStorage.setItem('rb_view_cards', mode);
     }
   };
+
+  const CARD_SORT_OPTIONS: SortOption[] = [
+    { value: 'bill_date_asc', label: 'Bill / Due Date (Soonest)', shortLabel: 'Due Date' },
+    { value: 'bill_date_desc', label: 'Bill / Due Date (Farthest)', shortLabel: 'Due (Far)' },
+    { value: 'name_asc', label: 'Card Name (A to Z)', shortLabel: 'A-Z' },
+    { value: 'name_desc', label: 'Card Name (Z to A)', shortLabel: 'Z-A' },
+    { value: 'due_desc', label: 'Billed Due (Highest)', shortLabel: 'High Due' },
+    { value: 'due_asc', label: 'Billed Due (Lowest)', shortLabel: 'Low Due' },
+    { value: 'limit_desc', label: 'Credit Limit (Highest)', shortLabel: 'High Limit' },
+  ];
+
+  const [cardSort, setCardSortState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('rb_sort_cards') || 'bill_date_asc';
+    }
+    return 'bill_date_asc';
+  });
+
+  const setCardSort = (sort: string) => {
+    setCardSortState(sort);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_sort_cards', sort);
+    }
+  };
+
   const [selectedCardForDetail, setSelectedCardForDetail] = useState<Card | null>(null);
 
   // Modals for AI Advisor & Bulk Statement Import
@@ -139,6 +165,40 @@ export function CardsScreen() {
 
   // Billing Report calculation across all deduplicated scoped cards
   const billingReport = calculateAllCardsBillingReport(scopedCards, ledger);
+
+  // Sorted and filtered card summaries for Grid and List views
+  const sortedCardSummaries = React.useMemo(() => {
+    const filtered = billingReport.cardSummaries.filter((summary) => {
+      if (cardFilter === 'due') return summary.billedDue > 0;
+      if (cardFilter === 'safe') return summary.billedDue <= 0;
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (cardSort === 'name_asc') {
+        return a.card.name.localeCompare(b.card.name);
+      }
+      if (cardSort === 'name_desc') {
+        return b.card.name.localeCompare(a.card.name);
+      }
+      if (cardSort === 'bill_date_asc') {
+        return a.dueDate.getTime() - b.dueDate.getTime();
+      }
+      if (cardSort === 'bill_date_desc') {
+        return b.dueDate.getTime() - a.dueDate.getTime();
+      }
+      if (cardSort === 'due_desc') {
+        return b.billedDue - a.billedDue;
+      }
+      if (cardSort === 'due_asc') {
+        return a.billedDue - b.billedDue;
+      }
+      if (cardSort === 'limit_desc') {
+        return b.card.credit_limit - a.card.credit_limit;
+      }
+      return 0;
+    });
+  }, [billingReport.cardSummaries, cardFilter, cardSort]);
 
   // New Card State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -661,7 +721,14 @@ export function CardsScreen() {
         </div>
 
         {activeTab === 'cards' && (
-          <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+          <div className="flex items-center gap-2">
+            <SortDropdown
+              value={cardSort}
+              onChange={setCardSort}
+              options={CARD_SORT_OPTIONS}
+            />
+            <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+          </div>
         )}
       </div>
 
@@ -917,13 +984,7 @@ export function CardsScreen() {
               </button>
             </div>
           ) : (
-            billingReport.cardSummaries
-              .filter((summary) => {
-                if (cardFilter === 'due') return summary.billedDue > 0;
-                if (cardFilter === 'safe') return summary.billedDue <= 0;
-                return true;
-              })
-              .map((summary, idx) => {
+            sortedCardSummaries.map((summary, idx) => {
               const card = summary.card;
               const theme = cardThemes[idx % cardThemes.length];
               const formattedDueDate = summary.dueDate.toLocaleDateString('en-IN', {
@@ -1191,13 +1252,7 @@ export function CardsScreen() {
           {cards.length === 0 ? (
             <div className="text-center py-12 text-xs text-slate-400">No credit cards added yet.</div>
           ) : (
-            billingReport.cardSummaries
-              .filter((summary) => {
-                if (cardFilter === 'due') return summary.billedDue > 0;
-                if (cardFilter === 'safe') return summary.billedDue <= 0;
-                return true;
-              })
-              .map((summary) => {
+            sortedCardSummaries.map((summary) => {
                 const card = summary.card;
                 const formattedDueDate = summary.dueDate.toLocaleDateString('en-IN', {
                   day: 'numeric',

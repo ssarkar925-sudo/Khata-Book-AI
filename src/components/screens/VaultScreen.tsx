@@ -29,6 +29,7 @@ import { useSessionStore } from '@/stores/useSessionStore';
 import { encryptData, decryptData } from '@/lib/crypto';
 import { syncEngine } from '@/lib/syncEngine';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
+import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
 
 const VAULT_COLORS = [
   { id: '#3B82F6', name: 'Blue', label: 'Banking & Finance', bg: 'bg-blue-500', text: 'text-blue-500' },
@@ -125,6 +126,28 @@ export function VaultScreen() {
     setViewModeState(mode);
     if (typeof window !== 'undefined') {
       localStorage.setItem('rb_view_vault', mode);
+    }
+  };
+
+  const VAULT_SORT_OPTIONS: SortOption[] = [
+    { value: 'title_asc', label: 'Item Name (A to Z)', shortLabel: 'A-Z' },
+    { value: 'title_desc', label: 'Item Name (Z to A)', shortLabel: 'Z-A' },
+    { value: 'category_asc', label: 'Category', shortLabel: 'Category' },
+    { value: 'updated_desc', label: 'Recently Updated', shortLabel: 'Recent' },
+    { value: 'created_desc', label: 'Date Added (Newest)', shortLabel: 'Newest' },
+  ];
+
+  const [vaultSort, setVaultSortState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('rb_sort_vault') || 'title_asc';
+    }
+    return 'title_asc';
+  });
+
+  const setVaultSort = (sort: string) => {
+    setVaultSortState(sort);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_sort_vault', sort);
     }
   };
 
@@ -492,6 +515,31 @@ export function VaultScreen() {
     });
   }, [vaultItems, activeCategoryFilter, searchQuery]);
 
+  const sortedVaultItems = useMemo(() => {
+    return [...filteredVaultItems].sort((a, b) => {
+      if (vaultSort === 'title_asc') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
+      if (vaultSort === 'title_desc') {
+        return (b.title || '').localeCompare(a.title || '');
+      }
+      if (vaultSort === 'category_asc') {
+        return (a.category || '').localeCompare(b.category || '');
+      }
+      if (vaultSort === 'updated_desc') {
+        const timeA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+        const timeB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+        return timeB - timeA;
+      }
+      if (vaultSort === 'created_desc') {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return timeB - timeA;
+      }
+      return 0;
+    });
+  }, [filteredVaultItems, vaultSort]);
+
   return (
     <div className="space-y-6 animate-fade-in pb-12">
       {/* Header */}
@@ -695,6 +743,11 @@ export function VaultScreen() {
                   className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
               </div>
+              <SortDropdown
+                value={vaultSort}
+                onChange={setVaultSort}
+                options={VAULT_SORT_OPTIONS}
+              />
               <ViewToggle viewMode={viewMode} onChange={setViewMode} />
             </div>
           </div>
@@ -711,7 +764,7 @@ export function VaultScreen() {
                 <p className="text-[11px]">Click &quot;Add Vault Item&quot; to store bank logins, PINs, and secure credentials.</p>
               </div>
             ) : (
-              filteredVaultItems.map((item) => {
+              sortedVaultItems.map((item) => {
                 const itemColor = item.color || '#3B82F6';
                 const cachedSecrets = decryptedSecretsMap[item.id] || (item.secrets && item.secrets.length > 0 ? item.secrets : null);
 
@@ -880,7 +933,7 @@ export function VaultScreen() {
                   No vault items found.
                 </div>
               ) : (
-                filteredVaultItems.map((item) => {
+                sortedVaultItems.map((item) => {
                   const itemColor = item.color || '#3B82F6';
                   const cachedSecrets = decryptedSecretsMap[item.id] || (item.secrets && item.secrets.length > 0 ? item.secrets : null);
                   const primarySecret = cachedSecrets && cachedSecrets.length > 0 ? cachedSecrets[0] : null;

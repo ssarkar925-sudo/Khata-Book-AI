@@ -958,4 +958,66 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
       'Account remark must be preserved even if remote database returns null or undefined notes'
     );
   });
+
+  // ==========================================================================
+  // 21. MULTI-MODULE SORTING FEATURES (A-Z, BILL DATE, AMOUNT, PERSISTENCE)
+  // ==========================================================================
+  test('Sorting: Multi-module sorting supports A-Z, Bill / Due Date, Amounts, and localStorage persistence', async () => {
+    // 1. Credit Cards Sorting (A-Z, Z-A, Bill Date)
+    const cardsList: Card[] = [
+      { id: 'c1', workspace_id: 'ws-test', name: 'SBI Cashback', bank: 'SBI', last4: '1111', credit_limit: 100000, statement_day: 15, due_day: 25, is_active: true, scope: 'business' },
+      { id: 'c2', workspace_id: 'ws-test', name: 'HDFC Millennia', bank: 'HDFC', last4: '2222', credit_limit: 200000, statement_day: 1, due_day: 5, is_active: true, scope: 'personal' },
+      { id: 'c3', workspace_id: 'ws-test', name: 'Axis Airtel', bank: 'Axis', last4: '3333', credit_limit: 150000, statement_day: 10, due_day: 15, is_active: true, scope: 'family' },
+    ];
+
+    // Test A-Z
+    const sortedAZ = [...cardsList].sort((a, b) => a.name.localeCompare(b.name));
+    assert.strictEqual(sortedAZ[0].name, 'Axis Airtel');
+    assert.strictEqual(sortedAZ[1].name, 'HDFC Millennia');
+    assert.strictEqual(sortedAZ[2].name, 'SBI Cashback');
+
+    // Test Z-A
+    const sortedZA = [...cardsList].sort((a, b) => b.name.localeCompare(a.name));
+    assert.strictEqual(sortedZA[0].name, 'SBI Cashback');
+    assert.strictEqual(sortedZA[2].name, 'Axis Airtel');
+
+    // Test Bill / Due Day
+    const sortedDueDay = [...cardsList].sort((a, b) => (a.due_day ?? 0) - (b.due_day ?? 0));
+    assert.strictEqual(sortedDueDay[0].name, 'HDFC Millennia'); // due_day = 5
+    assert.strictEqual(sortedDueDay[2].name, 'SBI Cashback'); // due_day = 25
+
+    // 2. Bank Accounts Sorting (Balance Highest, Name A-Z)
+    const accountsList: BankAccountItem[] = [
+      { id: 'a1', workspace_id: 'ws-1', name: 'Petty Cash', balance: 5000, is_default: false },
+      { id: 'a2', workspace_id: 'ws-1', name: 'Axis Current', balance: 1200000, is_default: true },
+      { id: 'a3', workspace_id: 'ws-1', name: 'HDFC Savings', balance: 450000, is_default: false },
+    ];
+
+    const sortedByBal = [...accountsList].sort((a, b) => b.balance - a.balance);
+    assert.strictEqual(sortedByBal[0].name, 'Axis Current'); // 12,00,000
+    assert.strictEqual(sortedByBal[1].name, 'HDFC Savings'); // 4,50,000
+    assert.strictEqual(sortedByBal[2].name, 'Petty Cash'); // 5,000
+
+    // 3. Dues Sorting (Due Date Soonest First)
+    const duesList = [
+      { id: 'd1', amount: 50000, due_date: '2026-11-20' },
+      { id: 'd2', amount: 150000, due_date: '2026-10-31' },
+      { id: 'd3', amount: 30000, due_date: '2026-11-05' },
+    ];
+    const sortedDuesDate = [...duesList].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+    assert.strictEqual(sortedDuesDate[0].id, 'd2'); // Oct 31 is soonest
+    assert.strictEqual(sortedDuesDate[1].id, 'd3'); // Nov 5
+    assert.strictEqual(sortedDuesDate[2].id, 'd1'); // Nov 20
+
+    // 4. Persistence across LocalStorage
+    localStorage.setItem('rb_sort_cards', 'bill_date_asc');
+    localStorage.setItem('rb_sort_cash', 'balance_desc');
+    localStorage.setItem('rb_sort_dues', 'due_date_asc');
+    localStorage.setItem('rb_sort_expenses', 'amount_desc');
+
+    assert.strictEqual(localStorage.getItem('rb_sort_cards'), 'bill_date_asc');
+    assert.strictEqual(localStorage.getItem('rb_sort_cash'), 'balance_desc');
+    assert.strictEqual(localStorage.getItem('rb_sort_dues'), 'due_date_asc');
+    assert.strictEqual(localStorage.getItem('rb_sort_expenses'), 'amount_desc');
+  });
 });

@@ -25,6 +25,7 @@ import { useSessionStore } from '@/stores/useSessionStore';
 import { syncEngine } from '@/lib/syncEngine';
 import { NoteDetailModal } from '@/components/modals/NoteDetailModal';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
+import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
 
 export function NotesScreen() {
   const { notes: allNotes } = useNoteStore();
@@ -47,6 +48,28 @@ export function NotesScreen() {
     setViewModeState(mode);
     if (typeof window !== 'undefined') {
       localStorage.setItem('rb_view_notes', mode);
+    }
+  };
+
+  const NOTE_SORT_OPTIONS: SortOption[] = [
+    { value: 'updated_desc', label: 'Last Updated (Newest)', shortLabel: 'Updated' },
+    { value: 'created_desc', label: 'Date Created (Newest)', shortLabel: 'Newest' },
+    { value: 'title_asc', label: 'Title (A to Z)', shortLabel: 'A-Z' },
+    { value: 'title_desc', label: 'Title (Z to A)', shortLabel: 'Z-A' },
+    { value: 'pinned_first', label: 'Pinned First', shortLabel: 'Pinned' },
+  ];
+
+  const [noteSort, setNoteSortState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('rb_sort_notes') || 'updated_desc';
+    }
+    return 'updated_desc';
+  });
+
+  const setNoteSort = (sort: string) => {
+    setNoteSortState(sort);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_sort_notes', sort);
     }
   };
 
@@ -308,6 +331,33 @@ export function NotesScreen() {
     new Map(filteredNotes.map((n) => [n.id, n])).values()
   );
 
+  const sortedNotes = React.useMemo(() => {
+    return [...dedupedFilteredNotes].sort((a, b) => {
+      if (noteSort === 'pinned_first') {
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
+        const timeA = new Date(a.updated_at || a.created_at || 0).getTime();
+        const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
+        return timeB - timeA;
+      }
+      if (noteSort === 'title_asc') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
+      if (noteSort === 'title_desc') {
+        return (b.title || '').localeCompare(a.title || '');
+      }
+      if (noteSort === 'created_desc') {
+        const timeA = new Date(a.created_at || 0).getTime();
+        const timeB = new Date(b.created_at || 0).getTime();
+        return timeB - timeA;
+      }
+      // default: updated_desc
+      const timeA = new Date(a.updated_at || a.created_at || 0).getTime();
+      const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [dedupedFilteredNotes, noteSort]);
+
   // Active viewing note synced with reactive store
   const activeViewingNote = viewingNote
     ? notes.find((n) => n.id === viewingNote.id) || viewingNote
@@ -419,7 +469,14 @@ export function NotesScreen() {
             })}
           </div>
 
-          <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+          <div className="flex items-center gap-2">
+            <SortDropdown
+              value={noteSort}
+              onChange={setNoteSort}
+              options={NOTE_SORT_OPTIONS}
+            />
+            <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+          </div>
         </div>
       </div>
 
@@ -439,7 +496,7 @@ export function NotesScreen() {
             </p>
           </div>
         ) : (
-          dedupedFilteredNotes.map((note) => {
+          sortedNotes.map((note) => {
             const matchedColor = colorOptions.find((c) => c.id === note.color) || colorOptions[0];
             const checklistCount = note.checklist_items ? note.checklist_items.length : 0;
             const completedCount = note.checklist_items
@@ -609,7 +666,7 @@ export function NotesScreen() {
               {searchQuery ? 'No notes matched your search.' : 'No notes written yet.'}
             </div>
           ) : (
-            dedupedFilteredNotes.map((note) => {
+            sortedNotes.map((note) => {
               const matchedColor = colorOptions.find((c) => c.id === note.color) || colorOptions[0];
               const checklistCount = note.checklist_items ? note.checklist_items.length : 0;
               const completedCount = note.checklist_items

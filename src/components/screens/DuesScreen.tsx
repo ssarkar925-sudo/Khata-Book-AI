@@ -33,6 +33,7 @@ import { ContactDetailModal } from '@/components/modals/ContactDetailModal';
 import { SettleDueModal } from '@/components/modals/SettleDueModal';
 import { WhatsAppReminderModal } from '@/components/modals/WhatsAppReminderModal';
 import { ViewToggle, ViewMode } from '@/components/common/ViewToggle';
+import { SortDropdown, SortOption } from '@/components/common/SortDropdown';
 
 export function DuesScreen() {
   const { customers, dues } = useCustomerStore();
@@ -54,6 +55,30 @@ export function DuesScreen() {
     setViewModeState(mode);
     if (typeof window !== 'undefined') {
       localStorage.setItem('rb_view_dues', mode);
+    }
+  };
+
+  const DUE_SORT_OPTIONS: SortOption[] = [
+    { value: 'due_date_asc', label: 'Due Date (Soonest First)', shortLabel: 'Due Date' },
+    { value: 'due_date_desc', label: 'Due Date (Farthest First)', shortLabel: 'Due (Far)' },
+    { value: 'name_asc', label: 'Customer Name (A to Z)', shortLabel: 'A-Z' },
+    { value: 'name_desc', label: 'Customer Name (Z to A)', shortLabel: 'Z-A' },
+    { value: 'amount_desc', label: 'Amount (Highest First)', shortLabel: 'High Amount' },
+    { value: 'amount_asc', label: 'Amount (Lowest First)', shortLabel: 'Low Amount' },
+    { value: 'date_desc', label: 'Recently Added', shortLabel: 'Newest' },
+  ];
+
+  const [dueSort, setDueSortState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('rb_sort_dues') || 'due_date_asc';
+    }
+    return 'due_date_asc';
+  });
+
+  const setDueSort = (sort: string) => {
+    setDueSortState(sort);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rb_sort_dues', sort);
     }
   };
 
@@ -219,6 +244,42 @@ export function DuesScreen() {
 
     return true;
   });
+
+  const sortedDues = React.useMemo(() => {
+    return [...filteredDues].sort((a, b) => {
+      const custA = customers.find((c) => c.id === a.customer_id);
+      const custB = customers.find((c) => c.id === b.customer_id);
+
+      if (dueSort === 'due_date_asc') {
+        const timeA = a.due_date ? new Date(a.due_date).getTime() : 0;
+        const timeB = b.due_date ? new Date(b.due_date).getTime() : 0;
+        return timeA - timeB;
+      }
+      if (dueSort === 'due_date_desc') {
+        const timeA = a.due_date ? new Date(a.due_date).getTime() : 0;
+        const timeB = b.due_date ? new Date(b.due_date).getTime() : 0;
+        return timeB - timeA;
+      }
+      if (dueSort === 'name_asc') {
+        return (custA?.name || '').localeCompare(custB?.name || '');
+      }
+      if (dueSort === 'name_desc') {
+        return (custB?.name || '').localeCompare(custA?.name || '');
+      }
+      if (dueSort === 'amount_desc') {
+        return b.amount - a.amount;
+      }
+      if (dueSort === 'amount_asc') {
+        return a.amount - b.amount;
+      }
+      if (dueSort === 'date_desc') {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA;
+      }
+      return 0;
+    });
+  }, [filteredDues, dueSort, customers]);
 
   const overdueCount = pendingDues.filter(
     (d) => new Date(d.due_date).getTime() < nowTime
@@ -496,7 +557,14 @@ export function DuesScreen() {
             </span>
           </div>
 
-          <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+          <div className="flex items-center gap-2">
+            <SortDropdown
+              value={dueSort}
+              onChange={setDueSort}
+              options={DUE_SORT_OPTIONS}
+            />
+            <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+          </div>
         </div>
 
         {filteredDues.length === 0 ? (
@@ -514,7 +582,7 @@ export function DuesScreen() {
         ) : viewMode === 'grid' ? (
           /* Grid View */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
-            {filteredDues.map((due) => {
+            {sortedDues.map((due) => {
               const cust = customers.find((c) => c.id === due.customer_id);
               const isGet = due.direction === 'you_will_get';
               const nameInitial = (cust?.name || 'C').charAt(0).toUpperCase();
@@ -631,7 +699,7 @@ export function DuesScreen() {
         ) : (
           /* List View */
           <div className="divide-y divide-slate-100 dark:divide-white/5 space-y-1">
-            {filteredDues.map((due) => {
+            {sortedDues.map((due) => {
               const cust = customers.find((c) => c.id === due.customer_id);
               const isGet = due.direction === 'you_will_get';
               const nameInitial = (cust?.name || 'C').charAt(0).toUpperCase();
