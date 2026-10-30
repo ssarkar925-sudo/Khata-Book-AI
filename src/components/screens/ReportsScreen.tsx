@@ -40,7 +40,7 @@ import {
   exportLedgerOnlyWorkbook,
   exportUdharOnlyWorkbook,
 } from '@/lib/excelReportGenerator';
-import { TabType } from '@/types';
+import { TabType, EntityScope } from '@/types';
 
 type DatePreset = 'today' | 'this_week' | 'this_month' | 'last_month' | 'this_fy' | 'all_time' | 'custom';
 type ReportTab = 'pnl' | 'cashflow' | 'udhar' | 'cards';
@@ -58,7 +58,16 @@ export function ReportsScreen({ onNavigateTab }: ReportsScreenProps = {}) {
   const isLight = theme === 'light';
 
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
-  const cardBillingReport = calculateAllCardsBillingReport(cards, ledger);
+  const [selectedScope, setSelectedScope] = useState<'all' | EntityScope>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  const scopeCards = useMemo(() => {
+    return selectedScope === 'all'
+      ? cards
+      : cards.filter((c) => (c.scope || 'business') === selectedScope);
+  }, [cards, selectedScope]);
+
+  const cardBillingReport = calculateAllCardsBillingReport(scopeCards, ledger);
 
   // State
   const [activeTab, setActiveTab] = useState<ReportTab>('pnl');
@@ -140,9 +149,13 @@ export function ReportsScreen({ onNavigateTab }: ReportsScreenProps = {}) {
   const filteredEntries = useMemo(() => {
     return ledger.filter((entry) => {
       const d = entry.entry_date.slice(0, 10);
-      return d >= startDateStr && d <= endDateStr;
+      const inDate = d >= startDateStr && d <= endDateStr;
+      if (!inDate) return false;
+      if (selectedScope !== 'all' && (entry.scope || 'business') !== selectedScope) return false;
+      if (selectedCategory !== 'all' && (entry.category_id || 'general') !== selectedCategory) return false;
+      return true;
     });
-  }, [ledger, startDateStr, endDateStr]);
+  }, [ledger, startDateStr, endDateStr, selectedScope, selectedCategory]);
 
   // Financial Metrics for the period
   const totalInflow = useMemo(() => {
@@ -209,7 +222,11 @@ export function ReportsScreen({ onNavigateTab }: ReportsScreenProps = {}) {
 
   // Account Liquidity Movement
   const accountMovement = useMemo(() => {
-    return accounts.map((acc) => {
+    const scopeAccounts = selectedScope === 'all'
+      ? accounts
+      : accounts.filter((a) => (a.scope || 'business') === selectedScope);
+
+    return scopeAccounts.map((acc) => {
       const inAmount = filteredEntries
         .filter((e) => e.cash_location_id === acc.id && e.type === 'cash_in')
         .reduce((sum, e) => sum + Number(e.amount), 0);
@@ -233,7 +250,7 @@ export function ReportsScreen({ onNavigateTab }: ReportsScreenProps = {}) {
         netFlow: inAmount - outAmount,
       };
     });
-  }, [accounts, filteredEntries]);
+  }, [accounts, filteredEntries, selectedScope]);
 
   // Udhar / Dues Aging Analysis
   const udharAging = useMemo(() => {
@@ -246,6 +263,7 @@ export function ReportsScreen({ onNavigateTab }: ReportsScreenProps = {}) {
 
     dues.forEach((due) => {
       if (due.status !== 'pending') return;
+      if (selectedScope !== 'all' && (due.scope || 'business') !== selectedScope) return;
       const amt = Number(due.amount);
 
       if (due.direction === 'you_will_get') {
@@ -706,6 +724,57 @@ export function ReportsScreen({ onNavigateTab }: ReportsScreenProps = {}) {
 
         <div className="text-[11px] text-slate-400 font-mono hidden md:block">
           {startDateStr} ~ {endDateStr}
+        </div>
+      </div>
+
+      {/* Scope and Category Filters */}
+      <div
+        className={`p-3 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs ${
+          isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-900/60 border-white/10'
+        }`}
+      >
+        {/* Scope Selector */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">
+            Scope Lens:
+          </span>
+          {[
+            { id: 'all', label: 'All Spheres' },
+            { id: 'business', label: '🏢 Business' },
+            { id: 'personal', label: '👤 Personal' },
+            { id: 'family', label: '👨‍👩‍👧‍👦 Family' },
+          ].map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setSelectedScope(s.id as 'all' | EntityScope)}
+              className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all ${
+                selectedScope === s.id
+                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Category Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+            Category:
+          </span>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Categories ({filteredEntries.length})</option>
+            {EXPENSE_CATEGORIES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

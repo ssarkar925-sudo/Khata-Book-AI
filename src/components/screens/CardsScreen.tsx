@@ -2636,18 +2636,40 @@ export function CardsScreen() {
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Deduct From Account
                 </label>
-                <select
-                  value={payAccountId}
-                  onChange={(e) => setPayAccountId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
-                >
-                  <option value="">Do not deduct from bank balance</option>
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id} className="dark:bg-slate-900">
-                      {acc.name} (Balance: {formatPaise(acc.balance)})
-                    </option>
-                  ))}
-                </select>
+                {(() => {
+                  const currentCard = cards.find((c) => c.id === payCardId);
+                  const cardScope = currentCard?.scope || 'business';
+                  const scopeAccounts = accounts.filter((a) => (a.scope || 'business') === cardScope);
+                  const otherAccounts = accounts.filter((a) => (a.scope || 'business') !== cardScope);
+
+                  return (
+                    <select
+                      value={payAccountId}
+                      onChange={(e) => setPayAccountId(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                    >
+                      <option value="">Do not deduct from bank balance</option>
+                      {scopeAccounts.length > 0 && (
+                        <optgroup label={`${cardScope.toUpperCase()} ACCOUNTS (${scopeAccounts.length})`}>
+                          {scopeAccounts.map((acc) => (
+                            <option key={acc.id} value={acc.id} className="dark:bg-slate-900 font-semibold">
+                              {acc.name} (Balance: {formatPaise(acc.balance)})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {otherAccounts.length > 0 && (
+                        <optgroup label="OTHER SPHERES">
+                          {otherAccounts.map((acc) => (
+                            <option key={acc.id} value={acc.id} className="dark:bg-slate-900 text-slate-400">
+                              {acc.name} ({(acc.scope || 'business').toUpperCase()}) (Balance: {formatPaise(acc.balance)})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  );
+                })()}
               </div>
 
               <div>

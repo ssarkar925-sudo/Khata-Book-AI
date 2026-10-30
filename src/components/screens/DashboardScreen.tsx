@@ -52,8 +52,8 @@ import { getCategoryById } from '@/lib/categories';
 interface DashboardProps {
   onNavigateTab: (tab: TabType) => void;
   onOpenAskAI: () => void;
-  onQuickCashIn: () => void;
-  onQuickCashOut: () => void;
+  onQuickCashIn: (scope?: EntityScope) => void;
+  onQuickCashOut: (scope?: EntityScope) => void;
   onOpenScanner?: () => void;
   onOpenVoice?: () => void;
 }
@@ -611,7 +611,7 @@ export function DashboardScreen({
           }}
         >
           <button
-            onClick={isViewer ? undefined : onQuickCashIn}
+            onClick={isViewer ? undefined : () => onQuickCashIn(selectedScope === 'all' ? undefined : selectedScope)}
             disabled={isViewer}
             title={isViewer ? 'Read-only access: Viewer role cannot add transactions' : undefined}
             className={`w-full py-3.5 px-3 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all min-h-[50px] ${
@@ -625,7 +625,7 @@ export function DashboardScreen({
           </button>
 
           <button
-            onClick={isViewer ? undefined : onQuickCashOut}
+            onClick={isViewer ? undefined : () => onQuickCashOut(selectedScope === 'all' ? undefined : selectedScope)}
             disabled={isViewer}
             title={isViewer ? 'Read-only access: Viewer role cannot add transactions' : undefined}
             className={`w-full py-3.5 px-3 rounded-2xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all min-h-[50px] ${
@@ -1386,42 +1386,75 @@ export function DashboardScreen({
       {/* ========================================================= */}
       {/* RECENT TRANSACTIONS LEDGER TIMELINE                       */}
       {/* ========================================================= */}
-      <div
-        className={`rounded-3xl border p-5 sm:p-6 transition-all ${
-          isLight ? 'bg-white border-slate-200/90 shadow-sm' : 'bg-slate-900/80 border-white/10 shadow-lg'
-        }`}
-      >
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-white/5">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-tr from-emerald-500 to-indigo-500" />
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-              Recent Activity Ledger
-            </h3>
-          </div>
-          <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full">
-            {metrics.filteredLedger.length} entries in {selectedScope.toUpperCase()}
-          </span>
-        </div>
+      {(() => {
+        const displayLedger = selectedDonutCategory
+          ? metrics.filteredLedger.filter(
+              (e) => (e.category_id || 'general') === selectedDonutCategory
+            )
+          : metrics.filteredLedger;
 
-        {metrics.filteredLedger.length === 0 ? (
-          <div className="text-center py-10 text-xs text-slate-400 space-y-2">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center mx-auto text-slate-400">
-              <Wallet className="w-6 h-6 opacity-60" />
+        return (
+          <div
+            className={`rounded-3xl border p-5 sm:p-6 transition-all ${
+              isLight ? 'bg-white border-slate-200/90 shadow-sm' : 'bg-slate-900/80 border-white/10 shadow-lg'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-white/5 flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-tr from-emerald-500 to-indigo-500" />
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                  Recent Activity Ledger
+                </h3>
+                {selectedDonutCategory && (
+                  <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                    <span>Category: {getCategoryById(selectedDonutCategory).name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDonutCategory(null)}
+                      className="hover:opacity-75 font-black text-sm ml-1"
+                      title="Clear Category Filter"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+              </div>
+              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full">
+                {displayLedger.length} entries {selectedScope !== 'all' ? `in ${selectedScope.toUpperCase()}` : ''}
+              </span>
             </div>
-            <p className="font-semibold text-slate-600 dark:text-slate-300">
-              No transactions recorded in this sphere yet.
-            </p>
-            <p className="text-[11px] text-slate-400">
-              Click <span className="font-bold text-emerald-600 dark:text-emerald-400">+ Inflow</span> or <span className="font-bold text-rose-600 dark:text-rose-400">− Expense</span> above to add.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100 dark:divide-white/5">
-            {metrics.filteredLedger.slice(0, 8).map((entry) => {
-              const isInflow = entry.type === 'cash_in';
-              const cat = getCategoryById(entry.category_id);
-              const acc = accounts.find((a) => a.id === entry.cash_location_id);
-              const entryScope = entry.scope || 'business';
+
+            {displayLedger.length === 0 ? (
+              <div className="text-center py-10 text-xs text-slate-400 space-y-2">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center mx-auto text-slate-400">
+                  <Wallet className="w-6 h-6 opacity-60" />
+                </div>
+                <p className="font-semibold text-slate-600 dark:text-slate-300">
+                  {selectedDonutCategory
+                    ? `No transactions in "${getCategoryById(selectedDonutCategory).name}" category.`
+                    : 'No transactions recorded in this sphere yet.'}
+                </p>
+                {selectedDonutCategory ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDonutCategory(null)}
+                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    View all categories
+                  </button>
+                ) : (
+                  <p className="text-[11px] text-slate-400">
+                    Click <span className="font-bold text-emerald-600 dark:text-emerald-400">+ Inflow</span> or <span className="font-bold text-rose-600 dark:text-rose-400">− Expense</span> above to add.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-white/5">
+                {displayLedger.slice(0, 8).map((entry) => {
+                  const isInflow = entry.type === 'cash_in';
+                  const cat = getCategoryById(entry.category_id);
+                  const acc = accounts.find((a) => a.id === entry.cash_location_id);
+                  const entryScope = entry.scope || 'business';
 
               return (
                 <div
@@ -1500,6 +1533,8 @@ export function DashboardScreen({
           </div>
         )}
       </div>
+    );
+  })()}
 
       {/* Transaction Detail Popup Modal */}
       <TransactionDetailModal

@@ -34,6 +34,7 @@ import { EXPENSE_CATEGORIES, ExpenseCategoryDef } from '@/lib/categories';
 interface QuickTransactionModalProps {
   isOpen: boolean;
   type: 'in' | 'out';
+  initialScope?: EntityScope;
   onClose: () => void;
   onSubmit: (data: {
     amountPaise: number;
@@ -49,21 +50,28 @@ interface QuickTransactionModalProps {
 export function QuickTransactionModal({
   isOpen,
   type,
+  initialScope,
   onClose,
   onSubmit,
 }: QuickTransactionModalProps) {
   const { accounts } = useAccountStore();
-  const { userRole } = useSessionStore();
+  const { userRole, workspaces, activeWorkspaceId } = useSessionStore();
   const isViewer = userRole === 'viewer';
+
+  // Determine starting scope from initialScope, active workspace name, or first account
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const inferredWsScope: EntityScope = activeWs?.name.toLowerCase().includes('personal')
+    ? 'personal'
+    : activeWs?.name.toLowerCase().includes('family')
+    ? 'family'
+    : 'business';
+
+  const defaultEffectiveScope = initialScope || inferredWsScope;
 
   const [amountRupees, setAmountRupees] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('general');
-  const [selectedAccountId, setSelectedAccountId] = useState(
-    accounts[0]?.id || ''
-  );
-  const [selectedScope, setSelectedScope] = useState<EntityScope>(
-    accounts[0]?.scope || 'business'
-  );
+  const [selectedScope, setSelectedScope] = useState<EntityScope>(defaultEffectiveScope);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [selectedMode, setSelectedMode] = useState<PaymentMode>('upi');
   const [note, setNote] = useState('');
   const [entryDate, setEntryDate] = useState(() =>
@@ -81,13 +89,23 @@ export function QuickTransactionModal({
       } else {
         setSelectedCategory('food');
       }
-      if (accounts.length > 0) {
-        const defaultAcc = accounts[0];
-        setSelectedAccountId(defaultAcc.id);
-        setSelectedScope(defaultAcc.scope || 'business');
+
+      const startingScope = initialScope || inferredWsScope;
+      setSelectedScope(startingScope);
+
+      // Pick first account matching this scope
+      const scopeMatchingAccs = accounts.filter(
+        (a) => (a.scope || 'business') === startingScope
+      );
+      if (scopeMatchingAccs.length > 0) {
+        setSelectedAccountId(scopeMatchingAccs[0].id);
+      } else if (accounts.length > 0) {
+        setSelectedAccountId(accounts[0].id);
+      } else {
+        setSelectedAccountId('');
       }
     }
-  }, [isOpen, type, accounts]);
+  }, [isOpen, type, initialScope, accounts]);
 
   if (!isOpen) return null;
 
@@ -276,7 +294,16 @@ export function QuickTransactionModal({
                   <button
                     key={s.id}
                     type="button"
-                    onClick={() => setSelectedScope(s.id as EntityScope)}
+                    onClick={() => {
+                      const newScope = s.id as EntityScope;
+                      setSelectedScope(newScope);
+                      const matchingAccs = accounts.filter(
+                        (a) => (a.scope || 'business') === newScope
+                      );
+                      if (matchingAccs.length > 0) {
+                        setSelectedAccountId(matchingAccs[0].id);
+                      }
+                    }}
                     className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
                       isSelected
                         ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent shadow-xs'
@@ -290,35 +317,69 @@ export function QuickTransactionModal({
             </div>
           </div>
 
-          {/* Paid Through / Bank Account Dropdown */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              {isInflow ? 'Deposit Into (Bank / Cash)' : 'Paid From (Bank / Cash)'}
-            </label>
-            <select
-              value={selectedAccountId}
-              onChange={(e) => {
-                const newId = e.target.value;
-                setSelectedAccountId(newId);
-                const matched = accounts.find((a) => a.id === newId);
-                if (matched && matched.scope) {
-                  setSelectedScope(matched.scope);
-                }
-              }}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
-            >
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id} className="dark:bg-slate-900">
-                  {acc.name} ({(acc.scope || 'business').toUpperCase()}) — Balance: {formatPaise(acc.balance)}
-                </option>
-              ))}
-            </select>
-            <span className="text-[10px] text-slate-400 block">
-              {isInflow
-                ? 'Selected account balance will increase automatically.'
-                : 'Selected account balance will be deducted automatically.'}
-            </span>
-          </div>
+          {/* Paid Through / Bank Account Dropdown Filtered by Category / Sphere */}
+          {(() => {
+            const scopeAccounts = accounts.filter(
+              (a) => (a.scope || 'business') === selectedScope
+            );
+            const otherAccounts = accounts.filter(
+              (a) => (a.scope || 'business') !== selectedScope
+            );
+
+            return (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    {isInflow ? 'Deposit Into (Bank / Cash)' : 'Paid From (Bank / Cash)'}
+                  </label>
+                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                    {selectedScope.toUpperCase()} ({scopeAccounts.length})
+                  </span>
+                </div>
+                <select
+                  value={selectedAccountId}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setSelectedAccountId(newId);
+                    const matched = accounts.find((a) => a.id === newId);
+                    if (matched && matched.scope && matched.scope !== selectedScope) {
+                      setSelectedScope(matched.scope);
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
+                >
+                  {scopeAccounts.length > 0 ? (
+                    <optgroup label={`${selectedScope.toUpperCase()} ACCOUNTS (${scopeAccounts.length})`}>
+                      {scopeAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id} className="dark:bg-slate-900 font-semibold">
+                          {acc.name} — Balance: {formatPaise(acc.balance)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : (
+                    <option value="" disabled className="dark:bg-slate-900 text-slate-400">
+                      No {selectedScope.toUpperCase()} accounts found
+                    </option>
+                  )}
+
+                  {otherAccounts.length > 0 && (
+                    <optgroup label="OTHER SPHERES (CROSS-SPHERE / SWITCH)">
+                      {otherAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id} className="dark:bg-slate-900 text-slate-400">
+                          {acc.name} ({(acc.scope || 'business').toUpperCase()}) — Balance: {formatPaise(acc.balance)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+                <span className="text-[10px] text-slate-400 block">
+                  {isInflow
+                    ? 'Selected account balance will increase automatically.'
+                    : 'Selected account balance will be deducted automatically.'}
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Payment Mode Pills */}
           <div className="space-y-1.5">

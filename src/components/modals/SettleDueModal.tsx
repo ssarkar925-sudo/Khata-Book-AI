@@ -46,7 +46,11 @@ export function SettleDueModal({
     if (isOpen && due) {
       setSettleAmountRupees(paiseToRupees(due.amount).toString());
       setRemark('');
-      if (accounts.length > 0 && !selectedAccountId) {
+      const dueScope = due.scope || 'business';
+      const matching = accounts.filter((a) => (a.scope || 'business') === dueScope);
+      if (matching.length > 0) {
+        setSelectedAccountId(matching[0].id);
+      } else if (accounts.length > 0) {
         setSelectedAccountId(accounts[0].id);
       }
     }
@@ -159,22 +163,53 @@ export function SettleDueModal({
           </div>
 
           {/* Destination / Source Bank Account */}
-          <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              {isReceivable ? 'Deposit Money Into' : 'Pay Money From'}
-            </label>
-            <select
-              value={selectedAccountId}
-              onChange={(e) => setSelectedAccountId(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
-            >
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id} className="dark:bg-slate-900">
-                  {acc.name} — Balance: {formatPaise(acc.balance)}
-                </option>
-              ))}
-            </select>
-          </div>
+          {(() => {
+            const dueScope = due.scope || 'business';
+            const scopeAccounts = accounts.filter((a) => (a.scope || 'business') === dueScope);
+            const otherAccounts = accounts.filter((a) => (a.scope || 'business') !== dueScope);
+
+            return (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    {isReceivable ? 'Deposit Money Into' : 'Pay Money From'}
+                  </label>
+                  <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">
+                    {dueScope.toUpperCase()} ({scopeAccounts.length})
+                  </span>
+                </div>
+                <select
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                >
+                  {scopeAccounts.length > 0 ? (
+                    <optgroup label={`${dueScope.toUpperCase()} ACCOUNTS (${scopeAccounts.length})`}>
+                      {scopeAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id} className="dark:bg-slate-900 font-semibold">
+                          {acc.name} — Balance: {formatPaise(acc.balance)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : (
+                    <option value="" disabled className="dark:bg-slate-900 text-slate-400">
+                      No {dueScope.toUpperCase()} accounts found
+                    </option>
+                  )}
+
+                  {otherAccounts.length > 0 && (
+                    <optgroup label="OTHER SPHERES">
+                      {otherAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id} className="dark:bg-slate-900 text-slate-400">
+                          {acc.name} ({(acc.scope || 'business').toUpperCase()}) — Balance: {formatPaise(acc.balance)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            );
+          })()}
 
           {/* Payment Mode */}
           <div className="space-y-1">

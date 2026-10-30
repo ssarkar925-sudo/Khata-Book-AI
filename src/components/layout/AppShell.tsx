@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { TabType, LedgerEntry } from '@/types';
+import { TabType, LedgerEntry, EntityScope } from '@/types';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { supabase } from '@/lib/supabase';
@@ -109,6 +109,7 @@ export function AppShell() {
 
   // Quick transaction modals
   const [showCashModal, setShowCashModal] = useState<'in' | 'out' | null>(null);
+  const [cashModalScope, setCashModalScope] = useState<EntityScope | undefined>(undefined);
 
   // Initialize authentic Supabase session and workspace role mapping
   useEffect(() => {
@@ -267,8 +268,14 @@ export function AppShell() {
             <DashboardScreen
               onNavigateTab={(tab) => setActiveTab(tab)}
               onOpenAskAI={() => setIsAskAIOpen(true)}
-              onQuickCashIn={() => setShowCashModal('in')}
-              onQuickCashOut={() => setShowCashModal('out')}
+              onQuickCashIn={(scope) => {
+                setCashModalScope(scope);
+                setShowCashModal('in');
+              }}
+              onQuickCashOut={(scope) => {
+                setCashModalScope(scope);
+                setShowCashModal('out');
+              }}
               onOpenScanner={() => setIsScannerOpen(true)}
               onOpenVoice={() => setIsVoiceOpen(true)}
             />
@@ -475,7 +482,11 @@ export function AppShell() {
         <QuickTransactionModal
           isOpen={showCashModal !== null}
           type={showCashModal || 'out'}
-          onClose={() => setShowCashModal(null)}
+          initialScope={cashModalScope}
+          onClose={() => {
+            setShowCashModal(null);
+            setCashModalScope(undefined);
+          }}
           onSubmit={({ amountPaise, categoryId, accountId, mode, note, entryDate, scope }) => {
             const newEntry: LedgerEntry = {
               id: crypto.randomUUID(),
@@ -485,12 +496,13 @@ export function AppShell() {
               category_id: categoryId,
               cash_location_id: accountId,
               mode,
-              scope: scope || 'business',
+              scope: scope || cashModalScope || 'business',
               note: note.trim() || (showCashModal === 'in' ? 'Cash Received' : 'Expense Recorded'),
               entry_date: entryDate,
             };
             syncEngine.pushLedgerEntry(newEntry);
             setShowCashModal(null);
+            setCashModalScope(undefined);
           }}
         />
       )}

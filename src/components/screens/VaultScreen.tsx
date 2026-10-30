@@ -525,8 +525,19 @@ export function VaultScreen() {
     return vaultItems.filter((item) => {
       // Category filter
       if (activeCategoryFilter !== 'all') {
-        const itemCat = item.category || 'Banking & Finance';
-        if (itemCat !== activeCategoryFilter && item.color !== activeCategoryFilter) {
+        const itemCat = (item.category || '').toLowerCase();
+        const itemColor = (item.color || '').toLowerCase();
+        const filterLower = activeCategoryFilter.toLowerCase();
+        const matchedDef = VAULT_COLORS.find(
+          (c) => c.label.toLowerCase() === filterLower || c.id.toLowerCase() === filterLower
+        );
+        const matchesCat = itemCat.length > 0 && (itemCat.includes(filterLower) || filterLower.includes(itemCat));
+        const matchesColor = matchedDef
+          ? itemColor === matchedDef.id.toLowerCase() ||
+            itemCat === matchedDef.name.toLowerCase()
+          : false;
+
+        if (!matchesCat && !matchesColor && itemCat !== filterLower && itemColor !== filterLower) {
           return false;
         }
       }

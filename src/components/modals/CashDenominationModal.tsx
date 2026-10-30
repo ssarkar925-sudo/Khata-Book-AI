@@ -362,17 +362,47 @@ export function CashDenominationModal({
             </span>
           </div>
 
-          <select
-            value={selectedAccountId}
-            onChange={(e) => handleSwitchAccount(e.target.value)}
-            className="px-3 py-1.5 rounded-xl border border-amber-500/30 bg-white dark:bg-slate-900 text-xs font-bold text-slate-900 dark:text-white shadow-xs focus:ring-2 focus:ring-amber-500"
-          >
-            {activeCashAccounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name} ({a.scope ? a.scope.toUpperCase() : 'BIZ'}) — Balance: {formatPaise(a.balance)}
-              </option>
-            ))}
-          </select>
+          {(() => {
+            const bizAccounts = activeCashAccounts.filter((a) => (a.scope || 'business') === 'business');
+            const personalAccounts = activeCashAccounts.filter((a) => a.scope === 'personal');
+            const familyAccounts = activeCashAccounts.filter((a) => a.scope === 'family');
+
+            return (
+              <select
+                value={selectedAccountId}
+                onChange={(e) => handleSwitchAccount(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-amber-500/30 bg-white dark:bg-slate-900 text-xs font-bold text-slate-900 dark:text-white shadow-xs focus:ring-2 focus:ring-amber-500"
+              >
+                {bizAccounts.length > 0 && (
+                  <optgroup label="BUSINESS CASH DRAWERS">
+                    {bizAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} — Balance: {formatPaise(a.balance)}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {personalAccounts.length > 0 && (
+                  <optgroup label="PERSONAL CASH DRAWERS">
+                    {personalAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} — Balance: {formatPaise(a.balance)}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {familyAccounts.length > 0 && (
+                  <optgroup label="FAMILY CASH DRAWERS">
+                    {familyAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} — Balance: {formatPaise(a.balance)}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            );
+          })()}
         </div>
 
         {/* Scrollable Body */}

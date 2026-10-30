@@ -48,13 +48,13 @@ export function InterSphereTransferModal({
     isSameScope: boolean;
   } | null>(null);
 
-  // Accounts belonging to source scope (or all accounts if none in scope)
+  // Accounts belonging to source scope
   const fromAccounts = accounts.filter((a) => (a.scope || 'business') === fromScope);
-  const resolvedFromAccounts = fromAccounts.length > 0 ? fromAccounts : accounts;
+  const resolvedFromAccounts = fromAccounts;
 
   // Accounts belonging to destination scope
   const toAccounts = accounts.filter((a) => (a.scope || 'business') === toScope);
-  const resolvedToAccounts = toAccounts.length > 0 ? toAccounts : accounts;
+  const resolvedToAccounts = toAccounts;
 
   const [fromAccountId, setFromAccountId] = useState('');
   const [toAccountId, setToAccountId] = useState('');
@@ -337,11 +337,15 @@ export function InterSphereTransferModal({
                   onChange={(e) => setFromAccountId(e.target.value)}
                   className="w-full text-xs font-bold px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  {resolvedFromAccounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} ({formatPaise(syncEngine.getAccountEffectiveBalance(acc.id))})
-                    </option>
-                  ))}
+                  {resolvedFromAccounts.length > 0 ? (
+                    resolvedFromAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} ({formatPaise(syncEngine.getAccountEffectiveBalance(acc.id))})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No accounts in {FromMeta.label}</option>
+                  )}
                 </select>
               </div>
 
@@ -354,14 +358,18 @@ export function InterSphereTransferModal({
                   onChange={(e) => setToAccountId(e.target.value)}
                   className="w-full text-xs font-bold px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  {resolvedToAccounts.map((acc) => {
-                    const isSelf = isSameScope && acc.id === fromAccountId;
-                    return (
-                      <option key={acc.id} value={acc.id} disabled={isSelf}>
-                        {acc.name} ({formatPaise(syncEngine.getAccountEffectiveBalance(acc.id))}){isSelf ? ' — (Source)' : ''}
-                      </option>
-                    );
-                  })}
+                  {resolvedToAccounts.length > 0 ? (
+                    resolvedToAccounts.map((acc) => {
+                      const isSelf = isSameScope && acc.id === fromAccountId;
+                      return (
+                        <option key={acc.id} value={acc.id} disabled={isSelf}>
+                          {acc.name} ({formatPaise(syncEngine.getAccountEffectiveBalance(acc.id))}){isSelf ? ' — (Source)' : ''}
+                        </option>
+                      );
+                    })
+                  ) : (
+                    <option value="" disabled>No accounts in {ToMeta.label}</option>
+                  )}
                 </select>
               </div>
             </div>

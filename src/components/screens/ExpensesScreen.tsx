@@ -120,6 +120,15 @@ export function ExpensesScreen({
 
   // New Expense Modal State
   const [showAddModal, setShowAddModal] = useState(false);
+  const handleOpenAddModal = () => {
+    const initialScope = selectedScope !== 'all' ? selectedScope : 'business';
+    setExpenseScope(initialScope);
+    const matchingAccs = accounts.filter((a) => (a.scope || 'business') === initialScope);
+    if (matchingAccs.length > 0) setExpenseAccountId(matchingAccs[0].id);
+    const matchingCards = cards.filter((c) => (c.scope || 'business') === initialScope);
+    if (matchingCards.length > 0) setExpenseCardId(matchingCards[0].id);
+    setShowAddModal(true);
+  };
   const [expenseScope, setExpenseScope] = useState<EntityScope>('business');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseNote, setExpenseNote] = useState('');
@@ -369,7 +378,7 @@ export function ExpensesScreen({
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           {/* Primary Action Button: Full width on mobile */}
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={handleOpenAddModal}
             className="w-full sm:w-auto flex items-center justify-center gap-2 py-3.5 sm:py-2.5 px-4 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 font-bold text-white text-xs shadow-md shadow-rose-500/25 active:scale-[0.98] transition-all min-h-[48px] sm:min-h-0 cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -660,27 +669,44 @@ export function ExpensesScreen({
             </select>
 
             {/* Account / Card Source Filter */}
-            <select
-              value={selectedAccount}
-              onChange={(e) => setSelectedAccount(e.target.value)}
-              className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
-            >
-              <option value="all">All Payment Sources</option>
-              <optgroup label="Bank Accounts & Cash Counters">
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    🏦 {acc.name}
+            {(() => {
+              const scopeAccounts = selectedScope === 'all'
+                ? accounts
+                : accounts.filter((a) => (a.scope || 'business') === selectedScope);
+              const scopeCards = selectedScope === 'all'
+                ? cards
+                : cards.filter((c) => (c.scope || 'business') === selectedScope);
+
+              return (
+                <select
+                  value={selectedAccount}
+                  onChange={(e) => setSelectedAccount(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                >
+                  <option value="all">
+                    {selectedScope === 'all' ? 'All Payment Sources' : `All ${selectedScope.toUpperCase()} Sources`}
                   </option>
-                ))}
-              </optgroup>
-              <optgroup label="Credit Cards">
-                {cards.map((card) => (
-                  <option key={card.id} value={`card_${card.id}`}>
-                    💳 {card.name} (•• {card.last4})
-                  </option>
-                ))}
-              </optgroup>
-            </select>
+                  {scopeAccounts.length > 0 && (
+                    <optgroup label="Bank Accounts & Cash Counters">
+                      {scopeAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          🏦 {acc.name} {selectedScope === 'all' ? `(${(acc.scope || 'business').toUpperCase()})` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {scopeCards.length > 0 && (
+                    <optgroup label="Credit Cards">
+                      {scopeCards.map((card) => (
+                        <option key={card.id} value={`card_${card.id}`}>
+                          💳 {card.name} (•• {card.last4}) {selectedScope === 'all' ? `(${(card.scope || 'business').toUpperCase()})` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              );
+            })()}
 
             {/* Export CSV */}
             <button
@@ -715,7 +741,7 @@ export function ExpensesScreen({
               </p>
             </div>
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={handleOpenAddModal}
               className="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs shadow-md shadow-rose-600/20 cursor-pointer"
             >
               + Record Expense
@@ -1047,7 +1073,18 @@ export function ExpensesScreen({
                       <button
                         key={s.id}
                         type="button"
-                        onClick={() => setExpenseScope(s.id as EntityScope)}
+                        onClick={() => {
+                          const newScope = s.id as EntityScope;
+                          setExpenseScope(newScope);
+                          const matchingAccs = accounts.filter(
+                            (a) => (a.scope || 'business') === newScope
+                          );
+                          if (matchingAccs.length > 0) setExpenseAccountId(matchingAccs[0].id);
+                          const matchingCards = cards.filter(
+                            (c) => (c.scope || 'business') === newScope
+                          );
+                          if (matchingCards.length > 0) setExpenseCardId(matchingCards[0].id);
+                        }}
                         className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
                           isSelected
                             ? 'bg-rose-600 text-white border-transparent shadow-xs'
@@ -1137,31 +1174,68 @@ export function ExpensesScreen({
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                     {expenseMode === 'card' ? 'Charge Card' : 'Paid From Account'}
                   </label>
-                  {expenseMode === 'card' ? (
-                    <select
-                      value={expenseCardId}
-                      onChange={(e) => setExpenseCardId(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs font-semibold text-slate-900 dark:text-white"
-                    >
-                      {cards.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} (•• {c.last4})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <select
-                      value={expenseAccountId}
-                      onChange={(e) => setExpenseAccountId(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs font-semibold text-slate-900 dark:text-white"
-                    >
-                      {accounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                  {(() => {
+                    const scopeAccounts = accounts.filter((a) => (a.scope || 'business') === expenseScope);
+                    const otherAccounts = accounts.filter((a) => (a.scope || 'business') !== expenseScope);
+                    const scopeCards = cards.filter((c) => (c.scope || 'business') === expenseScope);
+                    const otherCards = cards.filter((c) => (c.scope || 'business') !== expenseScope);
+
+                    return expenseMode === 'card' ? (
+                      <select
+                        value={expenseCardId}
+                        onChange={(e) => setExpenseCardId(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs font-semibold text-slate-900 dark:text-white"
+                      >
+                        {scopeCards.length > 0 ? (
+                          <optgroup label={`${expenseScope.toUpperCase()} CARDS (${scopeCards.length})`}>
+                            {scopeCards.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name} (•• {c.last4})
+                              </option>
+                            ))}
+                          </optgroup>
+                        ) : (
+                          <option value="" disabled>No {expenseScope.toUpperCase()} cards</option>
+                        )}
+                        {otherCards.length > 0 && (
+                          <optgroup label="OTHER SPHERES">
+                            {otherCards.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name} (•• {c.last4}) ({(c.scope || 'business').toUpperCase()})
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                    ) : (
+                      <select
+                        value={expenseAccountId}
+                        onChange={(e) => setExpenseAccountId(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs font-semibold text-slate-900 dark:text-white"
+                      >
+                        {scopeAccounts.length > 0 ? (
+                          <optgroup label={`${expenseScope.toUpperCase()} ACCOUNTS (${scopeAccounts.length})`}>
+                            {scopeAccounts.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.name} ({formatPaise(a.balance)})
+                              </option>
+                            ))}
+                          </optgroup>
+                        ) : (
+                          <option value="" disabled>No {expenseScope.toUpperCase()} accounts</option>
+                        )}
+                        {otherAccounts.length > 0 && (
+                          <optgroup label="OTHER SPHERES">
+                            {otherAccounts.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.name} ({(a.scope || 'business').toUpperCase()})
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                    );
+                  })()}
                 </div>
               </div>
 

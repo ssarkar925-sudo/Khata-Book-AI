@@ -1688,32 +1688,80 @@ export function CashScreen() {
             <form onSubmit={handleTransfer} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Transfer From (Debit)</label>
-                <select
-                  value={fromAccId}
-                  onChange={(e) => setFromAccId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
-                >
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id} className="dark:bg-slate-900">
-                      {a.name} ({formatPaise(getAccountEffectiveBalance(a))})
-                    </option>
-                  ))}
-                </select>
+                {(() => {
+                  const scopeAccounts = selectedScope === 'all'
+                    ? accounts
+                    : accounts.filter((a) => (a.scope || 'business') === selectedScope);
+                  const otherAccounts = selectedScope === 'all'
+                    ? []
+                    : accounts.filter((a) => (a.scope || 'business') !== selectedScope);
+
+                  return (
+                    <select
+                      value={fromAccId}
+                      onChange={(e) => setFromAccId(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                    >
+                      {scopeAccounts.length > 0 && (
+                        <optgroup label={selectedScope === 'all' ? 'Accounts' : `${selectedScope.toUpperCase()} Accounts`}>
+                          {scopeAccounts.map((a) => (
+                            <option key={a.id} value={a.id} className="dark:bg-slate-900 font-semibold">
+                              {a.name} ({formatPaise(getAccountEffectiveBalance(a))})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {otherAccounts.length > 0 && (
+                        <optgroup label="Other Spheres">
+                          {otherAccounts.map((a) => (
+                            <option key={a.id} value={a.id} className="dark:bg-slate-900 text-slate-400">
+                              {a.name} ({(a.scope || 'business').toUpperCase()}) ({formatPaise(getAccountEffectiveBalance(a))})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  );
+                })()}
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Transfer To (Credit)</label>
-                <select
-                  value={toAccId}
-                  onChange={(e) => setToAccId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
-                >
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id} disabled={a.id === fromAccId} className="dark:bg-slate-900">
-                      {a.name} ({formatPaise(getAccountEffectiveBalance(a))}){a.id === fromAccId ? ' — (Source)' : ''}
-                    </option>
-                  ))}
-                </select>
+                {(() => {
+                  const scopeAccounts = selectedScope === 'all'
+                    ? accounts
+                    : accounts.filter((a) => (a.scope || 'business') === selectedScope);
+                  const otherAccounts = selectedScope === 'all'
+                    ? []
+                    : accounts.filter((a) => (a.scope || 'business') !== selectedScope);
+
+                  return (
+                    <select
+                      value={toAccId}
+                      onChange={(e) => setToAccId(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs text-slate-900 dark:text-white font-medium"
+                    >
+                      {scopeAccounts.length > 0 && (
+                        <optgroup label={selectedScope === 'all' ? 'Accounts' : `${selectedScope.toUpperCase()} Accounts`}>
+                          {scopeAccounts.map((a) => (
+                            <option key={a.id} value={a.id} disabled={a.id === fromAccId} className="dark:bg-slate-900 font-semibold">
+                              {a.name} ({formatPaise(getAccountEffectiveBalance(a))}){a.id === fromAccId ? ' — (Source)' : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {otherAccounts.length > 0 && (
+                        <optgroup label="Other Spheres">
+                          {otherAccounts.map((a) => (
+                            <option key={a.id} value={a.id} disabled={a.id === fromAccId} className="dark:bg-slate-900 text-slate-400">
+                              {a.name} ({(a.scope || 'business').toUpperCase()}) ({formatPaise(getAccountEffectiveBalance(a))}){a.id === fromAccId ? ' — (Source)' : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  );
+                })()}
               </div>
 
               <div>
