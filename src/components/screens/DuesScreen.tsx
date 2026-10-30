@@ -248,10 +248,11 @@ export function DuesScreen() {
     return true;
   });
 
-  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder(
+  const { moveItem, applyCustomOrder, isCustomOrder, getCardDragProps } = useCardOrder(
     'dues',
     dues,
-    dueSort
+    dueSort,
+    setDueSort
   );
 
   const sortedDues = React.useMemo(() => {
@@ -600,15 +601,22 @@ export function DuesScreen() {
               const nameInitial = (cust?.name || 'C').charAt(0).toUpperCase();
               const deadline = getDueDeadlineStatus(due.due_date);
 
+              const drag = getCardDragProps(due.id);
               return (
                 <div
                   key={due.id}
+                  draggable={drag.draggable}
+                  onDragStart={drag.onDragStart}
+                  onDragOver={drag.onDragOver}
+                  onDragLeave={drag.onDragLeave}
+                  onDrop={drag.onDrop}
+                  onDragEnd={drag.onDragEnd}
                   onClick={() => cust && setSelectedCustForDetail(cust)}
                   className={`p-4 rounded-3xl border transition-all hover-lift cursor-pointer flex flex-col justify-between gap-3 ${
                     isLight
                       ? 'bg-slate-50/60 border-slate-200 hover:border-slate-300 shadow-xs'
                       : 'bg-white/5 border-white/10 hover:border-white/20'
-                  }`}
+                  } ${drag.dragClasses}`}
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2">
@@ -685,8 +693,8 @@ export function DuesScreen() {
                   >
                     <div className="flex items-center gap-1.5">
                       <CardMoveButtons
-                        onMoveUp={() => moveItem(due.id, 'up')}
-                        onMoveDown={() => moveItem(due.id, 'down')}
+                        onMoveUp={() => moveItem(due.id, 'up', sortedDues)}
+                        onMoveDown={() => moveItem(due.id, 'down', sortedDues)}
                         canMoveUp={idx > 0}
                         canMoveDown={idx < sortedDues.length - 1}
                         isLight={isLight}
@@ -726,10 +734,17 @@ export function DuesScreen() {
               const nameInitial = (cust?.name || 'C').charAt(0).toUpperCase();
               const deadline = getDueDeadlineStatus(due.due_date);
 
+              const drag = getCardDragProps(due.id);
               return (
                 <div
                   key={due.id}
-                  className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-slate-50/50 dark:hover:bg-white/5 px-2 rounded-2xl transition-colors"
+                  draggable={drag.draggable}
+                  onDragStart={drag.onDragStart}
+                  onDragOver={drag.onDragOver}
+                  onDragLeave={drag.onDragLeave}
+                  onDrop={drag.onDrop}
+                  onDragEnd={drag.onDragEnd}
+                  className={`py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-slate-50/50 dark:hover:bg-white/5 px-2 rounded-2xl transition-colors ${drag.dragClasses}`}
                 >
                   <div
                     onClick={() => cust && setSelectedCustForDetail(cust)}
@@ -812,8 +827,8 @@ export function DuesScreen() {
 
                     <div className="flex items-center gap-1.5">
                       <CardMoveButtons
-                        onMoveUp={() => moveItem(due.id, 'up')}
-                        onMoveDown={() => moveItem(due.id, 'down')}
+                        onMoveUp={() => moveItem(due.id, 'up', sortedDues)}
+                        onMoveDown={() => moveItem(due.id, 'down', sortedDues)}
                         canMoveUp={listIdx > 0}
                         canMoveDown={listIdx < sortedDues.length - 1}
                         isLight={isLight}

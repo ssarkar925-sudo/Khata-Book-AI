@@ -259,10 +259,11 @@ export function CashScreen() {
     return bal || 0;
   };
 
-  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder(
+  const { moveItem, applyCustomOrder, isCustomOrder, getCardDragProps } = useCardOrder(
     'cash',
     accounts,
-    accountSort
+    accountSort,
+    setAccountSort
   );
 
   const sortedAccounts = React.useMemo(() => {
@@ -679,9 +680,17 @@ export function CashScreen() {
       {/* Accounts: Grid View vs List View */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedAccounts.map((acc, idx) => (
+          {sortedAccounts.map((acc, idx) => {
+            const drag = getCardDragProps(acc.id);
+            return (
             <div
               key={acc.id}
+              draggable={drag.draggable}
+              onDragStart={drag.onDragStart}
+              onDragOver={drag.onDragOver}
+              onDragLeave={drag.onDragLeave}
+              onDrop={drag.onDrop}
+              onDragEnd={drag.onDragEnd}
               onClick={() => setSelectedAccForDetail(acc)}
               className={`cursor-pointer rounded-3xl border p-5 transition-all hover-lift bg-gradient-to-br ${
                 acc.gradient || 'from-blue-600/20 via-cyan-500/10 to-transparent'
@@ -689,7 +698,7 @@ export function CashScreen() {
                 isLight
                   ? 'bg-white border-slate-200 shadow-sm hover:border-slate-300'
                   : 'bg-slate-900/80 border-white/10 hover:border-white/20'
-              } flex flex-col justify-between space-y-4`}
+              } ${drag.dragClasses} flex flex-col justify-between space-y-4`}
             >
               <div>
                 {/* Account Card Header */}
@@ -757,8 +766,8 @@ export function CashScreen() {
                     )}
 
                     <CardMoveButtons
-                      onMoveUp={() => moveItem(acc.id, 'up')}
-                      onMoveDown={() => moveItem(acc.id, 'down')}
+                      onMoveUp={() => moveItem(acc.id, 'up', sortedAccounts)}
+                      onMoveDown={() => moveItem(acc.id, 'down', sortedAccounts)}
                       canMoveUp={idx > 0}
                       canMoveDown={idx < sortedAccounts.length - 1}
                       isLight={isLight}
@@ -836,16 +845,25 @@ export function CashScreen() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         /* List View */
         <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 shadow-xs divide-y divide-slate-100 dark:divide-white/5 overflow-hidden">
-          {sortedAccounts.map((acc, listIdx) => (
+          {sortedAccounts.map((acc, listIdx) => {
+            const drag = getCardDragProps(acc.id);
+            return (
             <div
               key={acc.id}
+              draggable={drag.draggable}
+              onDragStart={drag.onDragStart}
+              onDragOver={drag.onDragOver}
+              onDragLeave={drag.onDragLeave}
+              onDrop={drag.onDrop}
+              onDragEnd={drag.onDragEnd}
               onClick={() => setSelectedAccForDetail(acc)}
-              className="p-4 sm:px-5 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors cursor-pointer group"
+              className={`p-4 sm:px-5 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors cursor-pointer group ${drag.dragClasses}`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div
@@ -911,8 +929,8 @@ export function CashScreen() {
 
                 <div className="flex items-center gap-1">
                   <CardMoveButtons
-                    onMoveUp={() => moveItem(acc.id, 'up')}
-                    onMoveDown={() => moveItem(acc.id, 'down')}
+                    onMoveUp={() => moveItem(acc.id, 'up', sortedAccounts)}
+                    onMoveDown={() => moveItem(acc.id, 'down', sortedAccounts)}
                     canMoveUp={listIdx > 0}
                     canMoveDown={listIdx < sortedAccounts.length - 1}
                     isLight={isLight}
@@ -973,7 +991,8 @@ export function CashScreen() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

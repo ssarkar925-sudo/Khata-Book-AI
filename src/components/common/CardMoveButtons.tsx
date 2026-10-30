@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
 
 interface CardMoveButtonsProps {
   onMoveUp: () => void;
@@ -26,15 +26,25 @@ export function CardMoveButtons({
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className={`inline-flex items-center gap-0.5 rounded-xl border p-0.5 shadow-2xs backdrop-blur-md ${
+      className={`inline-flex items-center gap-0.5 rounded-xl border p-0.5 shadow-2xs backdrop-blur-md select-none ${
         isLight
-          ? 'bg-white/80 border-slate-200 text-slate-600'
+          ? 'bg-white/90 border-slate-200 text-slate-600'
           : 'bg-black/40 border-white/15 text-slate-300'
       } ${className}`}
-      title="Arrange Card Order"
+      title="Drag card to arrange or use Up/Down arrows"
     >
+      {/* Visual Drag Grip Handle */}
+      <div
+        className={`${btnPadding} rounded-lg cursor-grab active:cursor-grabbing hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-violet-500 transition-colors flex items-center justify-center`}
+        title="Drag card to arrange"
+      >
+        <GripVertical className={iconSize} />
+      </div>
+
+      {/* Move Up Button */}
       <button
         type="button"
+        draggable={false}
         disabled={!canMoveUp}
         onClick={onMoveUp}
         title="Move Up / Backward"
@@ -47,8 +57,10 @@ export function CardMoveButtons({
         <ArrowUp className={iconSize} />
       </button>
 
+      {/* Move Down Button */}
       <button
         type="button"
+        draggable={false}
         disabled={!canMoveDown}
         onClick={onMoveDown}
         title="Move Down / Forward"

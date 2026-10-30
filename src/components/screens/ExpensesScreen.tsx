@@ -208,10 +208,11 @@ export function ExpensesScreen({
     });
   }, [dateFilteredExpenses, searchQuery, selectedCategory, selectedMode, selectedAccount]);
 
-  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder<LedgerEntry>(
+  const { moveItem, applyCustomOrder, isCustomOrder, getCardDragProps } = useCardOrder<LedgerEntry>(
     'expenses',
     dateFilteredExpenses,
-    expenseSort
+    expenseSort,
+    setExpenseSort
   );
 
   const sortedExpenses = useMemo(() => {
@@ -729,14 +730,21 @@ export function ExpensesScreen({
               const card = cards.find((c) => c.id === expense.card_id);
               const customer = customers.find((c) => c.id === expense.customer_id);
 
+              const drag = getCardDragProps(expense.id);
               return (
                 <div
                   key={expense.id}
+                  draggable={drag.draggable}
+                  onDragStart={drag.onDragStart}
+                  onDragOver={drag.onDragOver}
+                  onDragLeave={drag.onDragLeave}
+                  onDrop={drag.onDrop}
+                  onDragEnd={drag.onDragEnd}
                   className={`p-4 rounded-3xl border transition-all hover-lift flex flex-col justify-between gap-3 ${
                     isLight
                       ? 'bg-slate-50/60 border-slate-200 hover:border-slate-300 shadow-xs'
                       : 'bg-white/5 border-white/10 hover:border-white/20'
-                  }`}
+                  } ${drag.dragClasses}`}
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2">
@@ -840,8 +848,8 @@ export function ExpensesScreen({
                     </div>
                     <div className="flex items-center gap-1">
                       <CardMoveButtons
-                        onMoveUp={() => moveItem(expense.id, 'up')}
-                        onMoveDown={() => moveItem(expense.id, 'down')}
+                        onMoveUp={() => moveItem(expense.id, 'up', sortedExpenses)}
+                        onMoveDown={() => moveItem(expense.id, 'down', sortedExpenses)}
                         canMoveUp={idx > 0}
                         canMoveDown={idx < sortedExpenses.length - 1}
                         isLight={isLight}
@@ -982,8 +990,8 @@ export function ExpensesScreen({
                     </span>
 
                     <CardMoveButtons
-                      onMoveUp={() => moveItem(expense.id, 'up')}
-                      onMoveDown={() => moveItem(expense.id, 'down')}
+                      onMoveUp={() => moveItem(expense.id, 'up', sortedExpenses)}
+                      onMoveDown={() => moveItem(expense.id, 'down', sortedExpenses)}
                       canMoveUp={listIdx > 0}
                       canMoveDown={listIdx < sortedExpenses.length - 1}
                       isLight={isLight}

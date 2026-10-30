@@ -334,10 +334,11 @@ export function NotesScreen() {
     new Map(filteredNotes.map((n) => [n.id, n])).values()
   );
 
-  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder(
+  const { moveItem, applyCustomOrder, isCustomOrder, getCardDragProps } = useCardOrder(
     'notes',
     notes,
-    noteSort
+    noteSort,
+    setNoteSort
   );
 
   const sortedNotes = React.useMemo(() => {
@@ -515,11 +516,18 @@ export function NotesScreen() {
               ? note.checklist_items.filter((i) => i.is_done).length
               : 0;
 
+            const drag = getCardDragProps(note.id);
             return (
               <div
                 key={note.id}
+                draggable={drag.draggable}
+                onDragStart={drag.onDragStart}
+                onDragOver={drag.onDragOver}
+                onDragLeave={drag.onDragLeave}
+                onDrop={drag.onDrop}
+                onDragEnd={drag.onDragEnd}
                 onClick={() => setViewingNote(note)}
-                className={`group rounded-3xl border p-5 space-y-3 transition-all hover-lift cursor-pointer relative overflow-hidden flex flex-col justify-between ${matchedColor.bg}`}
+                className={`group rounded-3xl border p-5 space-y-3 transition-all hover-lift cursor-pointer relative overflow-hidden flex flex-col justify-between ${matchedColor.bg} ${drag.dragClasses}`}
               >
                 <div>
                   {/* Card Header */}
@@ -534,8 +542,8 @@ export function NotesScreen() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       <CardMoveButtons
-                        onMoveUp={() => moveItem(note.id, 'up')}
-                        onMoveDown={() => moveItem(note.id, 'down')}
+                        onMoveUp={() => moveItem(note.id, 'up', sortedNotes)}
+                        onMoveDown={() => moveItem(note.id, 'down', sortedNotes)}
                         canMoveUp={idx > 0}
                         canMoveDown={idx < sortedNotes.length - 1}
                         isLight={isLight}
@@ -747,8 +755,8 @@ export function NotesScreen() {
 
                     <div className="flex items-center gap-1">
                       <CardMoveButtons
-                        onMoveUp={() => moveItem(note.id, 'up')}
-                        onMoveDown={() => moveItem(note.id, 'down')}
+                        onMoveUp={() => moveItem(note.id, 'up', sortedNotes)}
+                        onMoveDown={() => moveItem(note.id, 'down', sortedNotes)}
                         canMoveUp={listIdx > 0}
                         canMoveDown={listIdx < sortedNotes.length - 1}
                         isLight={isLight}

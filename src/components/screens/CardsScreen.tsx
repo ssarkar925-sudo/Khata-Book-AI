@@ -169,10 +169,11 @@ export function CardsScreen() {
   // Billing Report calculation across all deduplicated scoped cards
   const billingReport = calculateAllCardsBillingReport(scopedCards, ledger);
 
-  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder<Card>(
+  const { moveItem, applyCustomOrder, isCustomOrder, getCardDragProps } = useCardOrder<Card>(
     'cards',
     scopedCards,
-    cardSort
+    cardSort,
+    setCardSort
   );
 
   // Sorted and filtered card summaries for Grid and List views
@@ -1042,10 +1043,17 @@ export function CardsScreen() {
                 Math.round((summary.totalOutstanding / card.credit_limit) * 100)
               ) || 0;
 
+              const drag = getCardDragProps(card.id);
               return (
                 <div
                   key={card.id}
-                  className={`group rounded-3xl p-6 bg-gradient-to-br ${theme.bg} border text-white shadow-2xl relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl flex flex-col justify-between min-h-[300px]`}
+                  draggable={drag.draggable}
+                  onDragStart={drag.onDragStart}
+                  onDragOver={drag.onDragOver}
+                  onDragLeave={drag.onDragLeave}
+                  onDrop={drag.onDrop}
+                  onDragEnd={drag.onDragEnd}
+                  className={`group rounded-3xl p-6 bg-gradient-to-br ${theme.bg} border text-white shadow-2xl relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl flex flex-col justify-between min-h-[300px] ${drag.dragClasses}`}
                 >
                   {/* Subtle Top Metallic Reflection Arc */}
                   <div className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-white/10 via-transparent to-transparent pointer-events-none rounded-t-3xl" />
@@ -1236,8 +1244,8 @@ export function CardsScreen() {
                     </button>
 
                     <CardMoveButtons
-                      onMoveUp={() => moveItem(card.id, 'up')}
-                      onMoveDown={() => moveItem(card.id, 'down')}
+                      onMoveUp={() => moveItem(card.id, 'up', sortedCardSummaries.map((s) => s.card))}
+                      onMoveDown={() => moveItem(card.id, 'down', sortedCardSummaries.map((s) => s.card))}
                       canMoveUp={idx > 0}
                       canMoveDown={idx < sortedCardSummaries.length - 1}
                       isLight={false}
@@ -1400,8 +1408,8 @@ export function CardsScreen() {
 
                       <div className="flex items-center gap-1">
                         <CardMoveButtons
-                          onMoveUp={() => moveItem(card.id, 'up')}
-                          onMoveDown={() => moveItem(card.id, 'down')}
+                          onMoveUp={() => moveItem(card.id, 'up', sortedCardSummaries.map((s) => s.card))}
+                          onMoveDown={() => moveItem(card.id, 'down', sortedCardSummaries.map((s) => s.card))}
                           canMoveUp={listIdx > 0}
                           canMoveDown={listIdx < sortedCardSummaries.length - 1}
                           isLight={isLight}

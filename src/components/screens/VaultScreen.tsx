@@ -542,10 +542,11 @@ export function VaultScreen() {
     });
   }, [vaultItems, activeCategoryFilter, searchQuery]);
 
-  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder(
+  const { moveItem, applyCustomOrder, isCustomOrder, getCardDragProps } = useCardOrder(
     'vault',
     vaultItems,
-    vaultSort
+    vaultSort,
+    setVaultSort
   );
 
   const sortedVaultItems = useMemo(() => {
@@ -804,12 +805,19 @@ export function VaultScreen() {
                 const itemColor = item.color || '#3B82F6';
                 const cachedSecrets = decryptedSecretsMap[item.id] || (item.secrets && item.secrets.length > 0 ? item.secrets : null);
 
+                const drag = getCardDragProps(item.id);
                 return (
                   <div
                     key={item.id}
+                    draggable={drag.draggable}
+                    onDragStart={drag.onDragStart}
+                    onDragOver={drag.onDragOver}
+                    onDragLeave={drag.onDragLeave}
+                    onDrop={drag.onDrop}
+                    onDragEnd={drag.onDragEnd}
                     className={`rounded-3xl border p-5 space-y-4 transition-all hover-lift relative overflow-hidden ${
                       isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900/80 border-white/10'
-                    }`}
+                    } ${drag.dragClasses}`}
                   >
                     {/* Top Accent Strip */}
                     <div
@@ -847,8 +855,8 @@ export function VaultScreen() {
                       {/* Card Action Controls: Edit & Delete */}
                       <div className="flex items-center gap-1">
                         <CardMoveButtons
-                          onMoveUp={() => moveItem(item.id, 'up')}
-                          onMoveDown={() => moveItem(item.id, 'down')}
+                          onMoveUp={() => moveItem(item.id, 'up', sortedVaultItems)}
+                          onMoveDown={() => moveItem(item.id, 'down', sortedVaultItems)}
                           canMoveUp={idx > 0}
                           canMoveDown={idx < sortedVaultItems.length - 1}
                           isLight={isLight}
@@ -991,10 +999,17 @@ export function VaultScreen() {
                   const primarySecret = cachedSecrets && cachedSecrets.length > 0 ? cachedSecrets[0] : null;
                   const isRevealed = primarySecret ? (revealAll || revealedFields[`${item.id}_${primarySecret.id}`]) : false;
 
+                  const drag = getCardDragProps(item.id);
                   return (
                     <div
                       key={item.id}
-                      className="p-4 sm:px-5 sm:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors group"
+                      draggable={drag.draggable}
+                      onDragStart={drag.onDragStart}
+                      onDragOver={drag.onDragOver}
+                      onDragLeave={drag.onDragLeave}
+                      onDrop={drag.onDrop}
+                      onDragEnd={drag.onDragEnd}
+                      className={`p-4 sm:px-5 sm:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-white/5 transition-colors group ${drag.dragClasses}`}
                     >
                       {/* Left: Indicator, Title, Category, URL */}
                       <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1098,8 +1113,8 @@ export function VaultScreen() {
                       {/* Right: Action Buttons */}
                       <div className="flex items-center gap-1 shrink-0 justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-white/5">
                         <CardMoveButtons
-                          onMoveUp={() => moveItem(item.id, 'up')}
-                          onMoveDown={() => moveItem(item.id, 'down')}
+                          onMoveUp={() => moveItem(item.id, 'up', sortedVaultItems)}
+                          onMoveDown={() => moveItem(item.id, 'down', sortedVaultItems)}
                           canMoveUp={listIdx > 0}
                           canMoveDown={listIdx < sortedVaultItems.length - 1}
                           isLight={isLight}

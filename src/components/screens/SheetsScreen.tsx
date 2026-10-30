@@ -361,10 +361,11 @@ export function SheetsScreen() {
     return activeSheet.columns.find((c) => c.id === selectedColId) || activeSheet.columns[0] || null;
   }, [activeSheet, selectedColId]);
 
-  const { moveItem, applyCustomOrder, isCustomOrder } = useCardOrder<SheetRow>(
+  const { moveItem, applyCustomOrder, isCustomOrder, getCardDragProps } = useCardOrder<SheetRow>(
     'sheets_' + (activeSheet?.id || 'default'),
     activeSheet?.rows || [],
-    sheetRowSort
+    sheetRowSort,
+    setSheetRowSort
   );
 
   // Filtered and sorted rows
@@ -1901,8 +1902,8 @@ export function SheetsScreen() {
                         <td className="py-1 px-2 text-center border-slate-200 dark:border-slate-700">
                           <div className="flex items-center justify-center gap-1">
                             <CardMoveButtons
-                              onMoveUp={() => moveItem(row.id, 'up')}
-                              onMoveDown={() => moveItem(row.id, 'down')}
+                              onMoveUp={() => moveItem(row.id, 'up', paginatedRows)}
+                              onMoveDown={() => moveItem(row.id, 'down', paginatedRows)}
                               canMoveUp={idx > 0}
                               canMoveDown={idx < paginatedRows.length - 1}
                               isLight={isLight}
@@ -1952,10 +1953,17 @@ export function SheetsScreen() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {paginatedRows.map((row, rowIdx) => {
                     const absoluteIndex = pageSize > 0 ? (currentPage - 1) * pageSize + rowIdx + 1 : rowIdx + 1;
+                    const drag = getCardDragProps(row.id);
                     return (
                       <div
                         key={row.id}
-                        className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4 shadow-xs space-y-3 hover:border-blue-400/50 transition-all hover-lift group"
+                        draggable={drag.draggable}
+                        onDragStart={drag.onDragStart}
+                        onDragOver={drag.onDragOver}
+                        onDragLeave={drag.onDragLeave}
+                        onDrop={drag.onDrop}
+                        onDragEnd={drag.onDragEnd}
+                        className={`rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4 shadow-xs space-y-3 hover:border-blue-400/50 transition-all hover-lift group ${drag.dragClasses}`}
                       >
                         {/* Card Header: Record # and actions */}
                         <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-2">
