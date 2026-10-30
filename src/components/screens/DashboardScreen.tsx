@@ -80,7 +80,9 @@ export function DashboardScreen({
   // Active Scope Lens: 'all' (Combined) | 'business' | 'personal' | 'family'
   const [selectedScope, setSelectedScope] = useState<'all' | EntityScope>('all');
   const [chartDays, setChartDays] = useState<7 | 30>(30);
+  const [chartMode, setChartMode] = useState<'area' | 'bar'>('area');
   const [hoveredChartIndex, setHoveredChartIndex] = useState<number | null>(null);
+  const [selectedDonutCategory, setSelectedDonutCategory] = useState<string | null>(null);
 
   // Modals state
   const [selectedEntryForDetail, setSelectedEntryForDetail] = useState<LedgerEntry | null>(null);
@@ -449,11 +451,11 @@ export function DashboardScreen({
       {/* 1. EXECUTIVE GLASSMORPHIc HERO WEALTH CARD                */}
       {/* ========================================================= */}
       <div
-        className={`relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-br ${getHeroTheme()} text-white border shadow-2xl transition-all duration-300`}
+        className={`relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-br ${getHeroTheme()} text-white border shadow-2xl card-shimmer transition-all duration-300`}
       >
         {/* Ambient Gradient Glow Orbs */}
-        <div className="absolute top-0 right-0 -mt-16 -mr-16 w-80 h-80 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -mb-16 -ml-16 w-80 h-80 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 -mt-16 -mr-16 w-80 h-80 rounded-full bg-indigo-500/20 blur-3xl animate-glow pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -mb-16 -ml-16 w-80 h-80 rounded-full bg-emerald-500/15 blur-3xl animate-glow pointer-events-none" />
 
         <div className="relative z-10 space-y-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -817,27 +819,58 @@ export function DashboardScreen({
             </div>
 
             {/* 7D vs 30D Filter Pill */}
-            <div className="inline-flex p-0.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 text-xs font-bold">
-              <button
-                onClick={() => setChartDays(7)}
-                className={`px-3 py-1 rounded-lg transition-all ${
-                  chartDays === 7
-                    ? 'bg-white dark:bg-white/15 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-600'
-                }`}
-              >
-                7 Days
-              </button>
-              <button
-                onClick={() => setChartDays(30)}
-                className={`px-3 py-1 rounded-lg transition-all ${
-                  chartDays === 30
-                    ? 'bg-white dark:bg-white/15 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-600'
-                }`}
-              >
-                30 Days
-              </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Area vs Dual Bar Mode Toggle */}
+              <div className="inline-flex p-0.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setChartMode('area')}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                    chartMode === 'area'
+                      ? 'bg-white dark:bg-white/15 text-indigo-600 dark:text-indigo-400 shadow-xs font-black'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                  }`}
+                  title="Smooth Wave Area Graph"
+                >
+                  Wave
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartMode('bar')}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                    chartMode === 'bar'
+                      ? 'bg-white dark:bg-white/15 text-indigo-600 dark:text-indigo-400 shadow-xs font-black'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                  }`}
+                  title="Dual Column Comparison Bars"
+                >
+                  Bars
+                </button>
+              </div>
+
+              {/* 7D vs 30D Filter Pill */}
+              <div className="inline-flex p-0.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 text-xs font-bold">
+                <button
+                  onClick={() => setChartDays(7)}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    chartDays === 7
+                      ? 'bg-white dark:bg-white/15 text-slate-900 dark:text-white shadow-xs font-black'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                  }`}
+                >
+                  7 Days
+                </button>
+                <button
+                  onClick={() => setChartDays(30)}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    chartDays === 30
+                      ? 'bg-white dark:bg-white/15 text-slate-900 dark:text-white shadow-xs font-black'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                  }`}
+                >
+                  30 Days
+                </button>
+              </div>
             </div>
           </div>
 
@@ -846,12 +879,20 @@ export function DashboardScreen({
             <svg className="w-full h-full overflow-visible" viewBox="0 0 500 150" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="inflowGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10B981" stopOpacity="0.4" />
+                  <stop offset="0%" stopColor="#10B981" stopOpacity="0.45" />
                   <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
                 </linearGradient>
                 <linearGradient id="outflowGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#F43F5E" stopOpacity="0.3" />
+                  <stop offset="0%" stopColor="#F43F5E" stopOpacity="0.35" />
                   <stop offset="100%" stopColor="#F43F5E" stopOpacity="0.0" />
+                </linearGradient>
+                <linearGradient id="inflowBarGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10B981" stopOpacity="0.9" />
+                  <stop offset="100%" stopColor="#059669" stopOpacity="0.7" />
+                </linearGradient>
+                <linearGradient id="outflowBarGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#F43F5E" stopOpacity="0.9" />
+                  <stop offset="100%" stopColor="#E11D48" stopOpacity="0.7" />
                 </linearGradient>
               </defs>
 
@@ -860,51 +901,92 @@ export function DashboardScreen({
               <line x1="0" y1="75" x2="500" y2="75" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="4 4" />
               <line x1="0" y1="112.5" x2="500" y2="112.5" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="4 4" />
 
-              {/* Inflow Area & Curve */}
-              {(() => {
-                const step = 500 / Math.max(1, chartData.points.length - 1);
-                const pts = chartData.points.map((p, i) => {
-                  const x = i * step;
-                  const y = 140 - (p.inflow / chartData.maxVal) * 125;
-                  return { x, y };
-                });
+              {chartMode === 'area' ? (
+                <>
+                  {/* Inflow Area & Curve */}
+                  {(() => {
+                    const step = 500 / Math.max(1, chartData.points.length - 1);
+                    const pts = chartData.points.map((p, i) => {
+                      const x = i * step;
+                      const y = 140 - (p.inflow / chartData.maxVal) * 125;
+                      return { x, y };
+                    });
 
-                const linePath = pts.reduce(
-                  (acc, p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`),
-                  ''
-                );
-                const areaPath = `${linePath} L 500 150 L 0 150 Z`;
+                    const linePath = pts.reduce(
+                      (acc, p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`),
+                      ''
+                    );
+                    const areaPath = `${linePath} L 500 150 L 0 150 Z`;
 
-                return (
-                  <React.Fragment key="inflow-chart-paths">
-                    <path d={areaPath} fill="url(#inflowGrad)" />
-                    <path d={linePath} fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" />
-                  </React.Fragment>
-                );
-              })()}
+                    return (
+                      <React.Fragment key="inflow-chart-paths">
+                        <path d={areaPath} fill="url(#inflowGrad)" />
+                        <path d={linePath} fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" />
+                      </React.Fragment>
+                    );
+                  })()}
 
-              {/* Outflow Area & Curve */}
-              {(() => {
-                const step = 500 / Math.max(1, chartData.points.length - 1);
-                const pts = chartData.points.map((p, i) => {
-                  const x = i * step;
-                  const y = 140 - (p.outflow / chartData.maxVal) * 125;
-                  return { x, y };
-                });
+                  {/* Outflow Area & Curve */}
+                  {(() => {
+                    const step = 500 / Math.max(1, chartData.points.length - 1);
+                    const pts = chartData.points.map((p, i) => {
+                      const x = i * step;
+                      const y = 140 - (p.outflow / chartData.maxVal) * 125;
+                      return { x, y };
+                    });
 
-                const linePath = pts.reduce(
-                  (acc, p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`),
-                  ''
-                );
-                const areaPath = `${linePath} L 500 150 L 0 150 Z`;
+                    const linePath = pts.reduce(
+                      (acc, p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`),
+                      ''
+                    );
+                    const areaPath = `${linePath} L 500 150 L 0 150 Z`;
 
-                return (
-                  <React.Fragment key="outflow-chart-paths">
-                    <path d={areaPath} fill="url(#outflowGrad)" />
-                    <path d={linePath} fill="none" stroke="#F43F5E" strokeWidth="2" strokeDasharray="3 3" />
-                  </React.Fragment>
-                );
-              })()}
+                    return (
+                      <React.Fragment key="outflow-chart-paths">
+                        <path d={areaPath} fill="url(#outflowGrad)" />
+                        <path d={linePath} fill="none" stroke="#F43F5E" strokeWidth="2" strokeDasharray="3 3" />
+                      </React.Fragment>
+                    );
+                  })()}
+                </>
+              ) : (
+                /* Dual Bar Columns Mode */
+                chartData.points.map((p, i) => {
+                  const colWidth = 500 / chartData.points.length;
+                  const barWidth = Math.max(3, colWidth * 0.38);
+                  const inHeight = (p.inflow / chartData.maxVal) * 125;
+                  const outHeight = (p.outflow / chartData.maxVal) * 125;
+                  const xIn = i * colWidth + (colWidth * 0.1);
+                  const xOut = xIn + barWidth + 1.5;
+
+                  return (
+                    <g key={p.dateStr + '-bars'}>
+                      {p.inflow > 0 && (
+                        <rect
+                          x={xIn}
+                          y={145 - inHeight}
+                          width={barWidth}
+                          height={inHeight}
+                          rx={barWidth / 2}
+                          fill="url(#inflowBarGrad)"
+                          className="transition-all duration-300"
+                        />
+                      )}
+                      {p.outflow > 0 && (
+                        <rect
+                          x={xOut}
+                          y={145 - outHeight}
+                          width={barWidth}
+                          height={outHeight}
+                          rx={barWidth / 2}
+                          fill="url(#outflowBarGrad)"
+                          className="transition-all duration-300"
+                        />
+                      )}
+                    </g>
+                  );
+                })
+              )}
             </svg>
 
             {/* Hover Points Overlays */}
@@ -969,7 +1051,7 @@ export function DashboardScreen({
               Top spending categories across active lens
             </p>
 
-            {/* Circular Donut Graphic */}
+            {/* Circular Donut Graphic with Segment Focus */}
             <div className="flex items-center justify-center py-2">
               <div className="relative w-36 h-36">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
@@ -984,11 +1066,12 @@ export function DashboardScreen({
                   />
                   {(() => {
                     let cumulative = 0;
-                    const circumference = 2 * Math.PI * 40; // ~251.327
+                    const circumference = 2 * Math.PI * 40;
                     return metrics.topCategories.map(({ category, pct }) => {
                       const strokeDash = (pct / 100) * circumference;
                       const strokeOffset = circumference - (cumulative / 100) * circumference;
                       cumulative += pct;
+                      const isSelected = selectedDonutCategory === category.id;
                       return (
                         <circle
                           key={category.id}
@@ -997,23 +1080,47 @@ export function DashboardScreen({
                           r="40"
                           fill="transparent"
                           stroke={category.color || '#6366F1'}
-                          strokeWidth="12"
+                          strokeWidth={isSelected ? 15 : 12}
                           strokeDasharray={`${strokeDash} ${circumference - strokeDash}`}
                           strokeDashoffset={strokeOffset}
                           strokeLinecap="round"
-                          className="transition-all duration-700"
+                          onClick={() =>
+                            setSelectedDonutCategory(isSelected ? null : category.id)
+                          }
+                          className="transition-all duration-300 cursor-pointer hover:opacity-80"
                         />
                       );
                     });
                   })()}
                 </svg>
 
-                {/* Donut Center Label */}
+                {/* Donut Center Dynamic Label */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total</span>
-                  <span className="text-xs font-black text-slate-900 dark:text-white tabular-nums px-2">
-                    {formatPaise(metrics.totalExpenses)}
-                  </span>
+                  {selectedDonutCategory ? (
+                    (() => {
+                      const cat = metrics.topCategories.find((c) => c.category.id === selectedDonutCategory);
+                      return cat ? (
+                        <>
+                          <span className="text-[10px] font-bold uppercase tracking-wider truncate max-w-[80px]" style={{ color: cat.category.color }}>
+                            {cat.category.name}
+                          </span>
+                          <span className="text-xs font-black text-slate-900 dark:text-white tabular-nums px-1">
+                            {formatPaise(cat.amount)}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-400">
+                            {cat.pct}% of spends
+                          </span>
+                        </>
+                      ) : null;
+                    })()
+                  ) : (
+                    <>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total</span>
+                      <span className="text-xs font-black text-slate-900 dark:text-white tabular-nums px-2">
+                        {formatPaise(metrics.totalExpenses)}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1059,7 +1166,7 @@ export function DashboardScreen({
           {/* 1. BANK ACCOUNTS & CASH */}
           <div
             onClick={() => onNavigateTab('cash')}
-            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
+            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-depth card-shimmer ${
               isLight
                 ? 'bg-gradient-to-br from-white via-emerald-50/40 to-white border-emerald-200 shadow-sm hover:border-emerald-400'
                 : 'bg-gradient-to-br from-slate-900 via-emerald-950/20 to-slate-900 border-emerald-500/20 hover:border-emerald-500/40'
@@ -1085,7 +1192,7 @@ export function DashboardScreen({
           {/* 2. EXPENSE MANAGER */}
           <div
             onClick={() => onNavigateTab('expenses')}
-            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
+            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-depth card-shimmer ${
               isLight
                 ? 'bg-gradient-to-br from-white via-rose-50/40 to-white border-rose-200 shadow-sm hover:border-rose-400'
                 : 'bg-gradient-to-br from-slate-900 via-rose-950/20 to-slate-900 border-rose-500/20 hover:border-rose-500/40'
@@ -1111,7 +1218,7 @@ export function DashboardScreen({
           {/* 3. KHATA DUES & UDHAR */}
           <div
             onClick={() => onNavigateTab('dues')}
-            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
+            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-depth card-shimmer ${
               isLight
                 ? 'bg-gradient-to-br from-white via-cyan-50/40 to-white border-cyan-200 shadow-sm hover:border-cyan-400'
                 : 'bg-gradient-to-br from-slate-900 via-cyan-950/20 to-slate-900 border-cyan-500/20 hover:border-cyan-500/40'
@@ -1137,7 +1244,7 @@ export function DashboardScreen({
           {/* 4. CREDIT CARDS */}
           <div
             onClick={() => onNavigateTab('cards')}
-            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
+            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-depth card-shimmer ${
               isLight
                 ? 'bg-gradient-to-br from-white via-purple-50/40 to-white border-purple-200 shadow-sm hover:border-purple-400'
                 : 'bg-gradient-to-br from-slate-900 via-purple-950/20 to-slate-900 border-purple-500/20 hover:border-purple-500/40'
@@ -1173,7 +1280,7 @@ export function DashboardScreen({
           {/* 5. REGISTERS & SHEETS */}
           <div
             onClick={() => onNavigateTab('sheets')}
-            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
+            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-depth card-shimmer ${
               isLight
                 ? 'bg-gradient-to-br from-white via-blue-50/40 to-white border-blue-200 shadow-sm hover:border-blue-400'
                 : 'bg-gradient-to-br from-slate-900 via-blue-950/20 to-slate-900 border-blue-500/20 hover:border-blue-500/40'
@@ -1199,7 +1306,7 @@ export function DashboardScreen({
           {/* 6. DAILY NOTES & CHECKLIST */}
           <div
             onClick={() => onNavigateTab('notes')}
-            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
+            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-depth card-shimmer ${
               isLight
                 ? 'bg-gradient-to-br from-white via-amber-50/40 to-white border-amber-200 shadow-sm hover:border-amber-400'
                 : 'bg-gradient-to-br from-slate-900 via-amber-950/20 to-slate-900 border-amber-500/20 hover:border-amber-500/40'
@@ -1225,7 +1332,7 @@ export function DashboardScreen({
           {/* 7. ENCRYPTED VAULT */}
           <div
             onClick={() => onNavigateTab('vault')}
-            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
+            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-depth card-shimmer ${
               isLight
                 ? 'bg-gradient-to-br from-white via-teal-50/40 to-white border-teal-200 shadow-sm hover:border-teal-400'
                 : 'bg-gradient-to-br from-slate-900 via-teal-950/20 to-slate-900 border-teal-500/20 hover:border-teal-500/40'
@@ -1251,7 +1358,7 @@ export function DashboardScreen({
           {/* 8. REPORTS & TAX */}
           <div
             onClick={() => onNavigateTab('reports')}
-            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-lift ${
+            className={`group cursor-pointer rounded-3xl border p-5 transition-all hover-depth card-shimmer ${
               isLight
                 ? 'bg-gradient-to-br from-white via-indigo-50/40 to-white border-indigo-200 shadow-sm hover:border-indigo-400'
                 : 'bg-gradient-to-br from-slate-900 via-indigo-950/20 to-slate-900 border-indigo-500/20 hover:border-indigo-500/40'
