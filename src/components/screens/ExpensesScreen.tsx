@@ -420,7 +420,7 @@ export function ExpensesScreen({
             className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'all'
                 ? 'bg-white dark:bg-rose-600 text-rose-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
             }`}
           >
             <Globe className="w-3.5 h-3.5 shrink-0" />
@@ -431,7 +431,7 @@ export function ExpensesScreen({
             className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'business'
                 ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
             }`}
           >
             <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300 shrink-0" />
@@ -442,7 +442,7 @@ export function ExpensesScreen({
             className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'personal'
                 ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
             }`}
           >
             <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300 shrink-0" />
@@ -453,7 +453,7 @@ export function ExpensesScreen({
             className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'family'
                 ? 'bg-white dark:bg-amber-600 text-amber-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
             }`}
           >
             <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 shrink-0" />
@@ -494,7 +494,7 @@ export function ExpensesScreen({
                 className={`px-3 py-1.5 rounded-xl capitalize transition-all ${
                   dateRange === tab
                     ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400'
                 }`}
               >
                 {tab === 'all' ? 'All Time' : tab.replace('_', ' ')}

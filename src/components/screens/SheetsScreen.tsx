@@ -1195,7 +1195,7 @@ export function SheetsScreen() {
                     className={`px-1.5 py-0.5 rounded-lg transition-all ${
                       rowHeightMode === 'compact'
                         ? 'bg-blue-600 text-white font-bold'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400'
                     }`}
                     title="Compact Row Height (28px)"
                   >
@@ -1206,7 +1206,7 @@ export function SheetsScreen() {
                     className={`px-1.5 py-0.5 rounded-lg transition-all ${
                       rowHeightMode === 'normal'
                         ? 'bg-blue-600 text-white font-bold'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400'
                     }`}
                     title="Default Row Height (38px)"
                   >
@@ -1217,7 +1217,7 @@ export function SheetsScreen() {
                     className={`px-1.5 py-0.5 rounded-lg transition-all ${
                       rowHeightMode === 'relaxed'
                         ? 'bg-blue-600 text-white font-bold'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400'
                     }`}
                     title="Relaxed Row Height (48px)"
                   >
@@ -1559,7 +1559,7 @@ export function SheetsScreen() {
                     className={`p-0.5 rounded transition-colors ${
                       cellAlignment === 'left'
                         ? 'bg-blue-600 text-white'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400'
                     }`}
                     title="Align Left"
                   >
@@ -1570,7 +1570,7 @@ export function SheetsScreen() {
                     className={`p-0.5 rounded transition-colors ${
                       cellAlignment === 'center'
                         ? 'bg-blue-600 text-white'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400'
                     }`}
                     title="Align Center"
                   >
@@ -1581,7 +1581,7 @@ export function SheetsScreen() {
                     className={`p-0.5 rounded transition-colors ${
                       cellAlignment === 'right'
                         ? 'bg-blue-600 text-white'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400'
                     }`}
                     title="Align Right"
                   >

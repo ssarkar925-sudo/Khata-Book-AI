@@ -389,7 +389,7 @@ export function DashboardScreen({
                   ? 'bg-white text-indigo-700 shadow-sm border border-slate-300/80 font-black'
                   : 'bg-indigo-600 text-white shadow-sm font-black'
                 : isLight
-                ? 'text-slate-700 hover:text-slate-900 font-bold'
+                ? 'text-slate-700 hover:text-indigo-700 font-bold'
                 : 'text-slate-400 hover:text-white font-bold'
             }`}
           >
@@ -405,7 +405,7 @@ export function DashboardScreen({
                   ? 'bg-white text-indigo-700 shadow-sm border border-slate-300/80 font-black'
                   : 'bg-indigo-600 text-white shadow-sm font-black'
                 : isLight
-                ? 'text-slate-700 hover:text-slate-900 font-bold'
+                ? 'text-slate-700 hover:text-indigo-700 font-bold'
                 : 'text-slate-400 hover:text-white font-bold'
             }`}
           >
@@ -421,7 +421,7 @@ export function DashboardScreen({
                   ? 'bg-white text-emerald-700 shadow-sm border border-slate-300/80 font-black'
                   : 'bg-emerald-600 text-white shadow-sm font-black'
                 : isLight
-                ? 'text-slate-700 hover:text-slate-900 font-bold'
+                ? 'text-slate-700 hover:text-indigo-700 font-bold'
                 : 'text-slate-400 hover:text-white font-bold'
             }`}
           >
@@ -437,7 +437,7 @@ export function DashboardScreen({
                   ? 'bg-white text-amber-700 shadow-sm border border-slate-300/80 font-black'
                   : 'bg-amber-600 text-white shadow-sm font-black'
                 : isLight
-                ? 'text-slate-700 hover:text-slate-900 font-bold'
+                ? 'text-slate-700 hover:text-indigo-700 font-bold'
                 : 'text-slate-400 hover:text-white font-bold'
             }`}
           >

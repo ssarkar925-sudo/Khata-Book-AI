@@ -395,7 +395,7 @@ export function LoginPage() {
                     className={`py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                       mode === 'signin'
                         ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
                     }`}
                   >
                     Sign In
@@ -410,7 +410,7 @@ export function LoginPage() {
                     className={`py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                       mode === 'signup'
                         ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
                     }`}
                   >
                     Create Account

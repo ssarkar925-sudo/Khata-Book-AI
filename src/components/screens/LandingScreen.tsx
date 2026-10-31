@@ -111,7 +111,7 @@ export function LandingScreen() {
               className={`py-2 rounded-lg transition-all ${
                 !isSignUp
                   ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  : 'text-slate-500 hover:text-indigo-700 dark:hover:text-indigo-400'
               }`}
             >
               Sign In
@@ -121,7 +121,7 @@ export function LandingScreen() {
               className={`py-2 rounded-lg transition-all ${
                 isSignUp
                   ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  : 'text-slate-500 hover:text-indigo-700 dark:hover:text-indigo-400'
               }`}
             >
               Create Account

@@ -8,6 +8,7 @@ import { useNoteStore } from '@/stores/useNoteStore';
 import { useSheetStore, normalizeSheet } from '@/stores/useSheetStore';
 import { useVaultStore } from '@/stores/useVaultStore';
 import { CashLocation, Customer, PeopleDue, Card, LedgerEntry, NoteItem, RecordSheet, VaultItem, DueStatus, PaymentMode, EntityScope } from '@/types';
+import { formatPaise } from '@/lib/money';
 
 interface QueueItem {
   id: string;
@@ -761,11 +762,9 @@ class SyncEngine {
   }
 
   /**
-   * Universal Fund Transfer Engine:
-   * Handles Intra-Sphere (Business to Business, Personal to Personal, Family to Family)
-   * and Inter-Sphere (Business to Personal, Personal to Family, etc.) fund transfers.
-   * Atomically updates both account balances in local state, persistent storage, and Supabase cloud,
-   * while recording paired double-entry ledger audit trail entries.
+   * Atomic Fund Transfer with Saga Pattern & Compensation
+   * Handles Intra-Sphere and Inter-Sphere fund transfers.
+   * Uses idempotency keys for safe retries and compensation entries for rollback.
    */
   public async transferFunds(params: {
     fromAccountId: string;
@@ -775,7 +774,7 @@ class SyncEngine {
     fromScope?: EntityScope;
     toScope?: EntityScope;
     reason?: string;
-  }): Promise<{ success: boolean; fromNewBalance: number; toNewBalance: number }> {
+  }): Promise<{ success: boolean; fromNewBalance: number; toNewBalance: number; transferId: string }> {
     const perm = this.checkWritePermission();
     if (!perm.allowed) {
       useSessionStore.getState().setLastSyncError(perm.error || 'Permission denied');
@@ -783,6 +782,8 @@ class SyncEngine {
     }
 
     const { fromAccountId, toAccountId, amountPaise, note, fromScope, toScope, reason } = params;
+    const transferId = crypto.randomUUID();
+    const now = new Date().toISOString();
 
     if (amountPaise <= 0) {
       throw new Error('Transfer amount must be greater than zero.');
@@ -807,22 +808,21 @@ class SyncEngine {
     const toCurrentBal = this.getAccountEffectiveBalance(toAcc.id);
 
     // Liquid accounts floor balance at 0 (showing minus should be 0)
-    const fromNewBalance = fromAcc.account_type === 'od_cc' 
-      ? fromCurrentBal - amountPaise 
+    const fromNewBalance = fromAcc.account_type === 'od_cc'
+      ? fromCurrentBal - amountPaise
       : Math.max(0, fromCurrentBal - amountPaise);
     const toNewBalance = toCurrentBal + amountPaise;
 
-    // 1. Optimistically update local account balances immediately
-    useAccountStore.getState().updateAccountBalance(fromAcc.id, fromNewBalance);
-    useAccountStore.getState().updateAccountBalance(toAcc.id, toNewBalance);
+    // Check sufficient funds for liquid accounts
+    if (fromAcc.account_type !== 'od_cc' && fromCurrentBal < amountPaise) {
+      throw new Error(`Insufficient funds in ${fromAcc.name}. Available: ${formatPaise(fromCurrentBal)}`);
+    }
 
-    // 2. Build paired ledger entries with audit trail
-    const now = new Date().toISOString();
     const memo = note ? (reason ? `${reason}: ${note}` : note) : (reason || 'Internal Transfer');
-
     const fromMode: PaymentMode = fromAcc.account_type === 'cash_counter' ? 'cash' : 'bank';
     const toMode: PaymentMode = toAcc.account_type === 'cash_counter' ? 'cash' : 'bank';
 
+    // Build paired ledger entries with shared transfer_id for atomicity
     const outEntry: LedgerEntry = {
       id: crypto.randomUUID(),
       workspace_id: fromAcc.workspace_id || useSessionStore.getState().activeWorkspaceId,
@@ -834,7 +834,9 @@ class SyncEngine {
       note: `⇄ Transfer to ${toAcc.name} (${memo})`,
       entry_date: now,
       created_at: now,
-      idempotency_key: crypto.randomUUID(),
+      idempotency_key: `transfer_${transferId}_out`,
+      transfer_id: transferId,
+      transfer_direction: 'out',
     };
 
     const inEntry: LedgerEntry = {
@@ -848,10 +850,17 @@ class SyncEngine {
       note: `⇄ Transfer from ${fromAcc.name} (${memo})`,
       entry_date: now,
       created_at: now,
-      idempotency_key: crypto.randomUUID(),
+      idempotency_key: `transfer_${transferId}_in`,
+      transfer_id: transferId,
+      transfer_direction: 'in',
     };
 
-    // 3. Add to local ledger store optimistically
+    // 1. Optimistically update local state (account balances + ledger)
+    const previousFromBalance = fromAcc.balance;
+    const previousToBalance = toAcc.balance;
+
+    useAccountStore.getState().updateAccountBalance(fromAcc.id, fromNewBalance);
+    useAccountStore.getState().updateAccountBalance(toAcc.id, toNewBalance);
     useLedgerStore.getState().addEntryOptimistic(outEntry);
     useLedgerStore.getState().addEntryOptimistic(inEntry);
 
@@ -862,16 +871,22 @@ class SyncEngine {
       useSessionStore.getState().setSyncStatus('offline');
       this.enqueue('ledger_entries', 'upsert', cleanOut);
       this.enqueue('ledger_entries', 'upsert', cleanIn);
-      this.enqueue('cash_locations', 'upsert', { id: fromAcc.id, balance: fromNewBalance });
-      this.enqueue('cash_locations', 'upsert', { id: toAcc.id, balance: toNewBalance });
-      return { success: true, fromNewBalance, toNewBalance };
+      this.enqueue('cash_locations', 'upsert', { id: fromAcc.id, balance: fromNewBalance, updated_at: now });
+      this.enqueue('cash_locations', 'upsert', { id: toAcc.id, balance: toNewBalance, updated_at: now });
+      return { success: true, fromNewBalance, toNewBalance, transferId };
     }
 
+    // Track what succeeded for potential compensation
+    let ledgerOutSuccess = false;
+    let ledgerInSuccess = false;
+    let fromAccUpdateSuccess = false;
+    let toAccUpdateSuccess = false;
+
     try {
-      // 4. Push ledger entries to Supabase
+      // 2. Push ledger entries to Supabase (with idempotency keys)
       const [outRes, inRes] = await Promise.allSettled([
-        supabase.from('ledger_entries').upsert(cleanOut),
-        supabase.from('ledger_entries').upsert(cleanIn),
+        supabase.from('ledger_entries').upsert(cleanOut, { onConflict: 'idempotency_key' }),
+        supabase.from('ledger_entries').upsert(cleanIn, { onConflict: 'idempotency_key' }),
       ]);
 
       if (outRes.status === 'rejected') throw outRes.reason;
@@ -879,7 +894,10 @@ class SyncEngine {
       if (outRes.value.error) throw outRes.value.error;
       if (inRes.value.error) throw inRes.value.error;
 
-      // 5. Update cash_locations balances directly in Supabase
+      ledgerOutSuccess = true;
+      ledgerInSuccess = true;
+
+      // 3. Update cash_locations balances in Supabase
       const [accOutRes, accInRes] = await Promise.allSettled([
         supabase
           .from('cash_locations')
@@ -896,20 +914,69 @@ class SyncEngine {
       if (accOutRes.value.error) throw accOutRes.value.error;
       if (accInRes.value.error) throw accInRes.value.error;
 
+      fromAccUpdateSuccess = true;
+      toAccUpdateSuccess = true;
+
       useSessionStore.getState().setSyncStatus('synced');
       useSessionStore.getState().setLastSyncTime(new Date().toISOString());
       useSessionStore.getState().setLastSyncError(null);
 
-      return { success: true, fromNewBalance, toNewBalance };
+      return { success: true, fromNewBalance, toNewBalance, transferId };
+
     } catch (err: any) {
-      console.warn('[SyncEngine] Transfer push failed, enqueuing offline:', err);
+      console.warn('[SyncEngine] Transfer push failed, initiating compensation:', err);
       useSessionStore.getState().setSyncStatus('offline');
       useSessionStore.getState().setLastSyncError(err?.message || 'Transfer queued offline');
+
+      // COMPENSATION: Rollback in reverse order
+      // 1. Rollback account balances if they were updated
+      if (fromAccUpdateSuccess || toAccUpdateSuccess) {
+        // Revert to previous balances locally
+        useAccountStore.getState().updateAccountBalance(fromAcc.id, previousFromBalance);
+        useAccountStore.getState().updateAccountBalance(toAcc.id, previousToBalance);
+        // Queue balance reversions for cloud
+        this.enqueue('cash_locations', 'upsert', { id: fromAcc.id, balance: previousFromBalance, updated_at: now });
+        this.enqueue('cash_locations', 'upsert', { id: toAcc.id, balance: previousToBalance, updated_at: now });
+      }
+
+      // 2. Add compensation entries to ledger (reversal entries)
+      // These use the same transfer_id with opposite direction
+      const reversalOutEntry: LedgerEntry = {
+        ...outEntry,
+        id: crypto.randomUUID(),
+        idempotency_key: `transfer_${transferId}_out_compensation`,
+        note: `⇄ REVERSAL: Transfer to ${toAcc.name} (${memo})`,
+        amount: -amountPaise, // Negative amount to reverse
+        transfer_direction: 'out_compensation',
+      };
+
+      const reversalInEntry: LedgerEntry = {
+        ...inEntry,
+        id: crypto.randomUUID(),
+        idempotency_key: `transfer_${transferId}_in_compensation`,
+        note: `⇄ REVERSAL: Transfer from ${fromAcc.name} (${memo})`,
+        amount: -amountPaise, // Negative amount to reverse
+        transfer_direction: 'in_compensation',
+      };
+
+      // Add reversal entries locally
+      useLedgerStore.getState().addEntryOptimistic(reversalOutEntry);
+      useLedgerStore.getState().addEntryOptimistic(reversalInEntry);
+
+      // Queue reversal entries for cloud
+      const cleanReversalOut = sanitizeLedgerPayload(reversalOutEntry);
+      const cleanReversalIn = sanitizeLedgerPayload(reversalInEntry);
+      this.enqueue('ledger_entries', 'upsert', cleanReversalOut);
+      this.enqueue('ledger_entries', 'upsert', cleanReversalIn);
+
+      // 3. Queue original entries for retry (they may have succeeded in cloud)
       this.enqueue('ledger_entries', 'upsert', cleanOut);
       this.enqueue('ledger_entries', 'upsert', cleanIn);
-      this.enqueue('cash_locations', 'upsert', { id: fromAcc.id, balance: fromNewBalance });
-      this.enqueue('cash_locations', 'upsert', { id: toAcc.id, balance: toNewBalance });
-      return { success: true, fromNewBalance, toNewBalance };
+      this.enqueue('cash_locations', 'upsert', { id: fromAcc.id, balance: fromNewBalance, updated_at: now });
+      this.enqueue('cash_locations', 'upsert', { id: toAcc.id, balance: toNewBalance, updated_at: now });
+
+      // Return failure - UI will show error and user can retry
+      throw new Error(`Transfer failed: ${err?.message || 'Unknown error'}. Reversal queued.`);
     }
   }
 

@@ -698,7 +698,7 @@ export function CardsScreen() {
             className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'all'
                 ? 'bg-white dark:bg-purple-600 text-purple-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
             }`}
           >
             <Globe className="w-3.5 h-3.5 shrink-0" />
@@ -709,7 +709,7 @@ export function CardsScreen() {
             className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'business'
                 ? 'bg-white dark:bg-indigo-600 text-indigo-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
             }`}
           >
             <Building2 className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300 shrink-0" />
@@ -720,7 +720,7 @@ export function CardsScreen() {
             className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'personal'
                 ? 'bg-white dark:bg-emerald-600 text-emerald-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
             }`}
           >
             <User className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-300 shrink-0" />
@@ -731,7 +731,7 @@ export function CardsScreen() {
             className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedScope === 'family'
                 ? 'bg-white dark:bg-amber-600 text-amber-700 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
             }`}
           >
             <Users2 className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300 shrink-0" />
@@ -910,7 +910,7 @@ export function CardsScreen() {
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'cards'
                 ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-500 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
             }`}
           >
             <Layers className="w-4 h-4" />
@@ -922,7 +922,7 @@ export function CardsScreen() {
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'report'
                 ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'text-slate-500 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400'
             }`}
           >
             <FileSpreadsheet className="w-4 h-4" />

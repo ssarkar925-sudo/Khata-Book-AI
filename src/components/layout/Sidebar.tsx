@@ -133,7 +133,7 @@ export function Sidebar({ activeTab, setActiveTab, onOpenBackupRestore }: Sideba
                 ? isLight
                   ? 'bg-slate-100 text-slate-900 shadow-xs border border-slate-200/90 font-bold'
                   : 'bg-white/10 text-white shadow-xs border border-white/10 font-bold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/5'
+                : 'text-slate-600 dark:text-slate-400 hover:text-indigo-700 dark:hover:text-indigo-400 hover:bg-slate-100/70 dark:hover:bg-white/5'
             }`}
           >
             <div className="flex items-center gap-2.5">

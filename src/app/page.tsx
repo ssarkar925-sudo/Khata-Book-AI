@@ -17,5 +17,10 @@ const AppShell = dynamic(
 );
 
 export default function HomePage() {
-  return <AppShell />;
+  return (
+    <>
+      <h1 className="sr-only">Record Book - Smart Financial Ledger</h1>
+      <AppShell />
+    </>
+  );
 }

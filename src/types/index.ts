@@ -189,6 +189,8 @@ export interface LedgerEntry {
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
+  transfer_id?: string;
+  transfer_direction?: 'out' | 'in' | 'out_compensation' | 'in_compensation';
 }
 
 export interface NoteChecklistItem {
