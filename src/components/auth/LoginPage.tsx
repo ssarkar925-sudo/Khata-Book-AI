@@ -252,6 +252,7 @@ export function LoginPage() {
 
       {/* Main Authentication Container */}
       <main className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6 my-auto">
+        <h1 className="sr-only">Record Book - Sign In</h1>
         <div className="w-full max-w-md">
           {/* Post-Login Migration Prompt Card (If local records exist) */}
           {showMigrationPrompt ? (
