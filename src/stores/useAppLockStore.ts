@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { computeSecurePinHash } from '@/lib/crypto';
+import { computeSecurePinHash, verifySecurePinHash } from '@/lib/crypto';
 
 interface AppLockState {
   isLockConfigured: boolean;
@@ -23,16 +23,6 @@ const PIN_STORAGE_KEY = 'rb_security_app_pin';
 const LOCK_ENABLED_KEY = 'rb_security_lock_enabled';
 const BIOMETRIC_ENABLED_KEY = 'rb_security_biometric_enabled';
 const LOCKOUT_STORAGE_KEY = 'rb_security_lockout';
-
-// Legacy fallback FNV hash for smooth migration of existing installations
-function legacyHash(pin: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < pin.length; i++) {
-    h ^= pin.charCodeAt(i);
-    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
-  }
-  return (h >>> 0).toString(16);
-}
 
 function getStoredLockout(): { failedCount: number; lockedUntil: number } {
   if (typeof window === 'undefined') return { failedCount: 0, lockedUntil: 0 };
@@ -63,7 +53,7 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
   return {
     isLockConfigured: Boolean(storedPinData),
     isLockEnabled: Boolean(storedPinData && isEnabled),
-    isLocked: Boolean(storedPinData && isEnabled),
+    isLocked: Boolean(storedPinData && isEnabled), // Start locked when configured
     isBiometricSupported: Boolean(hasBiometrics),
     biometricEnabled: isBiometric,
     lockoutRemainingSeconds: 0,
@@ -78,7 +68,7 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
       if (isClient) {
         localStorage.setItem(LOCK_ENABLED_KEY, enabled ? 'true' : 'false');
       }
-      set({ isLockEnabled: enabled, isLocked: false });
+      set({ isLockEnabled: enabled, isLocked: enabled });
     },
 
     setBiometricEnabled: (enabled: boolean) => {
@@ -91,14 +81,14 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
     configurePin: async (pin: string) => {
       if (!isClient) return;
       const { hash, salt } = await computeSecurePinHash(pin);
-      localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256' }));
+      localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256', iterations: 600000 }));
       localStorage.setItem(LOCK_ENABLED_KEY, 'true');
       setStoredLockout(0, 0);
 
       set({
         isLockConfigured: true,
         isLockEnabled: true,
-        isLocked: false,
+        isLocked: true, // Lock immediately after setup
         lockoutRemainingSeconds: 0,
       });
     },
@@ -123,16 +113,11 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
       try {
         if (stored.startsWith('{')) {
           const parsed = JSON.parse(stored);
-          const computed = await computeSecurePinHash(pin, parsed.salt);
-          isMatch = computed.hash === parsed.hash;
+          // Use constant-time verification
+          isMatch = await verifySecurePinHash(pin, parsed.salt, parsed.hash);
         } else {
-          // Legacy migration
-          isMatch = stored === legacyHash(pin);
-          if (isMatch) {
-            // Upgrade legacy hash to PBKDF2 automatically
-            const upgraded = await computeSecurePinHash(pin);
-            localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify({ ...upgraded, algorithm: 'PBKDF2-SHA256' }));
-          }
+          // Legacy format - reject for security
+          isMatch = false;
         }
       } catch {
         isMatch = false;

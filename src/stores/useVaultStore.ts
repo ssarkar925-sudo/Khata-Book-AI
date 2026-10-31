@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { VaultItem } from '@/types';
-import { computeSecurePinHash } from '@/lib/crypto';
+import { 
+  computeSecurePinHash, 
+  verifySecurePinHash, 
+  reEncryptData,
+  verifyVaultAccess 
+} from '@/lib/crypto';
 
 interface VaultState {
   vaultItems: VaultItem[];
@@ -28,15 +33,6 @@ interface VaultState {
 const VAULT_AUTH_KEY = 'rb_vault_auth_token';
 const VAULT_ITEMS_KEY = 'rb_vault_saved_items';
 const VAULT_LOCKOUT_KEY = 'rb_vault_lockout';
-
-function legacyHash(pin: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < pin.length; i++) {
-    h ^= pin.charCodeAt(i);
-    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
-  }
-  return (h >>> 0).toString(16);
-}
 
 function getStoredVaultLockout(): { failedCount: number; lockedUntil: number } {
   if (typeof window === 'undefined') return { failedCount: 0, lockedUntil: 0 };
@@ -137,7 +133,7 @@ export const useVaultStore = create<VaultState>()(
       setupMasterPassword: async (pin: string) => {
         if (typeof window !== 'undefined') {
           const { hash, salt } = await computeSecurePinHash(pin);
-          localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256' }));
+          localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256', iterations: 600000 }));
           setStoredVaultLockout(0, 0);
         }
         set({
@@ -158,7 +154,7 @@ export const useVaultStore = create<VaultState>()(
             }
             // No items and no verifier - allow enrollment
             const { hash, salt } = await computeSecurePinHash(pin);
-            localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256' }));
+            localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256', iterations: 600000 }));
             setStoredVaultLockout(0, 0);
             set({
               masterPassword: pin,
@@ -180,14 +176,11 @@ export const useVaultStore = create<VaultState>()(
           try {
             if (stored.startsWith('{')) {
               const parsed = JSON.parse(stored);
-              const computed = await computeSecurePinHash(pin, parsed.salt);
-              isMatch = computed.hash === parsed.hash;
+              // Verify using secure constant-time comparison
+              isMatch = await verifySecurePinHash(pin, parsed.salt, parsed.hash);
             } else {
-              isMatch = stored === legacyHash(pin);
-              if (isMatch) {
-                const upgraded = await computeSecurePinHash(pin);
-                localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ ...upgraded, algorithm: 'PBKDF2-SHA256' }));
-              }
+              // Legacy format - reject for security
+              isMatch = false;
             }
           } catch {
             isMatch = false;
@@ -226,16 +219,46 @@ export const useVaultStore = create<VaultState>()(
             let isOldMatch = false;
             if (stored.startsWith('{')) {
               const parsed = JSON.parse(stored);
-              const computed = await computeSecurePinHash(oldPin, parsed.salt);
-              isOldMatch = computed.hash === parsed.hash;
-            } else {
-              isOldMatch = stored === legacyHash(oldPin);
+              isOldMatch = await verifySecurePinHash(oldPin, parsed.salt, parsed.hash);
             }
             if (!isOldMatch) return false;
           }
 
+          // Re-encrypt all vault items with new password
+          const { masterPassword } = get();
+          if (masterPassword && masterPassword === oldPin) {
+            const updatedItems: VaultItem[] = [];
+            for (const item of get().vaultItems) {
+              if (item.encrypted_password && item.iv && item.salt) {
+                try {
+                  const reEncrypted = await reEncryptData(
+                    item.encrypted_password,
+                    item.iv,
+                    item.salt,
+                    oldPin,
+                    newPin
+                  );
+                  updatedItems.push({
+                    ...item,
+                    encrypted_password: reEncrypted.encrypted,
+                    iv: reEncrypted.iv,
+                    salt: reEncrypted.salt,
+                    verificationToken: reEncrypted.verificationToken,
+                    updated_at: new Date().toISOString(),
+                  });
+                } catch {
+                  // If re-encryption fails, keep original (will fail to decrypt with new PIN)
+                  updatedItems.push(item);
+                }
+              } else {
+                updatedItems.push(item);
+              }
+            }
+            set({ vaultItems: updatedItems });
+          }
+
           const { hash, salt } = await computeSecurePinHash(newPin);
-          localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256' }));
+          localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256', iterations: 600000 }));
           setStoredVaultLockout(0, 0);
           set({
             masterPassword: newPin,

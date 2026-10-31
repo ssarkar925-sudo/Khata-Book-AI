@@ -233,6 +233,7 @@ export interface VaultItem {
   iv?: string;
   salt?: string;
   auth_tag?: string;
+  verificationToken?: string;
   decrypted_password?: string; // in-memory only
   url?: string | null;
   notes?: string | null;

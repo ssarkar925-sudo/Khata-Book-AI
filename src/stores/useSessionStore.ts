@@ -64,6 +64,7 @@ interface SessionState {
   syncStatus: SyncStatus;
   lastSyncTime: string | null;
   pendingSyncCount: number;
+  deadLetterCount: number;
   lastSyncError: string | null;
   theme: 'light' | 'dark';
   language: 'en' | 'bn' | 'hi';
@@ -81,6 +82,7 @@ interface SessionState {
   setSyncStatus: (status: SyncStatus) => void;
   setLastSyncTime: (time: string | null) => void;
   setPendingSyncCount: (count: number) => void;
+  setDeadLetterCount: (count: number) => void;
   setLastSyncError: (error: string | null) => void;
   setTheme: (theme: 'light' | 'dark') => void;
   setLanguage: (lang: 'en' | 'bn' | 'hi') => void;
@@ -179,6 +181,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return null;
   })(),
   pendingSyncCount: 0,
+  deadLetterCount: 0,
   lastSyncError: null,
   theme: (() => {
     if (typeof window !== 'undefined') {
@@ -250,6 +253,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ lastSyncTime: time });
   },
   setPendingSyncCount: (count) => set({ pendingSyncCount: count }),
+  setDeadLetterCount: (count) => set({ deadLetterCount: count }),
   setLastSyncError: (error) => set({ lastSyncError: error }),
   setTheme: (theme) => {
     if (typeof window !== 'undefined') {
@@ -622,6 +626,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       localStorage.removeItem('rb_cached_user');
       localStorage.removeItem('rb_last_sync_time');
       localStorage.removeItem('rb_sync_queue');
+      localStorage.removeItem('rb_sync_dead_letter');
       localStorage.removeItem('rb_accounts');
       localStorage.removeItem('rb_cards');
       localStorage.removeItem('rb_customers');
@@ -652,6 +657,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       activeWorkspaceId: localWs.id,
       syncStatus: 'offline',
       pendingSyncCount: 0,
+      deadLetterCount: 0,
       showMigrationPrompt: false,
       migrationProgress: null,
     });

@@ -15,9 +15,17 @@ interface QueueItem {
   action: 'upsert' | 'delete';
   payload: any;
   timestamp: number;
+  retryCount?: number;
+  lastError?: string;
+}
+
+interface DeadLetterItem extends QueueItem {
+  failureReason: string;
+  failedAt: number;
 }
 
 const QUEUE_STORAGE_KEY = 'rb_sync_queue';
+const DEAD_LETTER_STORAGE_KEY = 'rb_sync_dead_letter';
 
 import { LEDGER_ENTRY_VALID_COLUMNS, sanitizeLedgerPayload } from '@/lib/ledgerSanitizer';
 export { LEDGER_ENTRY_VALID_COLUMNS, sanitizeLedgerPayload };
@@ -124,6 +132,66 @@ class SyncEngine {
     useSessionStore.getState().setSyncStatus('offline');
   }
 
+  private getDeadLetterQueue(): DeadLetterItem[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem(DEAD_LETTER_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveDeadLetterQueue(queue: DeadLetterItem[]) {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(DEAD_LETTER_STORAGE_KEY, JSON.stringify(queue));
+      useSessionStore.getState().setDeadLetterCount(queue.length);
+    } catch {}
+  }
+
+  private moveToDeadLetter(item: QueueItem, error: any) {
+    const deadLetterQueue = this.getDeadLetterQueue();
+    deadLetterQueue.push({
+      ...item,
+      failureReason: error?.message || String(error),
+      failedAt: Date.now(),
+    });
+    this.saveDeadLetterQueue(deadLetterQueue);
+  }
+
+  public getDeadLetterCount(): number {
+    return this.getDeadLetterQueue().length;
+  }
+
+  public getDeadLetterItems(): DeadLetterItem[] {
+    return this.getDeadLetterQueue();
+  }
+
+  public async retryDeadLetterItem(itemId: string): Promise<boolean> {
+    const deadLetterQueue = this.getDeadLetterQueue();
+    const index = deadLetterQueue.findIndex(item => item.id === itemId);
+    if (index === -1) return false;
+    
+    const item = deadLetterQueue[index];
+    // Remove from dead letter queue
+    deadLetterQueue.splice(index, 1);
+    this.saveDeadLetterQueue(deadLetterQueue);
+    
+    // Re-add to main queue with incremented retry count
+    const queue = this.getQueue();
+    queue.push({
+      ...item,
+      retryCount: (item.retryCount || 0) + 1,
+      lastError: item.failureReason,
+    });
+    this.saveQueue(queue);
+    
+    // Try to flush immediately
+    await this.flushQueue();
+    return true;
+  }
+
   public async flushQueue() {
     const user = useSessionStore.getState().user;
     if (!user) {
@@ -156,7 +224,8 @@ class SyncEngine {
           if (error) {
             // Drop unrecoverable schema mismatch errors so the offline queue doesn't lock up
             if (error.code === 'PGRST204' || (error as any).code === '42703') {
-              console.warn(`[SyncEngine] Purging incompatible schema entry for ${item.table}:`, error.message);
+              console.warn(`[SyncEngine] Moving incompatible schema entry to dead letter queue for ${item.table}:`, error.message);
+              this.moveToDeadLetter(item, error);
               continue;
             }
             throw error;
@@ -167,7 +236,7 @@ class SyncEngine {
         }
       } catch (err: any) {
         const errCode = String(err?.code || '');
-        // Purge invalid schema columns or impossible constraint violations (e.g. non-existent test user foreign keys)
+        // Move invalid schema columns or impossible constraint violations to dead letter queue
         if (
           errCode === 'PGRST204' ||
           errCode === '42703' ||
@@ -175,7 +244,8 @@ class SyncEngine {
           errCode === '23503' ||
           errCode === '22P02'
         ) {
-          console.warn(`[SyncEngine] Purged invalid/obsolete database entry for ${item.table}:`, err?.message || errCode);
+          console.warn(`[SyncEngine] Moving invalid/obsolete database entry to dead letter queue for ${item.table}:`, err?.message || errCode);
+          this.moveToDeadLetter(item, err);
           continue;
         }
         console.warn(`[SyncEngine] Failed to flush item for table ${item.table}:`, err);
@@ -414,9 +484,28 @@ class SyncEngine {
   // REALTIME WEBSOCKET SUBSCRIPTION
   // Server-side filtered by workspace_id
   // ==========================================
+  private isSubscribing = false;
+  
   public subscribeRealtime(workspaceId: string) {
+    // Prevent concurrent subscription attempts
+    if (this.isSubscribing) {
+      console.warn('[SyncEngine] Subscription already in progress, skipping');
+      return;
+    }
+
+    // If already subscribed to the same workspace, skip
+    if (this.channel && this.currentWorkspaceId === workspaceId) {
+      return;
+    }
+
+    // Clean up existing channel
     if (this.channel) {
-      this.channel.unsubscribe();
+      try {
+        this.channel.unsubscribe();
+      } catch (err) {
+        console.warn('[SyncEngine] Error unsubscribing from previous channel:', err);
+      }
+      this.channel = null;
     }
 
     const user = useSessionStore.getState().user;
@@ -425,10 +514,12 @@ class SyncEngine {
       return;
     }
 
+    this.isSubscribing = true;
     this.currentWorkspaceId = workspaceId;
 
-    this.channel = supabase
-      .channel(`recordbook-realtime-${workspaceId}`)
+    try {
+      this.channel = supabase
+        .channel(`recordbook-realtime-${workspaceId}`)
       // Ledger Entries (Server-Side Filtered)
       .on(
         'postgres_changes',
@@ -619,6 +710,9 @@ class SyncEngine {
           useSessionStore.getState().setSyncStatus('synced');
         }
       });
+    } finally {
+      this.isSubscribing = false;
+    }
   }
 
   // ==========================================

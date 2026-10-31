@@ -76,15 +76,9 @@ export function calculateCardBilling(
   }
 
   // 2. Calculate Payment Due Date for the last generated statement
-  // Due date is in the month following the last statement
-  let dueDate: Date;
-  if (dueDay > statementDay) {
-    // Due date in the same month as statement (rare, but possible if statement is early)
-    dueDate = new Date(lastStatementDate.getFullYear(), lastStatementDate.getMonth(), dueDay, 23, 59, 59, 999);
-  } else {
-    // Due date in the month after statement (standard: e.g. statement 15th, due 5th next month)
-    dueDate = new Date(lastStatementDate.getFullYear(), lastStatementDate.getMonth() + 1, dueDay, 23, 59, 59, 999);
-  }
+  // Due date is ALWAYS in the month following the last statement date
+  // (Standard Indian banking: statement generates, then payment due X days later in next month)
+  const dueDate = new Date(lastStatementDate.getFullYear(), lastStatementDate.getMonth() + 1, dueDay, 23, 59, 59, 999);
 
   // 3. Due Date countdown
   const diffTime = dueDate.getTime() - referenceDate.getTime();
@@ -194,9 +188,10 @@ export function calculateCardBilling(
  */
 export function calculateAllCardsBillingReport(
   cards: Card[],
-  ledger: LedgerEntry[]
+  ledger: LedgerEntry[],
+  referenceDate: Date = new Date()
 ): AllCardsBillingReport {
-  const cardSummaries = cards.map((c) => calculateCardBilling(c, ledger));
+  const cardSummaries = cards.map((c) => calculateCardBilling(c, ledger, referenceDate));
 
   const totalBilledDue = cardSummaries.reduce((sum, s) => sum + s.billedDue, 0);
   const totalUnbilledSpends = cardSummaries.reduce((sum, s) => sum + s.netUnbilled, 0);

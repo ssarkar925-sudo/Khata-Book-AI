@@ -12,6 +12,7 @@ import { MobileNav } from '@/components/layout/MobileNav';
 import { AppLockScreen } from '@/components/security/AppLockScreen';
 import { syncEngine } from '@/lib/syncEngine';
 import { cloudSnapshotEngine } from '@/lib/cloudSnapshotEngine';
+import { ScreenWrapper } from '@/components/ScreenWrapper';
 import { X, Camera, Mic, Shield } from 'lucide-react';
 
 // Dynamic Code Splitting for ultra-fast startup
@@ -265,37 +266,67 @@ export function AppShell() {
 
         <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 pb-28 md:pb-8 max-w-7xl mx-auto w-full">
           {activeTab === 'dashboard' && (
-            <DashboardScreen
-              onNavigateTab={(tab) => setActiveTab(tab)}
-              onOpenAskAI={() => setIsAskAIOpen(true)}
-              onQuickCashIn={(scope) => {
-                setCashModalScope(scope);
-                setShowCashModal('in');
-              }}
-              onQuickCashOut={(scope) => {
-                setCashModalScope(scope);
-                setShowCashModal('out');
-              }}
-              onOpenScanner={() => setIsScannerOpen(true)}
-              onOpenVoice={() => setIsVoiceOpen(true)}
-            />
+            <ScreenWrapper screenName="DashboardScreen">
+              <DashboardScreen
+                onNavigateTab={(tab) => setActiveTab(tab)}
+                onOpenAskAI={() => setIsAskAIOpen(true)}
+                onQuickCashIn={(scope) => {
+                  setCashModalScope(scope);
+                  setShowCashModal('in');
+                }}
+                onQuickCashOut={(scope) => {
+                  setCashModalScope(scope);
+                  setShowCashModal('out');
+                }}
+                onOpenScanner={() => setIsScannerOpen(true)}
+                onOpenVoice={() => setIsVoiceOpen(true)}
+              />
+            </ScreenWrapper>
           )}
-          {activeTab === 'cash' && <CashScreen />}
+          {activeTab === 'cash' && (
+            <ScreenWrapper screenName="CashScreen">
+              <CashScreen />
+            </ScreenWrapper>
+          )}
           {activeTab === 'expenses' && (
-            <ExpensesScreen
-              onNavigateTab={(tab) => setActiveTab(tab)}
-              onOpenScanner={() => setIsScannerOpen(true)}
-              onOpenVoice={() => setIsVoiceOpen(true)}
-              onOpenQuickExpense={() => setShowCashModal('out')}
-            />
+            <ScreenWrapper screenName="ExpensesScreen">
+              <ExpensesScreen
+                onNavigateTab={(tab) => setActiveTab(tab)}
+                onOpenScanner={() => setIsScannerOpen(true)}
+                onOpenVoice={() => setIsVoiceOpen(true)}
+                onOpenQuickExpense={() => setShowCashModal('out')}
+              />
+            </ScreenWrapper>
           )}
-          {activeTab === 'dues' && <DuesScreen />}
-          {activeTab === 'cards' && <CardsScreen />}
-          {activeTab === 'sheets' && <SheetsScreen />}
-          {activeTab === 'notes' && <NotesScreen />}
-          {activeTab === 'vault' && <VaultScreen />}
+          {activeTab === 'dues' && (
+            <ScreenWrapper screenName="DuesScreen">
+              <DuesScreen />
+            </ScreenWrapper>
+          )}
+          {activeTab === 'cards' && (
+            <ScreenWrapper screenName="CardsScreen">
+              <CardsScreen />
+            </ScreenWrapper>
+          )}
+          {activeTab === 'sheets' && (
+            <ScreenWrapper screenName="SheetsScreen">
+              <SheetsScreen />
+            </ScreenWrapper>
+          )}
+          {activeTab === 'notes' && (
+            <ScreenWrapper screenName="NotesScreen">
+              <NotesScreen />
+            </ScreenWrapper>
+          )}
+          {activeTab === 'vault' && (
+            <ScreenWrapper screenName="VaultScreen">
+              <VaultScreen />
+            </ScreenWrapper>
+          )}
           {activeTab === 'reports' && (
-            <ReportsScreen onNavigateTab={(tab) => setActiveTab(tab)} />
+            <ScreenWrapper screenName="ReportsScreen">
+              <ReportsScreen onNavigateTab={(tab) => setActiveTab(tab)} />
+            </ScreenWrapper>
           )}
         </main>
       </div>
