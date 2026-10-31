@@ -60,9 +60,9 @@ export function CardStatementImportModal({
       const parts = line.split(/[,\t]+/).map((p) => p.trim());
       if (parts.length < 2) continue;
 
-      let dateStr = parts[0];
-      let desc = parts[1] || 'Card Transaction';
-      let amountStr = parts[2] || parts[parts.length - 1];
+      const dateStr = parts[0];
+      const desc = parts[1] || 'Card Transaction';
+      const amountStr = parts[2] || parts[parts.length - 1];
 
       // Extract amount digits
       const cleanedAmount = amountStr.replace(/[^0-9.-]/g, '');

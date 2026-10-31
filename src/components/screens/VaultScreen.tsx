@@ -408,7 +408,6 @@ export function VaultScreen() {
         salt: encrypted.salt,
         auth_tag: encrypted.authTag,
         notes: itemNotes.trim() || null,
-        secrets: validSecrets,
       };
 
       addVaultItemOptimistic(newItem);
@@ -471,7 +470,6 @@ export function VaultScreen() {
         iv: encrypted.iv,
         salt: encrypted.salt,
         auth_tag: encrypted.authTag,
-        secrets: validSecrets,
       };
 
       updateVaultItemOptimistic(editingItem.id, updates);
@@ -814,7 +812,7 @@ export function VaultScreen() {
             ) : (
               sortedVaultItems.map((item, idx) => {
                 const itemColor = item.color || '#3B82F6';
-                const cachedSecrets = decryptedSecretsMap[item.id] || (item.secrets && item.secrets.length > 0 ? item.secrets : null);
+                const cachedSecrets = decryptedSecretsMap[item.id];
 
                 const drag = getCardDragProps(item.id);
                 return (
@@ -1006,7 +1004,7 @@ export function VaultScreen() {
               ) : (
                 sortedVaultItems.map((item, listIdx) => {
                   const itemColor = item.color || '#3B82F6';
-                  const cachedSecrets = decryptedSecretsMap[item.id] || (item.secrets && item.secrets.length > 0 ? item.secrets : null);
+                  const cachedSecrets = decryptedSecretsMap[item.id];
                   const primarySecret = cachedSecrets && cachedSecrets.length > 0 ? cachedSecrets[0] : null;
                   const isRevealed = primarySecret ? (revealAll || revealedFields[`${item.id}_${primarySecret.id}`]) : false;
 

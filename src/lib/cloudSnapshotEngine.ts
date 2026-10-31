@@ -8,7 +8,6 @@ import {
   LedgerEntry,
   NoteItem,
   RecordSheet,
-  VaultItem,
 } from '@/types';
 import { useAccountStore } from '@/stores/useAccountStore';
 import { useCardStore } from '@/stores/useCardStore';
@@ -16,7 +15,6 @@ import { useCustomerStore } from '@/stores/useCustomerStore';
 import { useLedgerStore } from '@/stores/useLedgerStore';
 import { useNoteStore } from '@/stores/useNoteStore';
 import { useSheetStore } from '@/stores/useSheetStore';
-import { useVaultStore } from '@/stores/useVaultStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { syncEngine } from '@/lib/syncEngine';
 
@@ -41,7 +39,6 @@ export interface CloudSnapshot {
     ledger: LedgerEntry[];
     notes: NoteItem[];
     sheets: RecordSheet[];
-    vaultItems: VaultItem[];
   };
 }
 
@@ -119,7 +116,6 @@ export class CloudSnapshotEngine {
     const dues = useCustomerStore.getState().dues;
     const ledger = useLedgerStore.getState().entries;
     const sheets = useSheetStore.getState().sheets;
-    const vaultItems = useVaultStore.getState().vaultItems;
 
     // Filter out previous snapshot notes from the user's saved notes
     const notes = useNoteStore.getState().notes.filter(
@@ -133,8 +129,7 @@ export class CloudSnapshotEngine {
       dues.length +
       ledger.length +
       sheets.length +
-      notes.length +
-      vaultItems.length;
+      notes.length;
 
     const device = getDeviceName();
     const defaultLabel = isAuto
@@ -157,7 +152,6 @@ export class CloudSnapshotEngine {
         ledger,
         notes,
         sheets,
-        vaultItems,
       },
     };
 
@@ -205,7 +199,6 @@ export class CloudSnapshotEngine {
       if (Array.isArray(d.ledger)) useLedgerStore.getState().setEntries(d.ledger);
       if (Array.isArray(d.sheets)) useSheetStore.getState().setSheets(d.sheets);
       if (Array.isArray(d.notes)) useNoteStore.getState().setNotes(d.notes);
-      if (Array.isArray(d.vaultItems)) useVaultStore.getState().setVaultItems(d.vaultItems);
 
       return true;
     } catch (err) {

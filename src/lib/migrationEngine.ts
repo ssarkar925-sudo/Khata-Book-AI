@@ -41,10 +41,10 @@ export function countUnmigratedLocalRecords(targetCloudWorkspaceId?: string): nu
   if (typeof window === 'undefined') return 0;
   const localWsIds = new Set(getTrackedLocalWorkspaceIds());
   const stores = [
-    'rb_cash_locations',
+    'rb_accounts',
     'rb_customers',
     'rb_cards',
-    'rb_people_dues',
+    'rb_dues',
     'rb_ledger_entries',
     'rb_notes',
     'rb_sheets',
@@ -506,10 +506,10 @@ export class MigrationEngine {
       !item.workspace_id ||
       localWsIds.has(item.workspace_id);
 
-    const allAccounts = getStoreItems('rb_cash_locations');
+    const allAccounts = getStoreItems('rb_accounts');
     const allCustomers = getStoreItems('rb_customers');
     const allCards = getStoreItems('rb_cards');
-    const allDues = getStoreItems('rb_people_dues');
+    const allDues = getStoreItems('rb_dues');
     const allLedger = getStoreItems('rb_ledger_entries');
     const allNotes = getStoreItems('rb_notes');
 
@@ -1087,10 +1087,10 @@ export class MigrationEngine {
       localStorage.setItem(key, JSON.stringify(updated));
     };
 
-    updateLocalStore('rb_cash_locations', allAccounts);
+    updateLocalStore('rb_accounts', allAccounts);
     updateLocalStore('rb_customers', allCustomers);
     updateLocalStore('rb_cards', allCards);
-    updateLocalStore('rb_people_dues', allDues);
+    updateLocalStore('rb_dues', allDues);
     updateLocalStore('rb_ledger_entries', allLedger);
     updateLocalStore('rb_notes', allNotes);
     updateLocalStore('rb_saved_sheets', allSheets);

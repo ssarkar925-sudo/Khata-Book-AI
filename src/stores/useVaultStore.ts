@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { VaultItem } from '@/types';
 import { computeSecurePinHash } from '@/lib/crypto';
 
@@ -53,218 +54,218 @@ function setStoredVaultLockout(failedCount: number, lockedUntil: number) {
   } catch {}
 }
 
-export const useVaultStore = create<VaultState>((set, get) => ({
-  vaultItems: (() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem(VAULT_ITEMS_KEY);
-        if (cached) return JSON.parse(cached);
-      } catch {}
-    }
-    return [];
-  })(),
+// Partialize function to strip sensitive fields from persisted state
+const partialize = (state: VaultState) => ({
+  ...state,
+  vaultItems: state.vaultItems.map((item) => {
+    const { secrets, decrypted_password, ...rest } = item;
+    return rest;
+  }),
+  // Do NOT persist masterPassword, isUnlocked - these should always be null/false on load
   masterPassword: null,
   isUnlocked: false,
-  hasConfiguredPassword: (() => {
-    if (typeof window !== 'undefined') {
-      return Boolean(localStorage.getItem(VAULT_AUTH_KEY));
-    }
-    return false;
-  })(),
-  isLoading: false,
+});
 
-  getLockoutStatus: () => {
-    const { lockedUntil } = getStoredVaultLockout();
-    const remaining = Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000));
-    return { isLockedOut: remaining > 0, remainingSec: remaining };
-  },
-
-  setVaultItems: (newItems) => {
-    set((state) => {
-      // Merge with existing local items so in-memory decrypted fields, category, color and local secrets aren't wiped
-      const existingMap = new Map(state.vaultItems.map((item) => [item.id, item]));
-      const merged = newItems.map((incoming) => {
-        const local = existingMap.get(incoming.id);
-        if (!local) return incoming;
-        return {
-          ...incoming,
-          category: incoming.category || local.category,
-          color: incoming.color || local.color,
-          secrets: incoming.secrets && incoming.secrets.length > 0 ? incoming.secrets : local.secrets,
-          decrypted_password: local.decrypted_password,
-        };
-      });
-
-      // Preserve local items that haven't synced to cloud yet
-      const incomingIds = new Set(newItems.map((i) => i.id));
-      state.vaultItems.forEach((local) => {
-        if (!incomingIds.has(local.id)) {
-          merged.push(local);
-        }
-      });
-
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(VAULT_ITEMS_KEY, JSON.stringify(merged));
-      }
-      return { vaultItems: merged };
-    });
-  },
-
-  setMasterPassword: (masterPassword) => set({ masterPassword, isUnlocked: Boolean(masterPassword) }),
-  setIsUnlocked: (isUnlocked) => set({ isUnlocked }),
-
-  addVaultItemOptimistic: (item) =>
-    set((state) => {
-      const exists = state.vaultItems.some((v) => v.id === item.id);
-      const updated = exists
-        ? state.vaultItems.map((v) => (v.id === item.id ? { ...v, ...item } : v))
-        : [item, ...state.vaultItems];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(VAULT_ITEMS_KEY, JSON.stringify(updated));
-      }
-      return { vaultItems: updated };
-    }),
-
-  updateVaultItemOptimistic: (id, updates) =>
-    set((state) => {
-      const updated = state.vaultItems.map((v) =>
-        v.id === id ? { ...v, ...updates, updated_at: new Date().toISOString() } : v
-      );
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(VAULT_ITEMS_KEY, JSON.stringify(updated));
-      }
-      return { vaultItems: updated };
-    }),
-
-  deleteVaultItemOptimistic: (id) =>
-    set((state) => {
-      const updated = state.vaultItems.filter((v) => v.id !== id);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(VAULT_ITEMS_KEY, JSON.stringify(updated));
-      }
-      return { vaultItems: updated };
-    }),
-
-  lockVault: () => set({ masterPassword: null, isUnlocked: false }),
-
-  setupMasterPassword: async (pin: string) => {
-    if (typeof window !== 'undefined') {
-      const { hash, salt } = await computeSecurePinHash(pin);
-      localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256' }));
-      setStoredVaultLockout(0, 0);
-    }
-    set({
-      masterPassword: pin,
-      isUnlocked: true,
-      hasConfiguredPassword: true,
-    });
-  },
-
-  verifyAndUnlock: async (pin: string) => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(VAULT_AUTH_KEY);
-      if (!stored) {
-        const { hash, salt } = await computeSecurePinHash(pin);
-        localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256' }));
-        setStoredVaultLockout(0, 0);
-        set({
-          masterPassword: pin,
-          isUnlocked: true,
-          hasConfiguredPassword: true,
-        });
-        return { success: true };
-      }
-
-      // Check lockout status
-      const lockout = getStoredVaultLockout();
-      const now = Date.now();
-      if (lockout.lockedUntil > now) {
-        const remaining = Math.ceil((lockout.lockedUntil - now) / 1000);
-        return { success: false, lockedOut: true, remainingSec: remaining };
-      }
-
-      let isMatch = false;
-      try {
-        if (stored.startsWith('{')) {
-          const parsed = JSON.parse(stored);
-          const computed = await computeSecurePinHash(pin, parsed.salt);
-          isMatch = computed.hash === parsed.hash;
-        } else {
-          isMatch = stored === legacyHash(pin);
-          if (isMatch) {
-            const upgraded = await computeSecurePinHash(pin);
-            localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ ...upgraded, algorithm: 'PBKDF2-SHA256' }));
-          }
-        }
-      } catch {
-        isMatch = false;
-      }
-
-      if (isMatch) {
-        setStoredVaultLockout(0, 0);
-        set({
-          masterPassword: pin,
-          isUnlocked: true,
-          hasConfiguredPassword: true,
-        });
-        return { success: true };
-      }
-
-      // Record failed attempt
-      const newFailed = lockout.failedCount + 1;
-      let newLockedUntil = 0;
-      if (newFailed >= 10) {
-        newLockedUntil = now + 300 * 1000; // 5 min lockout
-      } else if (newFailed >= 5) {
-        newLockedUntil = now + 30 * 1000; // 30 sec lockout
-      }
-      setStoredVaultLockout(newFailed, newLockedUntil);
-
-      const remaining = newLockedUntil > now ? Math.ceil((newLockedUntil - now) / 1000) : 0;
-      return { success: false, lockedOut: remaining > 0, remainingSec: remaining };
-    }
-    return { success: false };
-  },
-
-  changeMasterPassword: async (oldPin: string, newPin: string) => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(VAULT_AUTH_KEY);
-      if (stored) {
-        let isOldMatch = false;
-        if (stored.startsWith('{')) {
-          const parsed = JSON.parse(stored);
-          const computed = await computeSecurePinHash(oldPin, parsed.salt);
-          isOldMatch = computed.hash === parsed.hash;
-        } else {
-          isOldMatch = stored === legacyHash(oldPin);
-        }
-        if (!isOldMatch) return false;
-      }
-
-      const { hash, salt } = await computeSecurePinHash(newPin);
-      localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256' }));
-      setStoredVaultLockout(0, 0);
-      set({
-        masterPassword: newPin,
-        isUnlocked: true,
-        hasConfiguredPassword: true,
-      });
-      return true;
-    }
-    return false;
-  },
-
-  resetVault: () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(VAULT_AUTH_KEY);
-      localStorage.removeItem(VAULT_ITEMS_KEY);
-      localStorage.removeItem(VAULT_LOCKOUT_KEY);
-    }
-    set({
+export const useVaultStore = create<VaultState>()(
+  persist(
+    (set, get) => ({
       vaultItems: [],
       masterPassword: null,
       isUnlocked: false,
       hasConfiguredPassword: false,
-    });
-  },
-}));
+      isLoading: false,
+
+      getLockoutStatus: () => {
+        const { lockedUntil } = getStoredVaultLockout();
+        const remaining = Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000));
+        return { isLockedOut: remaining > 0, remainingSec: remaining };
+      },
+
+      setVaultItems: (newItems) =>
+        set((state) => {
+          // Merge with existing local items so in-memory decrypted fields, category, color aren't wiped
+          const existingMap = new Map(state.vaultItems.map((item) => [item.id, item]));
+          const merged = newItems.map((incoming) => {
+            const local = existingMap.get(incoming.id);
+            if (!local) return incoming;
+            return {
+              ...incoming,
+              category: incoming.category || local.category,
+              color: incoming.color || local.color,
+            };
+          });
+
+          // Preserve local items that haven't synced to cloud yet
+          const incomingIds = new Set(newItems.map((i) => i.id));
+          state.vaultItems.forEach((local) => {
+            if (!incomingIds.has(local.id)) {
+              merged.push(local);
+            }
+          });
+
+          return { vaultItems: merged };
+        }),
+
+      setMasterPassword: (masterPassword) => set({ masterPassword, isUnlocked: Boolean(masterPassword) }),
+      setIsUnlocked: (isUnlocked) => set({ isUnlocked }),
+
+      addVaultItemOptimistic: (item) =>
+        set((state) => {
+          const exists = state.vaultItems.some((v) => v.id === item.id);
+          const updated = exists
+            ? state.vaultItems.map((v) => (v.id === item.id ? { ...v, ...item } : v))
+            : [item, ...state.vaultItems];
+          return { vaultItems: updated };
+        }),
+
+      updateVaultItemOptimistic: (id, updates) =>
+        set((state) => {
+          const updated = state.vaultItems.map((v) =>
+            v.id === id ? { ...v, ...updates, updated_at: new Date().toISOString() } : v
+          );
+          return { vaultItems: updated };
+        }),
+
+      deleteVaultItemOptimistic: (id) =>
+        set((state) => {
+          const updated = state.vaultItems.filter((v) => v.id !== id);
+          return { vaultItems: updated };
+        }),
+
+      lockVault: () => set({ masterPassword: null, isUnlocked: false }),
+
+      setupMasterPassword: async (pin: string) => {
+        if (typeof window !== 'undefined') {
+          const { hash, salt } = await computeSecurePinHash(pin);
+          localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256' }));
+          setStoredVaultLockout(0, 0);
+        }
+        set({
+          masterPassword: pin,
+          isUnlocked: true,
+          hasConfiguredPassword: true,
+        });
+      },
+
+      verifyAndUnlock: async (pin: string) => {
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem(VAULT_AUTH_KEY);
+          // If no stored verifier but vault items exist, treat as error/recovery state, not enrollment
+          if (!stored) {
+            const hasItems = get().vaultItems.length > 0;
+            if (hasItems) {
+              return { success: false, lockedOut: false, remainingSec: 0 };
+            }
+            // No items and no verifier - allow enrollment
+            const { hash, salt } = await computeSecurePinHash(pin);
+            localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256' }));
+            setStoredVaultLockout(0, 0);
+            set({
+              masterPassword: pin,
+              isUnlocked: true,
+              hasConfiguredPassword: true,
+            });
+            return { success: true };
+          }
+
+          // Check lockout status
+          const lockout = getStoredVaultLockout();
+          const now = Date.now();
+          if (lockout.lockedUntil > now) {
+            const remaining = Math.ceil((lockout.lockedUntil - now) / 1000);
+            return { success: false, lockedOut: true, remainingSec: remaining };
+          }
+
+          let isMatch = false;
+          try {
+            if (stored.startsWith('{')) {
+              const parsed = JSON.parse(stored);
+              const computed = await computeSecurePinHash(pin, parsed.salt);
+              isMatch = computed.hash === parsed.hash;
+            } else {
+              isMatch = stored === legacyHash(pin);
+              if (isMatch) {
+                const upgraded = await computeSecurePinHash(pin);
+                localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ ...upgraded, algorithm: 'PBKDF2-SHA256' }));
+              }
+            }
+          } catch {
+            isMatch = false;
+          }
+
+          if (isMatch) {
+            setStoredVaultLockout(0, 0);
+            set({
+              masterPassword: pin,
+              isUnlocked: true,
+              hasConfiguredPassword: true,
+            });
+            return { success: true };
+          }
+
+          // Record failed attempt
+          const newFailed = lockout.failedCount + 1;
+          let newLockedUntil = 0;
+          if (newFailed >= 10) {
+            newLockedUntil = now + 300 * 1000; // 5 min lockout
+          } else if (newFailed >= 5) {
+            newLockedUntil = now + 30 * 1000; // 30 sec lockout
+          }
+          setStoredVaultLockout(newFailed, newLockedUntil);
+
+          const remaining = newLockedUntil > now ? Math.ceil((newLockedUntil - now) / 1000) : 0;
+          return { success: false, lockedOut: remaining > 0, remainingSec: remaining };
+        }
+        return { success: false };
+      },
+
+      changeMasterPassword: async (oldPin: string, newPin: string) => {
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem(VAULT_AUTH_KEY);
+          if (stored) {
+            let isOldMatch = false;
+            if (stored.startsWith('{')) {
+              const parsed = JSON.parse(stored);
+              const computed = await computeSecurePinHash(oldPin, parsed.salt);
+              isOldMatch = computed.hash === parsed.hash;
+            } else {
+              isOldMatch = stored === legacyHash(oldPin);
+            }
+            if (!isOldMatch) return false;
+          }
+
+          const { hash, salt } = await computeSecurePinHash(newPin);
+          localStorage.setItem(VAULT_AUTH_KEY, JSON.stringify({ hash, salt, algorithm: 'PBKDF2-SHA256' }));
+          setStoredVaultLockout(0, 0);
+          set({
+            masterPassword: newPin,
+            isUnlocked: true,
+            hasConfiguredPassword: true,
+          });
+          return true;
+        }
+        return false;
+      },
+
+      resetVault: () => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(VAULT_AUTH_KEY);
+          localStorage.removeItem(VAULT_ITEMS_KEY);
+          localStorage.removeItem(VAULT_LOCKOUT_KEY);
+        }
+        set({
+          vaultItems: [],
+          masterPassword: null,
+          isUnlocked: false,
+          hasConfiguredPassword: false,
+        });
+      },
+    }),
+    {
+      name: VAULT_ITEMS_KEY,
+      partialize,
+      // Skip hydration on server
+      skipHydration: typeof window === 'undefined',
+    }
+  )
+);

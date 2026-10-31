@@ -76,7 +76,7 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
   // 3. LEDGER ENTRY DELETION RESTORES LINKED BANK ACCOUNT
   // ==========================================================================
   test('Ledger & Bank Consistency: Deleting an expense accurately restores bank account balance', () => {
-    let account = { id: 'acc-hdfc', name: 'HDFC', balance: 40000 };
+    const account = { id: 'acc-hdfc', name: 'HDFC', balance: 40000 };
     const ledger = [
       { id: 'tx-1', type: 'expense', amount: 10000, cash_location_id: 'acc-hdfc' }
     ];
@@ -102,7 +102,7 @@ describe('RecordBook AI — Deep Module & Bug Verification Test Suite', () => {
   // 4. CREDIT CARD BILL PAYMENT BALANCE DEDUCTION & CASH LOCATION TRACKING
   // ==========================================================================
   test('Card Billing: Bill payment properly assigns cash_location_id and deducts exactly once', () => {
-    let account = { id: 'acc-sbi', name: 'SBI', balance: 50000 };
+    const account = { id: 'acc-sbi', name: 'SBI', balance: 50000 };
     const ledger: any[] = [];
 
     function payCardBill(cardId: string, amountPaise: number, accountId?: string) {
