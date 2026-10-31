@@ -258,13 +258,15 @@ export function AppShell() {
       />
 
       <div className="flex-1 flex overflow-hidden">
-        <Sidebar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onOpenBackupRestore={() => setIsBackupModalOpen(true)}
-        />
+        <aside role="complementary" aria-label="Navigation" className="hidden md:flex flex-col w-64 border-r">
+          <Sidebar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onOpenBackupRestore={() => setIsBackupModalOpen(true)}
+          />
+        </aside>
 
-        <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 pb-28 md:pb-8 max-w-7xl mx-auto w-full">
+        <main id="main-content" role="main" className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 pb-28 md:pb-8 max-w-7xl mx-auto w-full">
           {activeTab === 'dashboard' && (
             <ScreenWrapper screenName="DashboardScreen">
               <DashboardScreen
